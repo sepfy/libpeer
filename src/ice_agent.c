@@ -145,7 +145,7 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
 static void* cb_component_state_chanaged(NiceAgent *agent,
  guint stream_id, guint component_id, guint state, gpointer data) {
 
-  LOG_INFO("SIGNAL: state changed %d %d %s[%d]\n",
+  LOG_INFO("SIGNAL: state changed %d %d %s[%d]",
    stream_id, component_id, STATE_NAME[state], state);
 }
 

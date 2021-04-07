@@ -33,35 +33,35 @@ void generate_self_certificate(dtls_transport_t *dtls_transport) {
 
   dtls_transport->private_key = EVP_PKEY_new();
   if(dtls_transport->private_key == NULL) {
-    fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
+    LOG_ERROR();
   }
   bne = BN_new();
   if(!bne) {
-    fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
+    LOG_ERROR();
   }
 
   if(!BN_set_word(bne, RSA_F4)) {  /* RSA_F4 == 65537 */
-    fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
+    LOG_ERROR();
   }
 
   rsa_key = RSA_new();
   if(!rsa_key) {
-    fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
+    LOG_ERROR();
   }
 
   if(!RSA_generate_key_ex(rsa_key, num_bits, bne, NULL)) {
-    fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
+    LOG_ERROR();
   }
 
   if(!EVP_PKEY_assign_RSA(dtls_transport->private_key, rsa_key)) {
-    fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
+    LOG_ERROR();
   }
 
   rsa_key = NULL;
 
   dtls_transport->certificate = X509_new();
   if(!dtls_transport->certificate) {
-    fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
+    LOG_ERROR();
   }
 
   X509_set_version(dtls_transport->certificate, 2);
@@ -70,30 +70,25 @@ void generate_self_certificate(dtls_transport_t *dtls_transport) {
   X509_gmtime_adj(X509_get_notBefore(dtls_transport->certificate), -1 * 60*60*24*365);  /* -1 year */
   X509_gmtime_adj(X509_get_notAfter(dtls_transport->certificate), 60*60*24*365);  /* 1 year */
 
-  /* Set the public key for the certificate using the key. */
   if(!X509_set_pubkey(dtls_transport->certificate, dtls_transport->private_key)) {
-    fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
+    LOG_ERROR();
   }
 
-  /* Set certificate fields. */
   cert_name = X509_get_subject_name(dtls_transport->certificate);
   if(!cert_name) {
-    fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
+    LOG_ERROR();
   }
   X509_NAME_add_entry_by_txt(cert_name, "O", MBSTRING_ASC, (const unsigned char*)"Test", -1, -1, 0);
   X509_NAME_add_entry_by_txt(cert_name, "CN", MBSTRING_ASC, (const unsigned char*)"Test", -1, -1, 0);
 
-  /* It is self-signed so set the issuer name to be the same as the subject. */
   if(!X509_set_issuer_name(dtls_transport->certificate, cert_name)) {
-    fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
+    LOG_ERROR();
   }
 
-  /* Sign the certificate with the private key. */
   if(!X509_sign(dtls_transport->certificate, dtls_transport->private_key, EVP_sha1())) {
-    fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
+    LOG_ERROR();
   }
 
-  /* Free stuff and resurn. */
   BN_free(bne);
 
 }
@@ -108,16 +103,16 @@ int dtls_transport_init(dtls_transport_t *dtls_transport, BIO *agent_write_bio) 
 
   generate_self_certificate(dtls_transport);
   if(!SSL_CTX_use_certificate(dtls_transport->ssl_ctx, dtls_transport->certificate)) {
-    g_error("use certificate failed");
+    LOG_ERROR("use certificate failed");
     return -1;
   }
 
   if(!SSL_CTX_use_PrivateKey(dtls_transport->ssl_ctx, dtls_transport->private_key)) {
-    g_error("use private key failed");
+    LOG_ERROR("use private key failed");
     return -1;
   }
   if(!SSL_CTX_check_private_key(dtls_transport->ssl_ctx)) {
-    g_error("check preverify key failed");
+    LOG_ERROR("check preverify key failed");
     return -1;
   }
   SSL_CTX_set_read_ahead(dtls_transport->ssl_ctx, 1);
@@ -125,7 +120,7 @@ int dtls_transport_init(dtls_transport_t *dtls_transport, BIO *agent_write_bio) 
   unsigned int size;
   unsigned char fingerprint[EVP_MAX_MD_SIZE];
   if(X509_digest(dtls_transport->certificate, EVP_sha256(), (unsigned char *)fingerprint, &size) == 0) {
-    g_error("generate fingerprint failed");
+    LOG_ERROR("generate fingerprint failed");
     return -1;
   }
 
@@ -136,8 +131,6 @@ int dtls_transport_init(dtls_transport_t *dtls_transport, BIO *agent_write_bio) 
     lfp += 3;
   }
   *(lfp-1) = 0;
-  //fprintf(stdout, "Fingerprint of our certificate: %s\n", dtls_transport->fingerprint);
-
 
   dtls_transport->ssl = SSL_new(dtls_transport->ssl_ctx);
 
@@ -148,7 +141,7 @@ int dtls_transport_init(dtls_transport_t *dtls_transport, BIO *agent_write_bio) 
 
   EC_KEY *ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
   if(ecdh == NULL) {
-    g_error("New ecdh curve by name failed"); 
+    LOG_ERROR("New ecdh curve by name failed"); 
     return -1;
   }
 
@@ -161,7 +154,7 @@ int dtls_transport_init(dtls_transport_t *dtls_transport, BIO *agent_write_bio) 
 }
 
 void dtls_transport_do_handshake(dtls_transport_t *dtls_transport) {
-  fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
+  LOG_INFO();
   SSL_set_accept_state(dtls_transport->ssl);
   SSL_do_handshake(dtls_transport->ssl);
 }
@@ -173,30 +166,26 @@ int dtls_transport_is_dtls(char *buf) {
 
 void dtls_transport_incomming_msg(dtls_transport_t *dtls_transport, char *buf, int len) {
 
-  static int do_handshake = 0;
   int written = BIO_write(dtls_transport->read_bio, buf, len);
   if(written != len) {
-    fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
-  } else {
-    fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
+    LOG_ERROR();
   }
-  /* Try to read data */
-  char data[3000];      /* FIXME */
+  else {
+
+  }
+
+  char data[3000];
   memset(&data, 0, 3000);
   int read = SSL_read(dtls_transport->ssl, &data, 3000);
   if(read < 0) {
     unsigned long err = SSL_get_error(dtls_transport->ssl, read);
     if(err == SSL_ERROR_SSL) {
-      /* Ops, something went wrong with the DTLS handshake */
       char error[200];
       ERR_error_string_n(ERR_get_error(), error, 200);
-      fprintf(stdout, "[%s][%d] %s\n", __func__, __LINE__, error);
+      LOG_ERROR("%s", error);
     }
   }
 
-  //    if(do_handshake == 0) {
-  //            do_handshake = 1;
-  //    }
   if(!SSL_is_init_finished(dtls_transport->ssl)) {
     return;
   }
@@ -212,7 +201,6 @@ void dtls_transport_incomming_msg(dtls_transport_t *dtls_transport, char *buf, i
     char remote_fingerprint[160];
     char *rfp = (char *)&remote_fingerprint;
     X509_free(rcert);
-    fprintf(stdout, "[%s][%d]\n", __func__, __LINE__);
     rcert = NULL;
     unsigned int i = 0;
     for(int i = 0; i < rsize; i++) {
