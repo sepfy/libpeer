@@ -4,6 +4,8 @@
 
 Pear is a WebRTC SDK written in C. The SDK aims to integrate IoT/Embedded device with WebRTC applications.
 
+<b>Notice: This project is a work in progress. Currently, only support streaming H264 video to browser.</b>
+
 ### Dependencies
 
 * [libsrtp](https://github.com/cisco/libsrtp)
