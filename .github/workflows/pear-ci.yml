@@ -1,0 +1,32 @@
+name: pear-ci
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-20.04
+    
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: recursive
+    - name: install
+      run: >
+        sudo apt-get update && sudo apt-get --no-install-recommends -y install
+        libglib2.0-dev
+        cmake
+        ninja-build
+        libssl-dev
+    - name: python
+      run: >
+        sudo pip3 install meson
+    - name: deps
+      run: >
+        ./build-third-party.sh
+    - name: build
+      run: >
+        mkdir cmake ;
+        cd cmake ;
+        cmake .. ;
+        make
