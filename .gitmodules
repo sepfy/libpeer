@@ -1,0 +1,9 @@
+[submodule "third_party/libnice"]
+	path = third_party/libnice
+	url = https://gitlab.freedesktop.org/libnice/libnice.git
+[submodule "third_party/libsrtp"]
+	path = third_party/libsrtp
+	url = https://github.com/cisco/libsrtp.git
+[submodule "third_party/media-server"]
+	path = third_party/media-server
+	url = https://github.com/ireader/media-server.git
