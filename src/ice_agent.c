@@ -6,6 +6,8 @@
 #include "sdp_attribute.h"
 #include "rtcp_receiver.h"
 
+#define IDLE_TIMEOUT 50000
+
 static const gchar *STATE_NAME[] = {"disconnected", "gathering", "connecting",
  "connected", "ready", "failed"};
 static const gchar *CANDIDATE_TYPE_NAME[] = {"host", "srflx", "prflx", "relay"};
@@ -180,6 +182,7 @@ int ice_agent_init(ice_agent_t *ice_agent, dtls_transport_t *dtls_transport) {
   g_object_set(ice_agent->nice_agent, "stun-server-port", STUN_PORT, NULL);
   g_object_set(ice_agent->nice_agent, "controlling-mode",
    ice_agent->controlling, NULL);
+  g_object_set(ice_agent->nice_agent, "idle-timeout", IDLE_TIMEOUT, NULL);
 
   g_signal_connect(ice_agent->nice_agent, "candidate-gathering-done", G_CALLBACK(cb_candidate_gathering_done), ice_agent);
   g_signal_connect(ice_agent->nice_agent, "component-state-changed", G_CALLBACK(cb_component_state_chanaged), ice_agent);
