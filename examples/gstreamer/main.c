@@ -8,11 +8,9 @@
 
 #include "pear.h"
 
-#define UDP_MAX_SIZE 65535
+#define MTU 1400
 
-//const char PIPE_LINE[] = "filesrc location=test.264 ! h264parse ! rtph264pay config-interval=1 ! application/x-rtp,media=video,encoding-name=H264,payload=102 ! udpsink host=127.0.0.1 port=8004";
-//const char PIPE_LINE[] = "filesrc location=test.264 ! appsink name=pear-sink";
-const char PIPE_LINE[] = "filesrc location=test.264 ! h264parse  config-interval=-1 ! queue ! rtph264pay config-interval=-1 ! application/x-rtp,media=video,encoding-name=H264,payload=102 ! appsink name=pear-sink";
+const char PIPE_LINE[] = "v4l2src ! videorate ! video/x-raw,width=640,height=360,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=pear-sink";
 
 int g_transport_ready = 0;
 
@@ -26,77 +24,29 @@ static void on_transport_ready(void *data) {
   g_transport_ready = 1;
 }
 
-void *gst_rtp_forwarding_thread(void *data) {
-
-  peer_connection_t *peer_connection = (peer_connection_t*)data;
-  int fd;
-  struct sockaddr_in server_addr, client_addr;
-  int len, n;
-  char buf[UDP_MAX_SIZE];
-
-  fd = socket(AF_INET, SOCK_DGRAM, 0);
-  if(fd < 0) {
-    perror("socket creation failed");
-    return NULL;
-  }
-
-  memset(&server_addr, 0, sizeof(server_addr));
-  memset(&client_addr, 0, sizeof(client_addr));
-
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_addr.s_addr = INADDR_ANY;
-  server_addr.sin_port = htons(8004);
-
-  if(bind(fd, (const struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-    perror("bind failed");
-    return NULL;
-  }
- 
-
-  while(1) {
-    len = sizeof(client_addr);
-    n = recvfrom(fd, buf, sizeof(buf), MSG_WAITALL, (struct sockaddr *)&client_addr, &len);
-    peer_connection_send_rtp_packet(peer_connection, (uint8_t*)buf, n);
-int i = 0;
-for(i = 0; i < 16; ++i) {
-  printf("%.2X ", (uint8_t)buf[i]);
-}
-printf("\n");
-    usleep(33000);
-  }
-
-  return NULL;
-}
-
-
 static GstFlowReturn new_sample(GstElement *sink, void *data) {
 
+  static uint8_t rtp_packet[MTU] = {0};
+  int bytes;
   peer_connection_t *peer_connection = (peer_connection_t*)data;
 
-  static uint8_t rtp_packet[1400] = {0};
   GstSample *sample;
   GstBuffer *buffer;
   GstMapInfo info;
-  uint8_t *data1;
-  /* Retrieve the buffer */
-printf("HAHA\n");
-  int i = 0;
-  g_signal_emit_by_name (sink, "pull-sample", &sample);
-  if (sample) {
-    /* The only thing we do in this example is print a * to indicate a received buffer */
 
-   buffer = gst_sample_get_buffer(sample);
-   gst_buffer_map(buffer, &info, GST_MAP_READ);
-   data1 = info.data;
-    for(i = 0; i< 16; ++i) {
-      printf("%.2X ", data1[i]);
-    }
+  g_signal_emit_by_name (sink, "pull-sample", &sample);
+  if(sample) {
+
+    buffer = gst_sample_get_buffer(sample);
+    gst_buffer_map(buffer, &info, GST_MAP_READ);
+
     memset(rtp_packet, 0, sizeof(rtp_packet));
     memcpy(rtp_packet, info.data, info.size);
-    int len = info.size;
-    printf(", %ld \n", info.size);
-    peer_connection_send_rtp_packet(peer_connection, rtp_packet, len);
-    gst_sample_unref (sample);
+    bytes = info.size;
+
+    peer_connection_send_rtp_packet(peer_connection, rtp_packet, bytes);
+
+    gst_sample_unref(sample);
     return GST_FLOW_OK;
   }
   return GST_FLOW_ERROR;
@@ -132,9 +82,7 @@ int main (int argc, char *argv[]) {
   while(!g_transport_ready) {
     sleep(1);
   }
-#if 0
-  g_thread_new("rtp-forwarding", gst_rtp_forwarding_thread, &peer_connection);
-#endif
+
   gst_init(&argc, &argv);
 
   gst_element = gst_parse_launch(PIPE_LINE, NULL);
@@ -147,8 +95,6 @@ int main (int argc, char *argv[]) {
   gloop = g_main_loop_new(NULL, FALSE);
 
   g_main_loop_run(gloop);
-
-  g_thread_join(gthread);
 
   g_main_loop_unref(gloop);
   gst_element_set_state(gst_element, GST_STATE_NULL);
