@@ -109,11 +109,6 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
   sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack");
   sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack pli");
   sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 goog-remb");
-  sdp_attribute_append(sdp_attribute, "a=ssrc:%d cname:pear", ssrc);
-  sdp_attribute_append(sdp_attribute, "a=ssrc:%d msid:pear", ssrc);
-  sdp_attribute_append(sdp_attribute, "a=ssrc:%d mslabel:pear", ssrc);
-  sdp_attribute_append(sdp_attribute, "a=ssrc:%d label:pear", ssrc);
-
 
   nice_candidates = nice_agent_get_local_candidates(ice_agent->nice_agent,
    ice_agent->stream_id, ice_agent->component_id);

@@ -8,3 +8,6 @@ include_directories(${GLIB_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/third_party/libsrtp
 link_directories(${CMAKE_SOURCE_DIR}/third_party/libnice/builddir/nice/ ${CMAKE_SOURCE_DIR}/third_party/libsrtp/build/ ${CMAKE_SOURCE_DIR}/third_party/media-server/librtp/debug.linux)
 
 add_subdirectory(local_file)
+if(ENABLE_EXAMPLES)
+  add_subdirectory(gstreamer)
+endif(ENABLE_EXAMPLES)
