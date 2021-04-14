@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Signal</title>
+</head>
+<body>
+  <div id="remoteVideos"></div>
+
+<script>
+
+function jsonRpc(payload, cb) {
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      cb(this.responseText);
+    }
+  };
+  xhttp.open("POST", "/api");
+  xhttp.setRequestHeader("Content-Type", "application/json");
+  xhttp.send(JSON.stringify(payload));
+}
+
+let pc = new RTCPeerConnection({
+  iceServers: [
+    {
+      urls: 'stun:stun.l.google.com:19302'
+    }
+  ]
+})
+
+let log = msg => {
+  console.log(msg);
+}
+
+pc.ontrack = function (event) {
+  var el = document.createElement(event.track.kind)
+  el.srcObject = event.streams[0]
+  el.autoplay = true
+  el.controls = true
+
+  document.getElementById('remoteVideos').appendChild(el)
+}
+
+pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
+
+function mycb(message) {
+  console.log(message);
+}
+
+pc.onicecandidate = event => {
+  if (event.candidate === null) {
+    var lines = pc.localDescription.sdp.split('\n');
+    for(let i = 0; i < lines.length; i++) {
+      // remove candidate which libnice cannot parse.
+      if(lines[i].search("candidate") != -1 && lines[i].search("local") != -1) {
+        lines.splice(i, 1);
+        i--;
+      }
+    }
+    sdp = lines.join('\n');
+    var payload = {"jsonrpc": "2.0", "method": "call", "params": btoa(sdp)};
+    jsonRpc(payload, mycb);
+  }
+}
+
+pc.addTransceiver('video', {'direction': 'sendrecv'})
+
+pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
+
+window.startSession = () => {
+  let sd = document.getElementById('remoteSessionDescription').value
+  if (sd === '') {
+    return alert('Session Description must not be empty')
+  }
+
+  try {
+    pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sd))))
+  } catch (e) {
+    alert(e)
+  }
+}
+</script>
+
+</body>
+</html>
