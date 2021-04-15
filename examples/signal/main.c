@@ -1,98 +1,59 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/socket.h>
-#include <signal.h>
-#include <fcntl.h>
 #include <unistd.h>
-#include <dirent.h>
 
-#include <event2/event.h>
-#include <event2/http.h>
-#include <event2/buffer.h>
-#include <event2/util.h>
-#include <event2/keyvalq_struct.h>
-#include <cjson/cJSON.h>
-
+#include <gst/gst.h>
+#include "signal_service.h"
 #include "utils.h"
+#include "pear.h"
 
-typedef struct options_t {
+#define MTU 1400
 
-  int port;
-  const char *host;
-  const char *root;
+GstElement *gst_element;
 
-} options_t;
+char *g_sdp;
 
-static void api_request_cb(struct evhttp_request *req, void *arg) {
+const char PIPE_LINE[] = "videotestsrc is-live=true pattern=ball ! videorate ! video/x-raw,width=640,height=360,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=pear-sink";
 
-  struct evbuffer *buf = NULL;
-  cJSON *json = NULL;
-  cJSON *sdp = NULL;
-  char *payload = NULL;
-  size_t len;
+int g_transport_ready = 0;
 
-  if(evhttp_request_get_command(req) != EVHTTP_REQ_POST) {
-    evhttp_send_error(req, HTTP_BADMETHOD, 0);
-    return;
-  }
+static void on_icecandidate(char *sdp, void *data) {
 
-  buf = evhttp_request_get_input_buffer(req);
-
-  len = evbuffer_get_length(buf);
-  payload = (char*)malloc(len);
-  if(payload == NULL) {
-    evhttp_send_error(req, HTTP_INTERNAL, 0);
-    return;
-  }
-
-  evbuffer_remove(buf, payload, len);
-
-  json = cJSON_Parse(payload);
-  sdp = cJSON_GetObjectItemCaseSensitive(json, "sdp");
-  if(cJSON_IsString(sdp) && (sdp->valuestring != NULL)) {
-    printf("%s\n", sdp->valuestring);
-  }
-
-  if(payload != NULL)
-    free(payload);
-
-  evhttp_send_reply(req, HTTP_OK, "OK", NULL);
+  g_sdp = g_base64_encode((const char *)sdp, strlen(sdp));
 }
 
-static void index_request_cb(struct evhttp_request *req, void *arg) {
+static void on_transport_ready(void *data) {
 
-  struct evbuffer *evb = NULL;
-  int fd = -1;
-  struct stat st;
+  gst_element_set_state(gst_element, GST_STATE_PLAYING);
+}
 
-  if(evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
-    evhttp_send_error(req, HTTP_BADMETHOD, 0);
-    return;
+
+static GstFlowReturn new_sample(GstElement *sink, void *data) {
+
+  static uint8_t rtp_packet[MTU] = {0};
+  int bytes;
+  peer_connection_t *peer_connection = (peer_connection_t*)data;
+
+  GstSample *sample;
+  GstBuffer *buffer;
+  GstMapInfo info;
+
+  g_signal_emit_by_name (sink, "pull-sample", &sample);
+  if(sample) {
+
+    buffer = gst_sample_get_buffer(sample);
+    gst_buffer_map(buffer, &info, GST_MAP_READ);
+
+    memset(rtp_packet, 0, sizeof(rtp_packet));
+    memcpy(rtp_packet, info.data, info.size);
+    bytes = info.size;
+
+    peer_connection_send_rtp_packet(peer_connection, rtp_packet, bytes);
+
+    gst_sample_unref(sample);
+    return GST_FLOW_OK;
   }
-
-  if((fd = open("index.html", O_RDONLY)) < 0) {
-    LOG_ERROR("%s", strerror(errno));
-    evhttp_send_error(req, HTTP_NOTFOUND, "Document was not found");
-    return;
-  }
-
-  if(fstat(fd, &st) < 0) {
-    LOG_ERROR("%s", strerror(errno));
-    evhttp_send_error(req, HTTP_NOTFOUND, "Document was not found");
-    return;
-  }
-
-  evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "text/html");
-  evb = evbuffer_new();
-  evbuffer_add_file(evb, fd, 0, st.st_size);
-  evhttp_send_reply(req, HTTP_OK, "OK", evb);
-
-  if(evb)
-    evbuffer_free(evb);
+  return GST_FLOW_ERROR;
 }
 
 static void print_usage(const char *prog) {
@@ -132,41 +93,42 @@ void parse_argv(int argc, char **argv, options_t *options) {
 
 }
 
+char* get_offer_cb(char *offer, void *data) {
+
+  peer_connection_t *peer_connection = (peer_connection_t*)data;
+  peer_connection_set_remote_description(peer_connection, offer);
+  return g_sdp;
+}
 
 int main(int argc, char **argv) {
 
-  struct event_base *base;
-  struct evhttp *http;
-  struct evhttp_bound_socket *handle;
-
+  signal_service_t signal_service;
   options_t options = {8080, "0.0.0.0", "root"};
-
   parse_argv(argc, argv, &options);
 
-  base = event_base_new();
-  if(!base) {
-    LOG_ERROR("Couldn't create an event_base: exiting");
-    return 1;
-  }
+  GThread *gthread;
+  GstElement *pear_sink;
 
-  http = evhttp_new(base);
-  if(!http) {
-    LOG_ERROR("Couldn't create evhttp. Exiting.");
-    return 1;
-  }
+  peer_connection_t peer_connection;
+  peer_connection_init(&peer_connection);
 
-  evhttp_set_cb(http, "/api", api_request_cb, NULL);
-  evhttp_set_cb(http, "/", index_request_cb, NULL);
+  peer_connection_set_on_icecandidate(&peer_connection, on_icecandidate, NULL);
+  peer_connection_set_on_transport_ready(&peer_connection, &on_transport_ready, NULL);
+  peer_connection_create_answer(&peer_connection);
 
-  handle = evhttp_bind_socket_with_handle(http, options.host, options.port);
-  if(!handle) {
-    LOG_ERROR("couldn't bind to %s:%d. Exiting.\n", options.host, options.port);
-    return 1;
-  }
+  gst_init(&argc, &argv);
 
-  printf("Listening %s:%d\n", options.host, options.port); 
+  gst_element = gst_parse_launch(PIPE_LINE, NULL);
+  pear_sink = gst_bin_get_by_name(GST_BIN(gst_element), "pear-sink");
+  g_signal_connect(pear_sink, "new-sample", G_CALLBACK(new_sample), &peer_connection);
+  g_object_set(pear_sink, "emit-signals", TRUE, NULL);
 
-  event_base_dispatch(base);
+  signal_service_create(&signal_service, options);
+  signal_service_on_offer_get(&signal_service, &get_offer_cb, &peer_connection);
+  signal_service_dispatch(&signal_service);
+
+  gst_element_set_state(gst_element, GST_STATE_NULL);
+  gst_object_unref(gst_element);
 
   return 0;
 }
