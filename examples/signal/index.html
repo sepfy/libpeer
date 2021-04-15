@@ -4,7 +4,7 @@
 <title>Signal</title>
 </head>
 <body>
-  <div id="remoteVideos"></div>
+  <video style="display:block; margin: 0 auto;" id="remoteVideos"></video>
 
 <script>
 
@@ -33,18 +33,28 @@ let log = msg => {
 }
 
 pc.ontrack = function (event) {
-  var el = document.createElement(event.track.kind)
+  var el = document.getElementById("remoteVideos")
   el.srcObject = event.streams[0]
   el.autoplay = true
   el.controls = true
-
-  document.getElementById('remoteVideos').appendChild(el)
+  el.muted = true
 }
 
 pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
 
-function mycb(message) {
-  console.log(message);
+function jsonRpcHandle(result) {
+  var sdp = JSON.parse(result).result
+
+  if (sdp === '') {
+    return alert('Session Description must not be empty')
+  }
+
+  try {
+    pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sdp))))
+  } catch (e) {
+    alert(e)
+  }
+
 }
 
 pc.onicecandidate = event => {
@@ -59,7 +69,7 @@ pc.onicecandidate = event => {
     }
     sdp = lines.join('\n');
     var payload = {"jsonrpc": "2.0", "method": "call", "params": btoa(sdp)};
-    jsonRpc(payload, mycb);
+    jsonRpc(payload, jsonRpcHandle);
   }
 }
 
@@ -69,15 +79,6 @@ pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
 
 window.startSession = () => {
   let sd = document.getElementById('remoteSessionDescription').value
-  if (sd === '') {
-    return alert('Session Description must not be empty')
-  }
-
-  try {
-    pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sd))))
-  } catch (e) {
-    alert(e)
-  }
 }
 </script>
 
