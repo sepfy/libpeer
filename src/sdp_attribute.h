@@ -15,7 +15,7 @@ typedef struct sdp_attribute_t {
 
 sdp_attribute_t* sdp_attribute_create(void);
 
-void sdp_attribute_free(sdp_attribute_t *sdp_attribute);
+void sdp_attribute_destroy(sdp_attribute_t *sdp_attribute);
 
 int sdp_attribute_append(sdp_attribute_t *sdp_attribute, const char *attribute, ...);
 

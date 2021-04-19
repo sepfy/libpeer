@@ -10,16 +10,17 @@
 #define MTU 1400
 
 GstElement *gst_element;
-
 char *g_sdp;
+static GCond g_cond;
+static GMutex g_mutex;
+peer_connection_t *g_peer_connection = NULL;
 
 const char PIPE_LINE[] = "videotestsrc is-live=true pattern=ball ! videorate ! video/x-raw,width=640,height=360,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=pear-sink";
-
-int g_transport_ready = 0;
 
 static void on_icecandidate(char *sdp, void *data) {
 
   g_sdp = g_base64_encode((const char *)sdp, strlen(sdp));
+  g_cond_signal(&g_cond);
 }
 
 static void on_transport_ready(void *data) {
@@ -27,12 +28,28 @@ static void on_transport_ready(void *data) {
   gst_element_set_state(gst_element, GST_STATE_PLAYING);
 }
 
+char* on_offer_get_cb(char *offer, void *data) {
+
+  gst_element_set_state(gst_element, GST_STATE_PAUSED);
+
+  g_mutex_lock(&g_mutex);
+  peer_connection_destroy(g_peer_connection);
+  g_peer_connection = peer_connection_create();
+  peer_connection_set_on_icecandidate(g_peer_connection, on_icecandidate, NULL);
+  peer_connection_set_on_transport_ready(g_peer_connection, &on_transport_ready, NULL);
+  peer_connection_create_answer(g_peer_connection);
+
+  g_cond_wait(&g_cond, &g_mutex);
+  peer_connection_set_remote_description(g_peer_connection, offer);
+  g_mutex_unlock(&g_mutex);
+
+  return g_sdp;
+}
 
 static GstFlowReturn new_sample(GstElement *sink, void *data) {
 
   static uint8_t rtp_packet[MTU] = {0};
   int bytes;
-  peer_connection_t *peer_connection = (peer_connection_t*)data;
 
   GstSample *sample;
   GstBuffer *buffer;
@@ -48,7 +65,7 @@ static GstFlowReturn new_sample(GstElement *sink, void *data) {
     memcpy(rtp_packet, info.data, info.size);
     bytes = info.size;
 
-    peer_connection_send_rtp_packet(peer_connection, rtp_packet, bytes);
+    peer_connection_send_rtp_packet(g_peer_connection, rtp_packet, bytes);
 
     gst_sample_unref(sample);
     return GST_FLOW_OK;
@@ -93,13 +110,6 @@ void parse_argv(int argc, char **argv, options_t *options) {
 
 }
 
-char* get_offer_cb(char *offer, void *data) {
-
-  peer_connection_t *peer_connection = (peer_connection_t*)data;
-  peer_connection_set_remote_description(peer_connection, offer);
-  return g_sdp;
-}
-
 int main(int argc, char **argv) {
 
   signal_service_t signal_service;
@@ -109,22 +119,15 @@ int main(int argc, char **argv) {
   GThread *gthread;
   GstElement *pear_sink;
 
-  peer_connection_t peer_connection;
-  peer_connection_init(&peer_connection);
-
-  peer_connection_set_on_icecandidate(&peer_connection, on_icecandidate, NULL);
-  peer_connection_set_on_transport_ready(&peer_connection, &on_transport_ready, NULL);
-  peer_connection_create_answer(&peer_connection);
-
   gst_init(&argc, &argv);
 
   gst_element = gst_parse_launch(PIPE_LINE, NULL);
   pear_sink = gst_bin_get_by_name(GST_BIN(gst_element), "pear-sink");
-  g_signal_connect(pear_sink, "new-sample", G_CALLBACK(new_sample), &peer_connection);
+  g_signal_connect(pear_sink, "new-sample", G_CALLBACK(new_sample), NULL);
   g_object_set(pear_sink, "emit-signals", TRUE, NULL);
 
   signal_service_create(&signal_service, options);
-  signal_service_on_offer_get(&signal_service, &get_offer_cb, &peer_connection);
+  signal_service_on_offer_get(&signal_service, &on_offer_get_cb, NULL);
   signal_service_dispatch(&signal_service);
 
   gst_element_set_state(gst_element, GST_STATE_NULL);

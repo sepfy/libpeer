@@ -31,6 +31,9 @@ typedef struct dtls_transport_t {
 
 } dtls_transport_t;
 
+dtls_transport_t* dtls_transport_create(BIO *agent_write_bio);
+void dtls_transport_destroy(dtls_transport_t *dtls_transport);
+
 int dtls_transport_is_dtls(char *buf);
 int dtls_transport_init(dtls_transport_t *dtls_transport, BIO *agent_write_bio);
 void dtls_transport_incomming_msg(dtls_transport_t *dtls_transport, char *buf, int len);

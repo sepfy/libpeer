@@ -7,6 +7,25 @@
 #include "utils.h"
 #include "peer_connection.h"
 
+peer_connection_t* peer_connection_create(void) {
+
+  peer_connection_t *peer_connection = NULL;
+  peer_connection = (peer_connection_t*)malloc(sizeof(peer_connection_t));
+  if(peer_connection != NULL) {
+    peer_connection_init(peer_connection);
+  }
+  return peer_connection;
+}
+
+void peer_connection_destroy(peer_connection_t *peer_connection) {
+
+  if(peer_connection != NULL) {
+
+    dtls_transport_destroy(&peer_connection->dtls_transport);
+    free(peer_connection);
+  }
+}
+
 int peer_connection_init(peer_connection_t *peer_connection) {
 
   ice_agent_init(&peer_connection->ice_agent, &peer_connection->dtls_transport);

@@ -11,6 +11,10 @@ typedef struct peer_connection_t {
 
 } peer_connection_t;
 
+peer_connection_t* peer_connection_create();
+
+void peer_connection_destroy(peer_connection_t *peer_connection);
+
 int peer_connection_init(peer_connection_t *peer_connection);
 
 int peer_connection_create_answer(peer_connection_t *peer_connection);

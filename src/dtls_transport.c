@@ -93,6 +93,31 @@ void generate_self_certificate(dtls_transport_t *dtls_transport) {
 
 }
 
+dtls_transport_t* dtls_transport_create(BIO *agent_write_bio) {
+
+  dtls_transport_t *dtls_transport = NULL;
+  dtls_transport = (dtls_transport_t*)malloc(sizeof(dtls_transport_t));
+  if(dtls_transport == NULL)
+    return dtls_transport;
+
+  dtls_transport_init(dtls_transport, agent_write_bio);
+  return dtls_transport;
+}
+
+
+void dtls_transport_destroy(dtls_transport_t *dtls_transport) {
+
+  if(dtls_transport == NULL)
+    return;
+  SSL_CTX_free(dtls_transport->ssl_ctx);
+  SSL_free(dtls_transport->ssl);
+  X509_free(dtls_transport->certificate);
+  EVP_PKEY_free(dtls_transport->private_key);
+
+  srtp_shutdown();
+}
+
+
 int dtls_transport_init(dtls_transport_t *dtls_transport, BIO *agent_write_bio) {
 
   dtls_transport->ssl_ctx = SSL_CTX_new(DTLS_method());
@@ -150,16 +175,22 @@ int dtls_transport_init(dtls_transport_t *dtls_transport, BIO *agent_write_bio) 
   SSL_set_tmp_ecdh(dtls_transport->ssl, ecdh);
   EC_KEY_free(ecdh);
 
+
+  if(srtp_init() != srtp_err_status_ok) {
+    LOG_ERROR("libsrtp init failed");
+  }
+
   return 0;
 }
 
 void dtls_transport_do_handshake(dtls_transport_t *dtls_transport) {
-  LOG_INFO();
+
   SSL_set_accept_state(dtls_transport->ssl);
   SSL_do_handshake(dtls_transport->ssl);
 }
 
 int dtls_transport_is_dtls(char *buf) {
+
   return ((*buf >= 20) && (*buf <= 64));
 }
 
@@ -203,7 +234,7 @@ void dtls_transport_incomming_msg(dtls_transport_t *dtls_transport, char *buf, i
     X509_free(rcert);
     rcert = NULL;
     unsigned int i = 0;
-    for(int i = 0; i < rsize; i++) {
+    for(i = 0; i < rsize; i++) {
       g_snprintf(rfp, 4, "%.2X:", rfingerprint[i]);
       rfp += 3;
     }
@@ -211,10 +242,6 @@ void dtls_transport_incomming_msg(dtls_transport_t *dtls_transport, char *buf, i
 
     LOG_INFO("Remote fingerprint %s", remote_fingerprint);
     LOG_INFO("Local fingerprint %s", dtls_transport->fingerprint);
-  }
-
-  if(srtp_init() != srtp_err_status_ok) {
-    LOG_ERROR("libsrtp init failed");
   }
 
   memset(&dtls_transport->remote_policy, 0x0, sizeof(dtls_transport->remote_policy));
@@ -263,5 +290,6 @@ void dtls_transport_incomming_msg(dtls_transport_t *dtls_transport, char *buf, i
 }
 
 void dtls_transport_encrypt_rtp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes) {
+
   srtp_protect(dtls_transport->srtp_out, packet, bytes);
 }

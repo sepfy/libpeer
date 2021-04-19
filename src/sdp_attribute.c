@@ -16,7 +16,7 @@ sdp_attribute_t* sdp_attribute_create(void) {
   return sdp_attribute;
 }
 
-void sdp_attribute_free(sdp_attribute_t *sdp_attribute) {
+void sdp_attribute_destroy(sdp_attribute_t *sdp_attribute) {
 
   if(sdp_attribute != NULL) {
     free(sdp_attribute);
