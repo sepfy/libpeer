@@ -116,7 +116,6 @@ int main(int argc, char **argv) {
   options_t options = {8080, "0.0.0.0", "root"};
   parse_argv(argc, argv, &options);
 
-  GThread *gthread;
   GstElement *pear_sink;
 
   gst_init(&argc, &argv);

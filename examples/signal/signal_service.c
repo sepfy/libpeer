@@ -59,10 +59,15 @@ static void api_request_cb(struct evhttp_request *req, void *arg) {
   if(payload != NULL)
     free(payload);
 
+  cJSON_Delete(json);
+
   evb = evbuffer_new();
   evbuffer_add_printf(evb, "{\"jsonrpc\": \"2.0\", \"result\": \"%s\"}", anwser);
 
   evhttp_send_reply(req, HTTP_OK, "OK", evb);
+
+  if(evb)
+    evbuffer_free(evb);
 }
 
 static void index_request_cb(struct evhttp_request *req, void *arg) {
