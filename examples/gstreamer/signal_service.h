@@ -1,3 +1,6 @@
+#ifndef GSTREAMER_SIGNAL_SERVICE_H_
+#define GSTREAMER_SIGNAL_SERVICE_H_
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -33,3 +36,5 @@ void signal_service_dispatch(signal_service_t *signal_service);
 
 void signal_service_on_offer_get(signal_service_t *signal_service,
  char* (*on_offer_get)(char *offer, void *data), void *data);
+
+#endif // GSTREAMER_SIGNAL_SERVICE_H_

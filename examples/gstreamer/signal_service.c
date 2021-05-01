@@ -17,6 +17,7 @@
 #include <glib.h>
 #include <cjson/cJSON.h>
 
+#include "index_html.h"
 #include "utils.h"
 #include "signal_service.h"
 
@@ -81,21 +82,9 @@ static void index_request_cb(struct evhttp_request *req, void *arg) {
     return;
   }
 
-  if((fd = open("index.html", O_RDONLY)) < 0) {
-    LOG_ERROR("%s", strerror(errno));
-    evhttp_send_error(req, HTTP_NOTFOUND, "Document was not found");
-    return;
-  }
-
-  if(fstat(fd, &st) < 0) {
-    LOG_ERROR("%s", strerror(errno));
-    evhttp_send_error(req, HTTP_NOTFOUND, "Document was not found");
-    return;
-  }
-
   evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "text/html");
   evb = evbuffer_new();
-  evbuffer_add_file(evb, fd, 0, st.st_size);
+  evbuffer_add(evb, index_html, sizeof(index_html));
   evhttp_send_reply(req, HTTP_OK, "OK", evb);
 
   if(evb)
@@ -140,6 +129,7 @@ void signal_service_dispatch(signal_service_t *signal_service) {
 
 void signal_service_on_offer_get(signal_service_t *signal_service,
  char* (*on_offer_get)(char *offer, void *data), void *data) {
+
   signal_service->data = data;
   signal_service->on_offer_get = on_offer_get;
 }

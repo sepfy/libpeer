@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Signal</title>
+<title>GStreamer</title>
 </head>
 <body>
   <video style="display:block; margin: 0 auto;" id="remoteVideos"></video>
@@ -74,9 +74,7 @@ pc.onicecandidate = event => {
 }
 
 pc.addTransceiver('video', {'direction': 'sendrecv'})
-
 pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
-
 window.startSession = () => {
   let sd = document.getElementById('remoteSessionDescription').value
 }
