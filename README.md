@@ -27,17 +27,5 @@ Pear is a WebRTC SDK written in C. The SDK aims to integrate IoT/Embedded device
 ```
 
 ### Examples
-This example is tested on Raspberry Pi zero W with image 2021-01-11-raspios-buster-armhf-lite.img
-
-1. Open index.html with browser in your computer
-2. Copy textarea content to remote_sdp.txt
-3. Download test [video file](http://www.live555.com/liveMedia/public/264/test.264)
-4. Run local file sample. (Please ensure that remote_sdp.txt and test.264 in the same directory)
-```
-./cmake/examples/local_file/local_file
-```
-6. Copy base64 sdp answer to browser.
-7. Click start session.
-
-You will see the video on your browser.
-
+- [Local file](https://github.com/sepfy/pear/tree/main/examples/local_file): Stream h264 file to browser and exchange SDP by copy and paste.
+- [GStreamer](https://github.com/sepfy/pear/tree/main/examples/gstreamer): Stream v4l2 source to browser with GStreamer and exhange SDP by libevent HTTP server.
