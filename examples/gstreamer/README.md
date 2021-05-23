@@ -42,3 +42,10 @@ v4l2src device=/dev/video0 ! videorate ! video/x-raw,width=1280,height=720,frame
 The latency of Raspberry Pi Zero W with 720P video
 ![rpi0](https://raw.githubusercontent.com/sepfy/readme-image/main/pear-rpi0.jpg)
 
+### With RTSP source
+Run RTSP server testProgs/testH264VideoStreamer in live555 library
+
+Modify GStreamer pipeline in examples/gstreamer/main.c to
+```
+rtspsrc location=rtsp://127.0.0.1:8554/testStream ! rtph264depay ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=pear-sink
+```
