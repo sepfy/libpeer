@@ -5,6 +5,15 @@
 #include "sdp_attribute.h"
 #include "dtls_transport.h"
 
+typedef enum iceconnectionstate_t {
+  DISCONNECTED,
+  GATHERING,
+  CONNECTING,
+  CONNECTED,
+  READY,
+  FAILED,
+} iceconnectionstate_t;
+
 typedef struct ice_agent_t {
 
   NiceAgent *nice_agent;
@@ -18,9 +27,11 @@ typedef struct ice_agent_t {
   sdp_attribute_t *sdp_attribute;
   
   void (*on_icecandidate)(char *sdp, void *data);
+  void (*on_iceconnectionstatechange)(iceconnectionstate_t state, void *data);
   void (*on_transport_ready)(void *data);
   void *on_icecandidate_data;
   void *on_transport_ready_data;
+  void *on_iceconnectionstatechange_data;
 
 } ice_agent_t;
 

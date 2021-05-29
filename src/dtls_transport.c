@@ -191,7 +191,7 @@ void dtls_transport_do_handshake(dtls_transport_t *dtls_transport) {
 
 int dtls_transport_is_dtls(char *buf) {
 
-  return ((*buf >= 20) && (*buf <= 64));
+  return ((*buf >= 19) && (*buf <= 64));
 }
 
 

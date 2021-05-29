@@ -18,6 +18,13 @@ peer_connection_t *g_peer_connection = NULL;
 
 const char PIPE_LINE[] = "v4l2src ! videorate ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=pear-sink";
 
+static void on_iceconnectionstatechange(iceconnectionstate_t state, void *data) {
+  if(state == FAILED) {
+    LOG_INFO("Disconnect with browser... Stop streaming");
+    gst_element_set_state(gst_element, GST_STATE_PAUSED);
+  }
+}
+
 static void on_icecandidate(char *sdp, void *data) {
 
   g_sdp = g_base64_encode((const char *)sdp, strlen(sdp));
@@ -38,6 +45,7 @@ char* on_offer_get_cb(char *offer, void *data) {
   g_peer_connection = peer_connection_create();
   peer_connection_set_on_icecandidate(g_peer_connection, on_icecandidate, NULL);
   peer_connection_set_on_transport_ready(g_peer_connection, &on_transport_ready, NULL);
+  peer_connection_set_on_iceconnectionstatechange(g_peer_connection, &on_iceconnectionstatechange, NULL);
   peer_connection_create_answer(g_peer_connection);
 
   g_cond_wait(&g_cond, &g_mutex);

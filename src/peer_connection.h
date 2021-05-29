@@ -26,6 +26,9 @@ int peer_connection_send_rtp_packet(peer_connection_t *peer_connection, uint8_t 
 void peer_connection_set_on_icecandidate(peer_connection_t *peer_connection,
  void (*on_icecandidate), void  *data);
 
+void peer_connection_set_on_iceconnectionstatechange(peer_connection_t *peer_connection,
+  void (*on_iceconnectionstatechange), void *data);
+
 void peer_connection_set_on_transport_ready(peer_connection_t *peer_connection,
  void (*on_transport_ready), void *data);
 

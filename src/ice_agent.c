@@ -140,8 +140,14 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
 static void* cb_component_state_chanaged(NiceAgent *agent,
  guint stream_id, guint component_id, guint state, gpointer data) {
 
-  LOG_INFO("SIGNAL: state changed %d %d %s[%d]",
-   stream_id, component_id, STATE_NAME[state], state);
+  ice_agent_t *ice_agent = (ice_agent_t*)data;
+
+  //LOG_INFO("SIGNAL: state changed %d %d %s[%d]",
+  // stream_id, component_id, STATE_NAME[state], state);
+  if(ice_agent->on_iceconnectionstatechange != NULL) {
+    ice_agent->on_iceconnectionstatechange(state, ice_agent->on_iceconnectionstatechange_data);
+  }
+
 }
 
 
@@ -151,6 +157,8 @@ int ice_agent_init(ice_agent_t *ice_agent, dtls_transport_t *dtls_transport) {
   ice_agent->on_transport_ready_data = NULL;
   ice_agent->on_icecandidate = NULL;
   ice_agent->on_icecandidate_data = NULL;
+  ice_agent->on_iceconnectionstatechange = NULL;
+  ice_agent->on_iceconnectionstatechange_data = NULL;
 
   dtls_transport_init(dtls_transport, ice_agent_bio_new(ice_agent));
 
@@ -175,6 +183,7 @@ int ice_agent_init(ice_agent_t *ice_agent, dtls_transport_t *dtls_transport) {
   g_object_set(ice_agent->nice_agent, "stun-server-port", STUN_PORT, NULL);
   g_object_set(ice_agent->nice_agent, "controlling-mode",
    ice_agent->controlling, NULL);
+  g_object_set(ice_agent->nice_agent, "keepalive-conncheck", TRUE, NULL);
 
   g_signal_connect(ice_agent->nice_agent, "candidate-gathering-done", G_CALLBACK(cb_candidate_gathering_done), ice_agent);
   g_signal_connect(ice_agent->nice_agent, "component-state-changed", G_CALLBACK(cb_component_state_chanaged), ice_agent);

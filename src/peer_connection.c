@@ -75,3 +75,11 @@ void peer_connection_set_on_icecandidate(peer_connection_t *peer_connection,
   ice_agent->on_icecandidate = on_icecandidate;
   ice_agent->on_icecandidate_data = data;
 }
+
+void peer_connection_set_on_iceconnectionstatechange(peer_connection_t *peer_connection,
+  void (*on_iceconnectionstatechange), void *data) {
+
+  ice_agent_t *ice_agent = (ice_agent_t*)&peer_connection->ice_agent;
+  ice_agent->on_iceconnectionstatechange = on_iceconnectionstatechange;
+  ice_agent->on_iceconnectionstatechange_data = data;
+}
