@@ -11,7 +11,7 @@
 #define MTU 1400
 
 GstElement *gst_element;
-char *g_sdp;
+char *g_sdp = NULL;
 static GCond g_cond;
 static GMutex g_mutex;
 peer_connection_t *g_peer_connection = NULL;
@@ -26,6 +26,9 @@ static void on_iceconnectionstatechange(iceconnectionstate_t state, void *data) 
 }
 
 static void on_icecandidate(char *sdp, void *data) {
+
+  if(g_sdp)
+    g_free(g_sdp);
 
   g_sdp = g_base64_encode((const char *)sdp, strlen(sdp));
   g_cond_signal(&g_cond);

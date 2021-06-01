@@ -114,6 +114,11 @@ void dtls_transport_destroy(dtls_transport_t *dtls_transport) {
   X509_free(dtls_transport->certificate);
   EVP_PKEY_free(dtls_transport->private_key);
 
+  if(dtls_transport->srtp_in)
+    srtp_dealloc(dtls_transport->srtp_in);
+  if(dtls_transport->srtp_out)
+    srtp_dealloc(dtls_transport->srtp_out);
+
   srtp_shutdown();
 }
 

@@ -12,7 +12,13 @@ int g_transport_ready = 0;
 
 static void on_icecandidate(char *sdp, void *data) {
 
-  printf("%s\n", g_base64_encode((const char *)sdp, strlen(sdp)));
+  gchar *encoded_sdp = NULL;
+  encoded_sdp = g_base64_encode((const char *)sdp, strlen(sdp));
+
+  printf("%s\n", encoded_sdp);
+
+  if(encoded_sdp)
+    g_free(encoded_sdp);
 }
 
 static void on_transport_ready(void *data) {
@@ -50,13 +56,11 @@ void* send_video_thread(void *data) {
       sps_frame.size = h264_frame->size;
       sps_frame.buf = (uint8_t*)malloc(h264_frame->size);
       memcpy(sps_frame.buf, h264_frame->buf, h264_frame->size);
-      continue;
     }
     else if(h264_frame->buf[4] == 0x68) {
       pps_frame.size = h264_frame->size;
       pps_frame.buf = (uint8_t*)malloc(h264_frame->size);
       memcpy(pps_frame.buf, h264_frame->buf, h264_frame->size);
-      continue;
     }
     else if(h264_frame->buf[4] == 0x65) {
       int size_tmp = h264_frame->size;

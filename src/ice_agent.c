@@ -63,17 +63,10 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
   ice_agent_t *ice_agent;
   ice_agent = (ice_agent_t*)data;
 
-  GRand *rand;
-  gchar *sdp;
-  gchar *answer_base64;
   gchar *local_ufrag = NULL;
   gchar *local_password = NULL;
   gchar ipaddr[INET6_ADDRSTRLEN];
   GSList *nice_candidates = NULL;
-  gint ssrc;
-  ssrc = 12345678;
-  rand = g_rand_new();
-  //ssrc = g_rand_int_range(rand, 1, 10000000);
 
   int i = 0;
   NiceCandidate *nice_candidate;
@@ -132,6 +125,12 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
       break;
   }
 
+  if(local_ufrag)
+    free(local_ufrag);
+
+  if(local_password)
+    free(local_password);
+
   nice_candidates = nice_agent_get_local_candidates(ice_agent->nice_agent,
    ice_agent->stream_id, ice_agent->component_id);
 
@@ -140,6 +139,7 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
     nice_candidate = (NiceCandidate *)g_slist_nth(nice_candidates, i)->data;
     nice_address_to_string(&nice_candidate->addr, nice_candidate_addr);
     if(utils_is_valid_ip_address(nice_candidate_addr) > 0) {
+      nice_candidate_free(nice_candidate);
       continue;
     }
 
@@ -150,12 +150,16 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
      nice_address_get_port(&nice_candidate->addr),
      CANDIDATE_TYPE_NAME[nice_candidate->type]);
 
+    nice_candidate_free(nice_candidate);
   }
 
   if(ice_agent->on_icecandidate != NULL) {
     ice_agent->on_icecandidate(sdp_attribute_get_answer(sdp_attribute),
      ice_agent->on_icecandidate_data);
   }
+
+  if(nice_candidates)
+    g_slist_free(nice_candidates);
 
 }
 
@@ -189,10 +193,6 @@ int ice_agent_init(ice_agent_t *ice_agent, dtls_transport_t *dtls_transport) {
   ice_agent->controlling = FALSE;
 
   ice_agent->gloop = g_main_loop_new(NULL, FALSE);
-
-  GIOChannel* io_stdin;
-  io_stdin = g_io_channel_unix_new(fileno(stdin));
-  g_io_channel_set_flags(io_stdin, G_IO_FLAG_NONBLOCK, NULL);
 
   ice_agent->nice_agent = nice_agent_new(g_main_loop_get_context(ice_agent->gloop),
    NICE_COMPATIBILITY_RFC5245);
@@ -242,7 +242,7 @@ void ice_agent_add_stream(ice_agent_t *ice_agent, codec_t codec) {
 
 void ice_agent_set_remote_sdp(ice_agent_t *ice_agent, char *remote_sdp_base64) {
 
-  guchar *remote_sdp;
+  guchar *remote_sdp = NULL;
   gsize len;
   gchar* ufrag = NULL;
   gchar* pwd = NULL;
@@ -269,5 +269,8 @@ void ice_agent_set_remote_sdp(ice_agent_t *ice_agent, char *remote_sdp_base64) {
     g_free(pwd);
     g_slist_free_full(plist, (GDestroyNotify)&nice_candidate_free);
   }
+
+  if(remote_sdp)
+    free(remote_sdp);
 
 }
