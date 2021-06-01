@@ -38,6 +38,17 @@ char* peer_connection_get_local_sdp(peer_connection_t *peer_connection) {
   return g_base64_encode((const char *)sdp, strlen(sdp));
 }
 
+void peer_connection_add_stream(peer_connection_t *peer_connection, const char *codec_name) {
+
+  if(strcmp(codec_name, "H264") == 0) {
+    ice_agent_add_stream(&peer_connection->ice_agent, CODEC_H264);
+  }
+  else if(strcmp(codec_name, "OPUS") == 0) {
+    ice_agent_add_stream(&peer_connection->ice_agent, CODEC_OPUS);
+  }
+
+}
+
 int peer_connection_create_answer(peer_connection_t *peer_connection) {
 
   if(!nice_agent_gather_candidates(peer_connection->ice_agent.nice_agent,

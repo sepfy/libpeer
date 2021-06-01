@@ -91,6 +91,7 @@ int main(int argv, char *argc[]) {
   peer_connection_t peer_connection;
   peer_connection_init(&peer_connection);
 
+  peer_connection_add_stream(&peer_connection, "H264");
   peer_connection_set_on_icecandidate(&peer_connection, on_icecandidate, NULL);
   peer_connection_set_on_transport_ready(&peer_connection, &on_transport_ready, NULL); 
 

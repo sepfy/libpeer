@@ -17,6 +17,8 @@ void peer_connection_destroy(peer_connection_t *peer_connection);
 
 int peer_connection_init(peer_connection_t *peer_connection);
 
+void peer_connection_add_stream(peer_connection_t *peer_connection, const char *codec_name);
+
 int peer_connection_create_answer(peer_connection_t *peer_connection);
 
 void peer_connection_set_remote_description(peer_connection_t *peer_connection, char *sdp);

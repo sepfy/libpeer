@@ -93,7 +93,18 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
   sdp_attribute_append(sdp_attribute, "t=0 0");
   sdp_attribute_append(sdp_attribute, "a=group:BUNDLE 0");
   sdp_attribute_append(sdp_attribute, "a=msid-semantic: pear");
-  sdp_attribute_append(sdp_attribute, "m=video 9 UDP/TLS/RTP/SAVPF 102");
+
+  switch(ice_agent->codec) {
+    case CODEC_OPUS:
+      sdp_attribute_append(sdp_attribute, "m=audio 9 UDP/TLS/RTP/SAVP 111");
+      break;
+    case CODEC_H264:
+      sdp_attribute_append(sdp_attribute, "m=video 9 UDP/TLS/RTP/SAVPF 102");
+      break;
+    default:
+      break;
+  }
+
   sdp_attribute_append(sdp_attribute, "c=IN IP4 0.0.0.0");
   sdp_attribute_append(sdp_attribute, "a=sendonly");
   sdp_attribute_append(sdp_attribute, "a=mid:0");
@@ -104,11 +115,22 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
   sdp_attribute_append(sdp_attribute, "a=fingerprint:sha-256 %s",
    ice_agent->dtls_transport->fingerprint);
   sdp_attribute_append(sdp_attribute, "a=setup:passive");
-  sdp_attribute_append(sdp_attribute, "a=rtpmap:102 H264/90000");
-  sdp_attribute_append(sdp_attribute, "a=fmtp:102 packetization-mode=1");
-  sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack");
-  sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack pli");
-  sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 goog-remb");
+
+  switch(ice_agent->codec) {
+    case CODEC_OPUS:
+      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:111 nack");
+      sdp_attribute_append(sdp_attribute, "a=rtpmap:111 opus/48000/2");
+      break;
+    case CODEC_H264:
+      sdp_attribute_append(sdp_attribute, "a=rtpmap:102 H264/90000");
+      sdp_attribute_append(sdp_attribute, "a=fmtp:102 packetization-mode=1");
+      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack");
+      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack pli");
+      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 goog-remb");
+      break;
+    default:
+      break;
+  }
 
   nice_candidates = nice_agent_get_local_candidates(ice_agent->nice_agent,
    ice_agent->stream_id, ice_agent->component_id);
@@ -159,6 +181,7 @@ int ice_agent_init(ice_agent_t *ice_agent, dtls_transport_t *dtls_transport) {
   ice_agent->on_icecandidate_data = NULL;
   ice_agent->on_iceconnectionstatechange = NULL;
   ice_agent->on_iceconnectionstatechange_data = NULL;
+  ice_agent->codec = CODEC_NONE;
 
   dtls_transport_init(dtls_transport, ice_agent_bio_new(ice_agent));
 
@@ -211,6 +234,10 @@ int ice_agent_init(ice_agent_t *ice_agent, dtls_transport_t *dtls_transport) {
   ice_agent->sdp_attribute = sdp_attribute_create();
 
   return 0;
+}
+
+void ice_agent_add_stream(ice_agent_t *ice_agent, codec_t codec) {
+  ice_agent->codec = codec;
 }
 
 void ice_agent_set_remote_sdp(ice_agent_t *ice_agent, char *remote_sdp_base64) {
