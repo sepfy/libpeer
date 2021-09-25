@@ -10,4 +10,5 @@ link_directories(${CMAKE_SOURCE_DIR}/third_party/libnice/builddir/nice/ ${CMAKE_
 add_subdirectory(local_file)
 if(ENABLE_EXAMPLES)
   add_subdirectory(gstreamer)
+  add_subdirectory(display)
 endif(ENABLE_EXAMPLES)
