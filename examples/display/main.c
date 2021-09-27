@@ -16,7 +16,7 @@ static GCond g_cond;
 static GMutex g_mutex;
 peer_connection_t *g_peer_connection = NULL;
 
-const char PIPE_LINE[] = "v4l2src ! videorate ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=pear-sink";
+const char PIPE_LINE[] = "appsrc name=pear-src ! rtph264depay ! h264parse ! nvh264dec ! videoconvert ! autovideosink";
 
 static void on_iceconnectionstatechange(iceconnectionstate_t state, void *data) {
   if(state == FAILED) {
@@ -39,6 +39,19 @@ static void on_transport_ready(void *data) {
   gst_element_set_state(gst_element, GST_STATE_PLAYING);
 }
 
+void on_track(uint8_t *packet, size_t bytes) {
+#if 0
+if(bytes > 16) {
+  int i = 0;
+  for(i = 0; i < 16; i++) {
+    printf("%.2X ", (uint8_t)packet[i]);
+  }
+  printf("\n");
+}
+#endif
+
+}
+
 char* on_offer_get_cb(char *offer, void *data) {
 
   gst_element_set_state(gst_element, GST_STATE_PAUSED);
@@ -47,7 +60,8 @@ char* on_offer_get_cb(char *offer, void *data) {
   peer_connection_destroy(g_peer_connection);
   g_peer_connection = peer_connection_create();
   peer_connection_add_stream(g_peer_connection, "H264");
-  //peer_connection_set_on_icecandidate(g_peer_connection, on_icecandidate, NULL);
+  peer_connection_set_on_track(g_peer_connection, on_track, NULL);
+  peer_connection_set_on_icecandidate(g_peer_connection, on_icecandidate, NULL);
   peer_connection_set_on_transport_ready(g_peer_connection, &on_transport_ready, NULL);
   peer_connection_set_on_iceconnectionstatechange(g_peer_connection, &on_iceconnectionstatechange, NULL);
   peer_connection_create_answer(g_peer_connection);
@@ -59,30 +73,26 @@ char* on_offer_get_cb(char *offer, void *data) {
   return g_sdp;
 }
 
-static GstFlowReturn new_sample(GstElement *sink, void *data) {
+static GstFlowReturn need_data(GstElement *src, guint arg, void *data) {
+  //static uint8_t rtp_packet[MTU] = {0};
+  //int bytes;
 
-  static uint8_t rtp_packet[MTU] = {0};
-  int bytes;
-
+  GstFlowReturn ret;
   GstSample *sample;
   GstBuffer *buffer;
   GstMapInfo info;
 
-  g_signal_emit_by_name (sink, "pull-sample", &sample);
-  if(sample) {
+  buffer = gst_buffer_new_and_alloc(arg);
 
-    buffer = gst_sample_get_buffer(sample);
-    gst_buffer_map(buffer, &info, GST_MAP_READ);
+  
+  g_signal_emit_by_name (src, "push-buffer", buffer, &ret);
 
-    memset(rtp_packet, 0, sizeof(rtp_packet));
-    memcpy(rtp_packet, info.data, info.size);
-    bytes = info.size;
-
-    peer_connection_send_rtp_packet(g_peer_connection, rtp_packet, bytes);
-
-    gst_sample_unref(sample);
-    return GST_FLOW_OK;
+  if (ret != GST_FLOW_OK) {
+    return FALSE;
   }
+
+  gst_buffer_unref(buffer);
+
   return GST_FLOW_ERROR;
 }
 
@@ -129,14 +139,14 @@ int main(int argc, char **argv) {
   options_t options = {8000, "0.0.0.0", "root"};
   parse_argv(argc, argv, &options);
 
-  GstElement *pear_sink;
+  GstElement *pear_src;
 
   gst_init(&argc, &argv);
 
   gst_element = gst_parse_launch(PIPE_LINE, NULL);
-  pear_sink = gst_bin_get_by_name(GST_BIN(gst_element), "pear-sink");
-  g_signal_connect(pear_sink, "new-sample", G_CALLBACK(new_sample), NULL);
-  g_object_set(pear_sink, "emit-signals", TRUE, NULL);
+  pear_src = gst_bin_get_by_name(GST_BIN(gst_element), "pear-src");
+  g_signal_connect(pear_src, "need-data", G_CALLBACK(need_data), NULL);
+  g_object_set(pear_src, "emit-signals", TRUE, NULL);
 
   if(signal_service_create(&signal_service, options)) {
     exit(1);

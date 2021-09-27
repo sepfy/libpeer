@@ -34,4 +34,7 @@ void peer_connection_set_on_iceconnectionstatechange(peer_connection_t *peer_con
 void peer_connection_set_on_transport_ready(peer_connection_t *peer_connection,
  void (*on_transport_ready), void *data);
 
+void peer_connection_set_on_track(peer_connection_t *peer_connection,
+ void (*on_track), void *data);
+
 #endif // PEER_CONNECTION_H_

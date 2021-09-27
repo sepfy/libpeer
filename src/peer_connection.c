@@ -65,6 +65,7 @@ void peer_connection_set_remote_description(peer_connection_t *peer_connection,
   ice_agent_set_remote_sdp(&peer_connection->ice_agent, sdp);
 }
 
+
 int peer_connection_send_rtp_packet(peer_connection_t *peer_connection, uint8_t *packet, int bytes) {
 
   ice_agent_t *ice_agent = (ice_agent_t*)&peer_connection->ice_agent;
@@ -93,4 +94,13 @@ void peer_connection_set_on_iceconnectionstatechange(peer_connection_t *peer_con
   ice_agent_t *ice_agent = (ice_agent_t*)&peer_connection->ice_agent;
   ice_agent->on_iceconnectionstatechange = on_iceconnectionstatechange;
   ice_agent->on_iceconnectionstatechange_data = data;
+}
+
+
+void peer_connection_set_on_track(peer_connection_t *peer_connection,
+ void (*on_track), void *data) {
+
+  ice_agent_t *ice_agent = (ice_agent_t*)&peer_connection->ice_agent;
+  ice_agent->on_track = on_track;
+  ice_agent->on_track_data = data;
 }

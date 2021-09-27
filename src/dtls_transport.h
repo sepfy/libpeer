@@ -39,5 +39,6 @@ int dtls_transport_init(dtls_transport_t *dtls_transport, BIO *agent_write_bio);
 void dtls_transport_incomming_msg(dtls_transport_t *dtls_transport, char *buf, int len);
 void dtls_transport_do_handshake(dtls_transport_t *dtls_transport);
 void dtls_transport_encrypt_rtp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes);
+void dtls_transport_decrypt_rtp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes);
 
 #endif // DTLS_TRANSPORT_H_

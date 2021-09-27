@@ -25,6 +25,15 @@ void* ice_agent_gather_thread(void *data) {
 
 int ice_agent_send_rtp_packet(ice_agent_t *ice_agent, uint8_t *packet, int *bytes) {
 
+if(*bytes > 16) {
+  int i = 0;
+  for(i = 0; i < 16; i++) {
+    printf("%.2X ", (uint8_t)packet[i]);
+  }
+  printf("\n");
+}
+
+
     dtls_transport_encrypt_rtp_packet(ice_agent->dtls_transport, packet, bytes);
     int sent = nice_agent_send(ice_agent->nice_agent, ice_agent->stream_id,
      ice_agent->component_id, *bytes, (gchar*)packet);
@@ -45,6 +54,12 @@ static void cb_ice_recv(NiceAgent *agent, guint stream_id, guint component_id,
   }
   else if(dtls_transport_is_dtls(buf)) {
     dtls_transport_incomming_msg(ice_agent->dtls_transport, buf, len);
+  }
+  else if(rtp_receiver_is_rtp(buf, len)) {
+    dtls_transport_decrypt_rtp_packet(ice_agent->dtls_transport, buf, &len);
+    if(ice_agent->on_track != NULL) {
+      ice_agent->on_track(buf, len);
+    }
   }
 }
 
@@ -99,7 +114,7 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
   }
 
   sdp_attribute_append(sdp_attribute, "c=IN IP4 0.0.0.0");
-  sdp_attribute_append(sdp_attribute, "a=sendonly");
+  sdp_attribute_append(sdp_attribute, "a=recvonly");
   sdp_attribute_append(sdp_attribute, "a=mid:0");
   sdp_attribute_append(sdp_attribute, "a=rtcp-mux");
   sdp_attribute_append(sdp_attribute, "a=ice-ufrag:%s", local_ufrag);

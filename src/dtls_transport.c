@@ -294,6 +294,12 @@ void dtls_transport_incomming_msg(dtls_transport_t *dtls_transport, char *buf, i
   LOG_INFO("Created outbound SRTP session");
 }
 
+void dtls_transport_decrypt_rtp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes) {
+
+  srtp_unprotect(dtls_transport->srtp_in, packet, bytes);
+}
+
+
 void dtls_transport_encrypt_rtp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes) {
 
   srtp_protect(dtls_transport->srtp_out, packet, bytes);

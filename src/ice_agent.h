@@ -36,10 +36,11 @@ typedef struct ice_agent_t {
   void (*on_icecandidate)(char *sdp, void *data);
   void (*on_iceconnectionstatechange)(iceconnectionstate_t state, void *data);
   void (*on_transport_ready)(void *data);
+  void (*on_track)(uint8_t *packet, size_t bytes);
   void *on_icecandidate_data;
   void *on_transport_ready_data;
   void *on_iceconnectionstatechange_data;
-
+  void *on_track_data;
 } ice_agent_t;
 
 
