@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include <gst/gst.h>
+#include "h264_depacketizer.h"
 
 #include "signal_service.h"
 #include "utils.h"
@@ -10,6 +11,7 @@
 
 #define MTU 1400
 
+rtp_decode_context_t *rtp_decode_context;
 GstElement *gst_element;
 char *g_sdp = NULL;
 static GCond g_cond;
@@ -41,7 +43,7 @@ static void on_transport_ready(void *data) {
 
 void on_track(uint8_t *packet, size_t bytes) {
 #if 0
-printf("%d\n", bytes);
+//printf("%d\n", bytes);
 if(bytes > 16) {
   int i = 0;
   for(i = 0; i < 16; i++) {
@@ -50,6 +52,8 @@ if(bytes > 16) {
   printf("\n");
 }
 #endif
+
+rtp_decode_frame(rtp_decode_context, packet, bytes);
 
 }
 
@@ -144,10 +148,13 @@ int main(int argc, char **argv) {
 
   gst_init(&argc, &argv);
 
+
+  rtp_decode_context = create_rtp_decode_context();
+
   gst_element = gst_parse_launch(PIPE_LINE, NULL);
   pear_src = gst_bin_get_by_name(GST_BIN(gst_element), "pear-src");
-  g_signal_connect(pear_src, "need-data", G_CALLBACK(need_data), NULL);
-  g_object_set(pear_src, "emit-signals", TRUE, NULL);
+//  g_signal_connect(pear_src, "need-data", G_CALLBACK(need_data), NULL);
+//  g_object_set(pear_src, "emit-signals", TRUE, NULL);
 
   if(signal_service_create(&signal_service, options)) {
     exit(1);

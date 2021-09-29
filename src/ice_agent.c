@@ -68,7 +68,6 @@ static void cb_ice_recv(NiceAgent *agent, guint stream_id, guint component_id,
       memcpy(plibuf + 4, buf + 8, 4);
 
       dtls_transport_encrypt_rctp_packet(ice_agent->dtls_transport, plibuf, &size);
-
       int ret = nice_agent_send(ice_agent->nice_agent, ice_agent->stream_id,
        ice_agent->component_id, size, (gchar*)plibuf); 
    
