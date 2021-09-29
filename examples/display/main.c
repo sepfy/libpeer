@@ -41,10 +41,11 @@ static void on_transport_ready(void *data) {
 
 void on_track(uint8_t *packet, size_t bytes) {
 #if 0
+printf("%d\n", bytes);
 if(bytes > 16) {
   int i = 0;
   for(i = 0; i < 16; i++) {
-    printf("%.2X ", (uint8_t)packet[i]);
+    printf("%.2X ", (uint8_t)packet[i+12]);
   }
   printf("\n");
 }

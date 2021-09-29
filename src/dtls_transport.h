@@ -40,5 +40,6 @@ void dtls_transport_incomming_msg(dtls_transport_t *dtls_transport, char *buf, i
 void dtls_transport_do_handshake(dtls_transport_t *dtls_transport);
 void dtls_transport_encrypt_rtp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes);
 void dtls_transport_decrypt_rtp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes);
+void dtls_transport_encrypt_rctp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes);
 
 #endif // DTLS_TRANSPORT_H_
