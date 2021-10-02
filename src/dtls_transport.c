@@ -194,7 +194,10 @@ void dtls_transport_do_handshake(dtls_transport_t *dtls_transport) {
   SSL_do_handshake(dtls_transport->ssl);
 }
 
-int dtls_transport_is_dtls(char *buf) {
+int dtls_transport_validate(char *buf) {
+
+  if(buf == NULL)
+    return 0;
 
   return ((*buf >= 19) && (*buf <= 64));
 }
@@ -296,6 +299,7 @@ void dtls_transport_incomming_msg(dtls_transport_t *dtls_transport, char *buf, i
 }
 
 void dtls_transport_decrypt_rtp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes) {
+
   srtp_unprotect(dtls_transport->srtp_in, packet, bytes);
 }
 

@@ -4,7 +4,8 @@
 #include "ice_agent.h"
 #include "ice_agent_bio.h"
 #include "sdp_attribute.h"
-#include "rtcp_receiver.h"
+#include "rtp_packet.h"
+#include "rtcp_packet.h"
 
 static const gchar *STATE_NAME[] = {"disconnected", "gathering", "connecting",
  "connected", "ready", "failed"};
@@ -25,15 +26,6 @@ void* ice_agent_gather_thread(void *data) {
 
 int ice_agent_send_rtp_packet(ice_agent_t *ice_agent, uint8_t *packet, int *bytes) {
 
-if(*bytes > 16) {
-  int i = 0;
-  for(i = 0; i < 16; i++) {
-    printf("%.2X ", (uint8_t)packet[i]);
-  }
-  printf("\n");
-}
-
-
     dtls_transport_encrypt_rtp_packet(ice_agent->dtls_transport, packet, bytes);
     int sent = nice_agent_send(ice_agent->nice_agent, ice_agent->stream_id,
      ice_agent->component_id, *bytes, (gchar*)packet);
@@ -43,39 +35,50 @@ if(*bytes > 16) {
     return sent;
 }
 
+int ice_agent_send_rtcp_pil(ice_agent_t *ice_agent, uint32_t ssrc) {
+
+  int ret = -1;
+  guint size = 12;
+  uint8_t plibuf[128];
+  rtcp_packet_get_pli(plibuf, 12, ssrc);
+
+  dtls_transport_encrypt_rctp_packet(ice_agent->dtls_transport, plibuf, &size);
+  ret = nice_agent_send(ice_agent->nice_agent, ice_agent->stream_id,
+   ice_agent->component_id, size, (gchar*)plibuf); 
+
+  return -1;
+}
+
 static void cb_ice_recv(NiceAgent *agent, guint stream_id, guint component_id,
  guint len, gchar *buf, gpointer data) {
 
   ice_agent_t *ice_agent = (ice_agent_t*)data;
-  if(rtcp_receiver_is_rtcp(buf)) {
-    if(ice_agent->on_transport_ready != NULL) {
-      ice_agent->on_transport_ready((void*)ice_agent->on_transport_ready_data);
-    }
-  }
-  else if(dtls_transport_is_dtls(buf)) {
-    dtls_transport_incomming_msg(ice_agent->dtls_transport, buf, len);
-  }
-  else if(rtp_receiver_is_rtp(buf, len)) {
-    dtls_transport_decrypt_rtp_packet(ice_agent->dtls_transport, buf, &len);
-    static int count = 0;
-    count++;
-    if(count%60 == 0) {
-      guint size = 12;
-      char plibuf[128];
-      memset(plibuf, 0, 12);
-      rtcp_receiver_get_pli((char *)&plibuf, 12);
-      memcpy(plibuf + 8, buf + 8, 4);
-      memcpy(plibuf + 4, buf + 8, 4);
+  if(rtcp_packet_validate(buf, len)) {
 
-      dtls_transport_encrypt_rctp_packet(ice_agent->dtls_transport, plibuf, &size);
-      int ret = nice_agent_send(ice_agent->nice_agent, ice_agent->stream_id,
-       ice_agent->component_id, size, (gchar*)plibuf); 
-   
+    if(ice_agent->on_transport_ready != NULL)
+      ice_agent->on_transport_ready((void*)ice_agent->on_transport_ready_data);
+
+  }
+  else if(dtls_transport_validate(buf)) {
+
+    dtls_transport_incomming_msg(ice_agent->dtls_transport, buf, len);
+
+  }
+  else if(rtp_packet_validate(buf, len)) {
+
+    dtls_transport_decrypt_rtp_packet(ice_agent->dtls_transport, buf, &len);
+
+    static int frame_number = 0;
+    frame_number++;
+    if(frame_number % ice_agent->h264_gop == 0) {
+      uint32_t ssrc = *(uint32_t*)(buf + 8);
+      ice_agent_send_rtcp_pil(ice_agent, ssrc);
     }
 
     if(ice_agent->on_track != NULL) {
       ice_agent->on_track(buf, len);
     }
+
   }
 }
 
@@ -150,7 +153,8 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
       sdp_attribute_append(sdp_attribute, "a=fmtp:102 packetization-mode=1");
       sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack");
       sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack pli");
-      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 goog-remb");
+      //sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 goog-remb");
+      sdp_attribute_append(sdp_attribute, "a=fmtp:102 x-google-max-bitrate=5000;x-google-min-bitrate=3000;x-google-start-bitrate=200000");
       break;
     default:
       break;
@@ -216,6 +220,7 @@ int ice_agent_init(ice_agent_t *ice_agent, dtls_transport_t *dtls_transport) {
   ice_agent->on_icecandidate_data = NULL;
   ice_agent->on_iceconnectionstatechange = NULL;
   ice_agent->on_iceconnectionstatechange_data = NULL;
+  ice_agent->h264_gop = 60;
   ice_agent->codec = CODEC_NONE;
 
   dtls_transport_init(dtls_transport, ice_agent_bio_new(ice_agent));

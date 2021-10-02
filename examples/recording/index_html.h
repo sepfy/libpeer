@@ -62,7 +62,7 @@ console.log(JSON.parse(atob(sdp))); \n\
       window.startSession = () => { \n \
         let sd = document.getElementById('remoteSessionDescription').value; \n \
       } \n \
-      navigator.mediaDevices.getUserMedia({ video: true, audio: false }) \n \
+      navigator.mediaDevices.getDisplayMedia({ video: true, audio: false }) \n \
         .then(stream => { \n \
           document.getElementById('localVideo').srcObject = stream \n \
           stream.getTracks().forEach(track => pc.addTrack(track, stream)); \n \
