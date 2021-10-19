@@ -47,6 +47,8 @@ char* on_offer_get_cb(char *offer, void *data) {
   peer_connection_destroy(g_peer_connection);
   g_peer_connection = peer_connection_create();
   peer_connection_add_stream(g_peer_connection, "H264");
+  transceiver_t transceiver = {.video = RECVONLY};
+  peer_connection_add_transceiver(g_peer_connection, transceiver);
   peer_connection_set_on_track(g_peer_connection, on_track, NULL);
   peer_connection_set_on_icecandidate(g_peer_connection, on_icecandidate, NULL);
   peer_connection_set_on_transport_ready(g_peer_connection, &on_transport_ready, NULL);

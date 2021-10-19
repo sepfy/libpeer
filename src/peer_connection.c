@@ -104,3 +104,8 @@ void peer_connection_set_on_track(peer_connection_t *peer_connection,
   ice_agent->on_track = on_track;
   ice_agent->on_track_data = data;
 }
+
+int peer_connection_add_transceiver(peer_connection_t *pc, transceiver_t transceiver) {
+  pc->transceiver = transceiver;
+  pc->ice_agent.direction = transceiver.video;
+}

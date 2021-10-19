@@ -34,4 +34,6 @@
 #define LOG_ERROR(fmt, arg...)
 #endif
 
+int utils_get_ipv4addr(char *hostname, char *ipv4addr, size_t size);
+
 int utils_is_valid_ip_address(char *ip_address);

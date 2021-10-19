@@ -133,7 +133,19 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
   }
 
   sdp_attribute_append(sdp_attribute, "c=IN IP4 0.0.0.0");
-  sdp_attribute_append(sdp_attribute, "a=recvonly");
+
+  switch(ice_agent->direction) {
+    case SENDRECV:
+      sdp_attribute_append(sdp_attribute, "a=sendrecv");
+      break;
+    case RECVONLY:
+      sdp_attribute_append(sdp_attribute, "a=recvonly");
+      break;
+    default:
+      sdp_attribute_append(sdp_attribute, "a=sendonly");
+      break;
+  }
+
   sdp_attribute_append(sdp_attribute, "a=mid:0");
   sdp_attribute_append(sdp_attribute, "a=rtcp-mux");
   sdp_attribute_append(sdp_attribute, "a=ice-ufrag:%s", local_ufrag);
@@ -222,6 +234,7 @@ int ice_agent_init(ice_agent_t *ice_agent, dtls_transport_t *dtls_transport) {
   ice_agent->on_iceconnectionstatechange_data = NULL;
   ice_agent->h264_gop = 60;
   ice_agent->codec = CODEC_NONE;
+  ice_agent->direction = SENDONLY;
 
   dtls_transport_init(dtls_transport, ice_agent_bio_new(ice_agent));
 

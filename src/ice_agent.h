@@ -31,6 +31,7 @@ typedef struct ice_agent_t {
 
   dtls_transport_t *dtls_transport;
   sdp_attribute_t *sdp_attribute;
+  transceiver_direction_t direction;
   codec_t codec;
   int h264_gop;
 

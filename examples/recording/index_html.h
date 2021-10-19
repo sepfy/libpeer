@@ -46,15 +46,7 @@ console.log(JSON.parse(atob(sdp))); \n\
       } \n \
       pc.onicecandidate = event => { \n \
         if (event.candidate === null) { \n \
-          var lines = pc.localDescription.sdp.split('\\n'); \n \
-          for(let i = 0; i < lines.length; i++) { \n \
-            // remove candidate which libnice cannot parse. \n \
-            if(lines[i].search('candidate') != -1 && lines[i].search('local') != -1) { \n \
-              lines.splice(i, 1); \n \
-              i--; \n \
-            } \n \
-          } \n \
-          sdp = lines.join('\\n'); \n \
+          let sdp = pc.localDescription.sdp; \n \
           var payload = {\"jsonrpc\": \"2.0\", \"method\": \"call\", \"params\": btoa(sdp)}; \n \
           jsonRpc(payload, jsonRpcHandle); \n \
         } \n \
