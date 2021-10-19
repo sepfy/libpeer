@@ -76,16 +76,8 @@ pc.ontrack = function (event) {
 
 pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
 pc.onicecandidate = event => {
-  if (event.candidate === null) {
-    var lines = pc.localDescription.sdp.split('\n');
-    for(let i = 0; i < lines.length; i++) {
-      // remove candidate which libnice cannot parse.
-      if(lines[i].search("candidate") != -1 && lines[i].search("local") != -1) {
-        lines.splice(i, 1);
-        i--;
-      }
-    }
-    sdp = lines.join('\n');
+  if(event.candidate === null) {
+    let sdp = pc.localDescription.sdp;
     document.getElementById('localSessionDescription').value = btoa(sdp);
   }
 }

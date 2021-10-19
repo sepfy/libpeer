@@ -28,7 +28,7 @@ struct rtp_encode_context_t* create_rtp_encode_context(peer_connection_t *peer_c
   rtp_encode_context->handler.alloc = rtp_encode_alloc;
   rtp_encode_context->handler.free = rtp_encode_free;
   rtp_encode_context->handler.packet = rtp_encode_packet;
-  rtp_encode_context->encoder = rtp_payload_encode_create(102, "H264", 0, 12345678, &rtp_encode_context->handler, rtp_encode_context);
+  rtp_encode_context->encoder = rtp_payload_encode_create(102, "H264", 0, 0, &rtp_encode_context->handler, rtp_encode_context);
   rtp_encode_context->peer_connection = peer_connection;
 
   return rtp_encode_context;
