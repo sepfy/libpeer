@@ -166,7 +166,7 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
       sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack");
       sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack pli");
       //sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 goog-remb");
-      sdp_attribute_append(sdp_attribute, "a=fmtp:102 x-google-max-bitrate=5000;x-google-min-bitrate=3000;x-google-start-bitrate=200000");
+      sdp_attribute_append(sdp_attribute, "a=fmtp:102 x-google-max-bitrate=6000;x-google-min-bitrate=2000;x-google-start-bitrate=4000");
       break;
     default:
       break;
@@ -299,6 +299,30 @@ void ice_agent_set_remote_sdp(ice_agent_t *ice_agent, char *remote_sdp_base64) {
 
   remote_sdp = g_base64_decode(remote_sdp_base64, &len);
 
+  // Remove mDNS
+  sdp_attribute_t *sdp_attribute = NULL;
+  if(strstr(remote_sdp, "local") != NULL) {
+    sdp_attribute = sdp_attribute_create();
+    char *token;
+    token = strtok(remote_sdp, "\r\n");
+    while(token != NULL) {
+
+      if(strstr(token, "candidate") != NULL && strstr(token, "local") != NULL) {
+        char buf[256] = {0};
+        if(sdp_attribute_update_mdns_of_candidate(token, buf, sizeof(buf)) != -1) {
+          sdp_attribute_append_newline(sdp_attribute, buf);
+	}
+      }
+      else {
+        sdp_attribute_append_newline(sdp_attribute, token);
+      }
+
+      token = strtok(NULL, "\r\n");
+    }
+ 
+    remote_sdp = sdp_attribute->attributes;
+  }
+
   plist = nice_agent_parse_remote_stream_sdp(ice_agent->nice_agent,
    ice_agent->component_id, (gchar*)remote_sdp, &ufrag, &pwd);
 
@@ -319,7 +343,11 @@ void ice_agent_set_remote_sdp(ice_agent_t *ice_agent, char *remote_sdp_base64) {
     g_slist_free_full(plist, (GDestroyNotify)&nice_candidate_free);
   }
 
-  if(remote_sdp)
+  if(sdp_attribute) {
+    sdp_attribute_destroy(sdp_attribute);
+  }
+  else {
     free(remote_sdp);
+  }
 
 }
