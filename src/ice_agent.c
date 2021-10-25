@@ -4,7 +4,8 @@
 #include "ice_agent.h"
 #include "ice_agent_bio.h"
 #include "sdp_attribute.h"
-#include "rtcp_receiver.h"
+#include "rtp_packet.h"
+#include "rtcp_packet.h"
 
 static const gchar *STATE_NAME[] = {"disconnected", "gathering", "connecting",
  "connected", "ready", "failed"};
@@ -34,17 +35,50 @@ int ice_agent_send_rtp_packet(ice_agent_t *ice_agent, uint8_t *packet, int *byte
     return sent;
 }
 
+int ice_agent_send_rtcp_pil(ice_agent_t *ice_agent, uint32_t ssrc) {
+
+  int ret = -1;
+  guint size = 12;
+  uint8_t plibuf[128];
+  rtcp_packet_get_pli(plibuf, 12, ssrc);
+
+  dtls_transport_encrypt_rctp_packet(ice_agent->dtls_transport, plibuf, &size);
+  ret = nice_agent_send(ice_agent->nice_agent, ice_agent->stream_id,
+   ice_agent->component_id, size, (gchar*)plibuf); 
+
+  return -1;
+}
+
 static void cb_ice_recv(NiceAgent *agent, guint stream_id, guint component_id,
  guint len, gchar *buf, gpointer data) {
 
   ice_agent_t *ice_agent = (ice_agent_t*)data;
-  if(rtcp_receiver_is_rtcp(buf)) {
-    if(ice_agent->on_transport_ready != NULL) {
+  if(rtcp_packet_validate(buf, len)) {
+
+    if(ice_agent->on_transport_ready != NULL)
       ice_agent->on_transport_ready((void*)ice_agent->on_transport_ready_data);
-    }
+
   }
-  else if(dtls_transport_is_dtls(buf)) {
+  else if(dtls_transport_validate(buf)) {
+
     dtls_transport_incomming_msg(ice_agent->dtls_transport, buf, len);
+
+  }
+  else if(rtp_packet_validate(buf, len)) {
+
+    dtls_transport_decrypt_rtp_packet(ice_agent->dtls_transport, buf, &len);
+
+    static int frame_number = 0;
+    frame_number++;
+    if(frame_number % ice_agent->h264_gop == 0) {
+      uint32_t ssrc = *(uint32_t*)(buf + 8);
+      ice_agent_send_rtcp_pil(ice_agent, ssrc);
+    }
+
+    if(ice_agent->on_track != NULL) {
+      ice_agent->on_track(buf, len, ice_agent->on_track_data);
+    }
+
   }
 }
 
@@ -99,7 +133,19 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
   }
 
   sdp_attribute_append(sdp_attribute, "c=IN IP4 0.0.0.0");
-  sdp_attribute_append(sdp_attribute, "a=sendonly");
+
+  switch(ice_agent->direction) {
+    case SENDRECV:
+      sdp_attribute_append(sdp_attribute, "a=sendrecv");
+      break;
+    case RECVONLY:
+      sdp_attribute_append(sdp_attribute, "a=recvonly");
+      break;
+    default:
+      sdp_attribute_append(sdp_attribute, "a=sendonly");
+      break;
+  }
+
   sdp_attribute_append(sdp_attribute, "a=mid:0");
   sdp_attribute_append(sdp_attribute, "a=rtcp-mux");
   sdp_attribute_append(sdp_attribute, "a=ice-ufrag:%s", local_ufrag);
@@ -119,7 +165,8 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
       sdp_attribute_append(sdp_attribute, "a=fmtp:102 packetization-mode=1");
       sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack");
       sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack pli");
-      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 goog-remb");
+      //sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 goog-remb");
+      sdp_attribute_append(sdp_attribute, "a=fmtp:102 x-google-max-bitrate=6000;x-google-min-bitrate=2000;x-google-start-bitrate=4000");
       break;
     default:
       break;
@@ -185,7 +232,9 @@ int ice_agent_init(ice_agent_t *ice_agent, dtls_transport_t *dtls_transport) {
   ice_agent->on_icecandidate_data = NULL;
   ice_agent->on_iceconnectionstatechange = NULL;
   ice_agent->on_iceconnectionstatechange_data = NULL;
+  ice_agent->h264_gop = 60;
   ice_agent->codec = CODEC_NONE;
+  ice_agent->direction = SENDONLY;
 
   dtls_transport_init(dtls_transport, ice_agent_bio_new(ice_agent));
 
@@ -250,6 +299,30 @@ void ice_agent_set_remote_sdp(ice_agent_t *ice_agent, char *remote_sdp_base64) {
 
   remote_sdp = g_base64_decode(remote_sdp_base64, &len);
 
+  // Remove mDNS
+  sdp_attribute_t *sdp_attribute = NULL;
+  if(strstr(remote_sdp, "local") != NULL) {
+    sdp_attribute = sdp_attribute_create();
+    char *token;
+    token = strtok(remote_sdp, "\r\n");
+    while(token != NULL) {
+
+      if(strstr(token, "candidate") != NULL && strstr(token, "local") != NULL) {
+        char buf[256] = {0};
+        if(sdp_attribute_update_mdns_of_candidate(token, buf, sizeof(buf)) != -1) {
+          sdp_attribute_append_newline(sdp_attribute, buf);
+	}
+      }
+      else {
+        sdp_attribute_append_newline(sdp_attribute, token);
+      }
+
+      token = strtok(NULL, "\r\n");
+    }
+ 
+    remote_sdp = sdp_attribute->attributes;
+  }
+
   plist = nice_agent_parse_remote_stream_sdp(ice_agent->nice_agent,
    ice_agent->component_id, (gchar*)remote_sdp, &ufrag, &pwd);
 
@@ -270,7 +343,11 @@ void ice_agent_set_remote_sdp(ice_agent_t *ice_agent, char *remote_sdp_base64) {
     g_slist_free_full(plist, (GDestroyNotify)&nice_candidate_free);
   }
 
-  if(remote_sdp)
+  if(sdp_attribute) {
+    sdp_attribute_destroy(sdp_attribute);
+  }
+  else {
     free(remote_sdp);
+  }
 
 }

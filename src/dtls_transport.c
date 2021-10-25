@@ -194,7 +194,10 @@ void dtls_transport_do_handshake(dtls_transport_t *dtls_transport) {
   SSL_do_handshake(dtls_transport->ssl);
 }
 
-int dtls_transport_is_dtls(char *buf) {
+int dtls_transport_validate(char *buf) {
+
+  if(buf == NULL)
+    return 0;
 
   return ((*buf >= 19) && (*buf <= 64));
 }
@@ -292,9 +295,21 @@ void dtls_transport_incomming_msg(dtls_transport_t *dtls_transport, char *buf, i
     LOG_ERROR("Error creating outbound SRTP session");
   }
   LOG_INFO("Created outbound SRTP session");
+
 }
+
+void dtls_transport_decrypt_rtp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes) {
+
+  srtp_unprotect(dtls_transport->srtp_in, packet, bytes);
+}
+
 
 void dtls_transport_encrypt_rtp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes) {
 
   srtp_protect(dtls_transport->srtp_out, packet, bytes);
+}
+
+void dtls_transport_encrypt_rctp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes) {
+
+  srtp_protect_rtcp(dtls_transport->srtp_out, packet, bytes);
 }
