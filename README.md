@@ -29,3 +29,4 @@ Pear is a WebRTC SDK written in C. The SDK aims to integrate IoT/Embedded device
 ### Examples
 - [Local file](https://github.com/sepfy/pear/tree/main/examples/local_file): Stream h264 file to browser and exchange SDP by copy and paste.
 - [GStreamer](https://github.com/sepfy/pear/tree/main/examples/gstreamer): Stream v4l2 source to browser with GStreamer and exchange SDP by libevent HTTP server.
+- [Recording](https://github.com/sepfy/pear/tree/main/examples/recording): Record your screen and save as a file.
