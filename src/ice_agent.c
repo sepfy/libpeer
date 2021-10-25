@@ -76,7 +76,7 @@ static void cb_ice_recv(NiceAgent *agent, guint stream_id, guint component_id,
     }
 
     if(ice_agent->on_track != NULL) {
-      ice_agent->on_track(buf, len);
+      ice_agent->on_track(buf, len, ice_agent->on_track_data);
     }
 
   }

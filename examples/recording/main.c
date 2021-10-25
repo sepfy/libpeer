@@ -36,7 +36,7 @@ static void on_transport_ready(void *data) {
 }
 
 
-void on_track(uint8_t *packet, size_t bytes) {
+void on_track(uint8_t *packet, size_t bytes, void *data) {
 
   rtp_decode_frame(rtp_decode_context, packet, bytes);
 }
