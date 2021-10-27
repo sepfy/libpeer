@@ -21,7 +21,7 @@ static int rtp_encode_packet(void* param, const void *packet, int bytes, uint32_
   return 0;
 }
 
-struct rtp_encode_context_t* create_rtp_encode_context(peer_connection_t *peer_connection) {
+struct rtp_encode_context_t* create_rtp_encode_context(PeerConnection *peer_connection) {
 
   struct rtp_encode_context_t *rtp_encode_context = NULL;
   rtp_encode_context = (rtp_encode_context_t*)malloc(sizeof(struct rtp_encode_context_t));

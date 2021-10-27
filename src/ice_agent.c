@@ -51,13 +51,12 @@ int ice_agent_send_rtcp_pil(ice_agent_t *ice_agent, uint32_t ssrc) {
 
 static void cb_ice_recv(NiceAgent *agent, guint stream_id, guint component_id,
  guint len, gchar *buf, gpointer data) {
-
   ice_agent_t *ice_agent = (ice_agent_t*)data;
   if(rtcp_packet_validate(buf, len)) {
 
-    if(ice_agent->on_transport_ready != NULL)
+     if(ice_agent->on_transport_ready != NULL) {
       ice_agent->on_transport_ready((void*)ice_agent->on_transport_ready_data);
-
+     }
   }
   else if(dtls_transport_validate(buf)) {
 
@@ -91,8 +90,57 @@ static void cb_new_selected_pair_full(NiceAgent* agent, guint stream_id,
   dtls_transport_do_handshake(ice_agent->dtls_transport);
 }
 
+void codec_to_sdp(sdp_attribute_t *sdp, MediaCodec codec, transceiver_direction_t direction,
+ const char *ufrag, const char *password, const char *fingerprint) {
+
+  static int mid = 0;
+
+  switch(codec) {
+    case CODEC_H264:
+      sdp_attribute_append(sdp, "m=video 9 UDP/TLS/RTP/SAVPF 102");
+      sdp_attribute_append(sdp, "a=rtpmap:102 H264/90000");
+      sdp_attribute_append(sdp, "a=fmtp:102 packetization-mode=1");
+      sdp_attribute_append(sdp, "a=rtcp-fb:102 nack");
+      sdp_attribute_append(sdp, "a=rtcp-fb:102 nack pli");
+      sdp_attribute_append(sdp, "a=fmtp:102 x-google-max-bitrate=6000;x-google-min-bitrate=2000;x-google-start-bitrate=4000");
+      break;
+    case CODEC_OPUS:
+      sdp_attribute_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 111");
+      sdp_attribute_append(sdp, "a=rtcp-fb:111 nack");
+      sdp_attribute_append(sdp, "a=rtpmap:111 opus/48000/2");
+    default:
+      return;
+  }
+
+  sdp_attribute_append(sdp, "c=IN IP4 0.0.0.0");
+
+  switch(direction) {
+    case SENDRECV:
+      sdp_attribute_append(sdp, "a=sendrecv");
+      break;
+    case RECVONLY:
+      sdp_attribute_append(sdp, "a=recvonly");
+      break;
+    case SENDONLY:
+      sdp_attribute_append(sdp, "a=sendonly");
+      break;
+    default:
+      break;
+  }
+
+  sdp_attribute_append(sdp, "a=mid:%d", mid);
+  sdp_attribute_append(sdp, "a=rtcp-mux");
+  sdp_attribute_append(sdp, "a=ice-ufrag:%s", ufrag);
+  sdp_attribute_append(sdp, "a=ice-pwd:%s", password);
+  sdp_attribute_append(sdp, "a=ice-options:trickle");
+  sdp_attribute_append(sdp, "a=fingerprint:sha-256 %s", fingerprint);
+  sdp_attribute_append(sdp, "a=setup:passive");
+  mid = (mid + 1)%2;
+}
+
 static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
  gpointer data) {
+
 
   ice_agent_t *ice_agent;
   ice_agent = (ice_agent_t*)data;
@@ -116,60 +164,125 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
 
   sdp_attribute_append(sdp_attribute, "v=0");
   sdp_attribute_append(sdp_attribute, "o=- 1495799811084970 1495799811084970 IN IP4 0.0.0.0");
-  sdp_attribute_append(sdp_attribute, "s=Streaming Test");
+  sdp_attribute_append(sdp_attribute, "s=-");
   sdp_attribute_append(sdp_attribute, "t=0 0");
-  sdp_attribute_append(sdp_attribute, "a=group:BUNDLE 0");
-  sdp_attribute_append(sdp_attribute, "a=msid-semantic: pear");
+  sdp_attribute_append(sdp_attribute, "a=msid-semantic: WMS");
 
-  switch(ice_agent->codec) {
-    case CODEC_OPUS:
-      sdp_attribute_append(sdp_attribute, "m=audio 9 UDP/TLS/RTP/SAVP 111");
-      break;
-    case CODEC_H264:
-      sdp_attribute_append(sdp_attribute, "m=video 9 UDP/TLS/RTP/SAVPF 102");
-      break;
-    default:
-      break;
+  if(ice_agent->media_stream->tracks_num > 1)
+    sdp_attribute_append(sdp_attribute, "a=group:BUNDLE 0 1");
+  else
+    sdp_attribute_append(sdp_attribute, "a=group:BUNDLE 0");
+
+
+  codec_to_sdp(sdp_attribute, ice_agent->media_stream->video_codec, ice_agent->direction, local_ufrag, local_password, ice_agent->dtls_transport->fingerprint);
+ 
+  if(local_ufrag)
+    free(local_ufrag);
+
+  if(local_password)
+    free(local_password);
+
+  nice_candidates = nice_agent_get_local_candidates(ice_agent->nice_agent,
+   ice_agent->stream_id, ice_agent->component_id);
+
+  for(i = 0; i < g_slist_length(nice_candidates); ++i) {
+
+    nice_candidate = (NiceCandidate *)g_slist_nth(nice_candidates, i)->data;
+    nice_address_to_string(&nice_candidate->addr, nice_candidate_addr);
+    if(utils_is_valid_ip_address(nice_candidate_addr) > 0) {
+      nice_candidate_free(nice_candidate);
+      continue;
+    }
+
+    sdp_attribute_append(sdp_attribute, "a=candidate:%s 1 udp %u %s %d typ %s",
+     nice_candidate->foundation,
+     nice_candidate->priority,
+     nice_candidate_addr,
+     nice_address_get_port(&nice_candidate->addr),
+     CANDIDATE_TYPE_NAME[nice_candidate->type]);
+
+    nice_candidate_free(nice_candidate);
   }
 
-  sdp_attribute_append(sdp_attribute, "c=IN IP4 0.0.0.0");
-
-  switch(ice_agent->direction) {
-    case SENDRECV:
-      sdp_attribute_append(sdp_attribute, "a=sendrecv");
-      break;
-    case RECVONLY:
-      sdp_attribute_append(sdp_attribute, "a=recvonly");
-      break;
-    default:
-      sdp_attribute_append(sdp_attribute, "a=sendonly");
-      break;
+  if(ice_agent->on_icecandidate != NULL) {
+    ice_agent->on_icecandidate(sdp_attribute_get_answer(sdp_attribute),
+     ice_agent->on_icecandidate_data);
   }
 
-  sdp_attribute_append(sdp_attribute, "a=mid:0");
-  sdp_attribute_append(sdp_attribute, "a=rtcp-mux");
-  sdp_attribute_append(sdp_attribute, "a=ice-ufrag:%s", local_ufrag);
-  sdp_attribute_append(sdp_attribute, "a=ice-pwd:%s", local_password);
-  sdp_attribute_append(sdp_attribute, "a=ice-options:trickle");
-  sdp_attribute_append(sdp_attribute, "a=fingerprint:sha-256 %s",
-   ice_agent->dtls_transport->fingerprint);
-  sdp_attribute_append(sdp_attribute, "a=setup:passive");
+  if(nice_candidates)
+    g_slist_free(nice_candidates);
 
-  switch(ice_agent->codec) {
-    case CODEC_OPUS:
-      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:111 nack");
-      sdp_attribute_append(sdp_attribute, "a=rtpmap:111 opus/48000/2");
-      break;
-    case CODEC_H264:
-      sdp_attribute_append(sdp_attribute, "a=rtpmap:102 H264/90000");
-      sdp_attribute_append(sdp_attribute, "a=fmtp:102 packetization-mode=1");
-      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack");
-      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack pli");
-      //sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 goog-remb");
-      sdp_attribute_append(sdp_attribute, "a=fmtp:102 x-google-max-bitrate=6000;x-google-min-bitrate=2000;x-google-start-bitrate=4000");
-      break;
-    default:
-      break;
+
+
+
+#if 0
+  gchar *local_ufrag = NULL;
+  gchar *local_password = NULL;
+  gchar ipaddr[INET6_ADDRSTRLEN];
+  GSList *nice_candidates = NULL;
+
+  ice_agent_t *ice_agent;
+  ice_agent = (ice_agent_t*)data;
+
+  int i = 0;
+  NiceCandidate *nice_candidate;
+  char nice_candidate_addr[INET6_ADDRSTRLEN];
+
+  sdp_attribute_t *sdp_attribute = ice_agent->sdp_attribute;
+
+  if(!nice_agent_get_local_credentials(ice_agent->nice_agent,
+   ice_agent->stream_id, &local_ufrag, &local_password)) {
+    LOG_ERROR("get local credentials failed");
+    return NULL;
+  }
+
+  sdp_attribute_append(sdp_attribute, "v=0");
+  sdp_attribute_append(sdp_attribute, "o=- 1495799811084970 1495799811084970 IN IP4 0.0.0.0");
+  sdp_attribute_append(sdp_attribute, "s=-");
+  sdp_attribute_append(sdp_attribute, "t=0 0");
+
+  if(ice_agent->media_stream->tracks_num > 1)
+    sdp_attribute_append(sdp_attribute, "a=group:BUNDLE 0 1");
+  else
+    sdp_attribute_append(sdp_attribute, "a=group:BUNDLE 0");
+
+  sdp_attribute_append(sdp_attribute, "a=msid-semantic: WMS");
+
+
+  if(ice_agent->media_stream->audio_codec == CODEC_OPUS) {
+    sdp_attribute_append(sdp_attribute, "m=audio 9 UDP/TLS/RTP/SAVP 111");
+    sdp_attribute_append(sdp_attribute, "a=rtcp-fb:111 nack");
+    sdp_attribute_append(sdp_attribute, "a=rtpmap:111 opus/48000/2");
+    sdp_attribute_append(sdp_attribute, "c=IN IP4 0.0.0.0");
+    sdp_attribute_append(sdp_attribute, "a=mid:%d", i);
+    sdp_attribute_append(sdp_attribute, "a=rtcp-mux");
+    sdp_attribute_append(sdp_attribute, "a=ice-ufrag:%s", local_ufrag);
+    sdp_attribute_append(sdp_attribute, "a=ice-pwd:%s", local_password);
+    sdp_attribute_append(sdp_attribute, "a=ice-options:trickle");
+    sdp_attribute_append(sdp_attribute, "a=fingerprint:sha-256 %s",
+     ice_agent->dtls_transport->fingerprint);
+    sdp_attribute_append(sdp_attribute, "a=setup:passive");
+  }
+
+  if(ice_agent->media_stream->video_codec == CODEC_H264) {
+
+    sdp_attribute_append(sdp_attribute, "m=video 9 UDP/TLS/RTP/SAVPF 102");
+    sdp_attribute_append(sdp_attribute, "a=rtpmap:102 H264/90000");
+    sdp_attribute_append(sdp_attribute, "a=fmtp:102 packetization-mode=1");
+    sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack");
+    sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack pli");
+    //sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 goog-remb");
+    sdp_attribute_append(sdp_attribute, "a=fmtp:102 x-google-max-bitrate=6000;x-google-min-bitrate=2000;x-google-start-bitrate=4000");
+    sdp_attribute_append(sdp_attribute, "c=IN IP4 0.0.0.0");
+    sdp_attribute_append(sdp_attribute, "a=mid:%d", i);
+    sdp_attribute_append(sdp_attribute, "a=rtcp-mux");
+    sdp_attribute_append(sdp_attribute, "a=ice-ufrag:%s", local_ufrag);
+    sdp_attribute_append(sdp_attribute, "a=ice-pwd:%s", local_password);
+    sdp_attribute_append(sdp_attribute, "a=ice-options:trickle");
+    sdp_attribute_append(sdp_attribute, "a=fingerprint:sha-256 %s",
+     ice_agent->dtls_transport->fingerprint);
+    sdp_attribute_append(sdp_attribute, "a=setup:passive");
+
   }
 
   if(local_ufrag)
@@ -207,7 +320,203 @@ static void* cb_candidate_gathering_done(NiceAgent *agent, guint stream_id,
 
   if(nice_candidates)
     g_slist_free(nice_candidates);
+#endif
 
+
+#if 0
+  ice_agent_t *ice_agent;
+  ice_agent = (ice_agent_t*)data;
+
+  gchar *local_ufrag = NULL;
+  gchar *local_password = NULL;
+  gchar ipaddr[INET6_ADDRSTRLEN];
+  GSList *nice_candidates = NULL;
+
+  int i = 0;
+  NiceCandidate *nice_candidate;
+  char nice_candidate_addr[INET6_ADDRSTRLEN];
+
+  sdp_attribute_t *sdp_attribute = ice_agent->sdp_attribute;
+
+  if(!nice_agent_get_local_credentials(ice_agent->nice_agent,
+   ice_agent->stream_id, &local_ufrag, &local_password)) {
+    LOG_ERROR("get local credentials failed");
+    return NULL;
+  }
+
+  sdp_attribute_append(sdp_attribute, "v=0");
+  sdp_attribute_append(sdp_attribute, "o=- 1495799811084970 1495799811084970 IN IP4 0.0.0.0");
+  sdp_attribute_append(sdp_attribute, "s=- Stream Test");
+  sdp_attribute_append(sdp_attribute, "t=0 0");
+  sdp_attribute_append(sdp_attribute, "a=group:BUNDLE 0");
+  sdp_attribute_append(sdp_attribute, "a=msid-semantic: WMS");
+
+
+  switch(ice_agent->media_stream->audio_codec) {
+    case CODEC_OPUS:
+      sdp_attribute_append(sdp_attribute, "m=audio 9 UDP/TLS/RTP/SAVP 111");
+      break;
+    case CODEC_H264:
+      sdp_attribute_append(sdp_attribute, "m=video 9 UDP/TLS/RTP/SAVPF 102");
+      break;
+    default:
+      break;
+  }
+
+  sdp_attribute_append(sdp_attribute, "c=IN IP4 0.0.0.0");
+
+  switch(ice_agent->direction) {
+    case SENDRECV:
+      sdp_attribute_append(sdp_attribute, "a=sendrecv");
+      break;
+    case RECVONLY:
+      sdp_attribute_append(sdp_attribute, "a=recvonly");
+      break;
+    default:
+      sdp_attribute_append(sdp_attribute, "a=sendonly");
+      break;
+  }
+
+  sdp_attribute_append(sdp_attribute, "a=mid:0");
+  sdp_attribute_append(sdp_attribute, "a=rtcp-mux");
+  sdp_attribute_append(sdp_attribute, "a=ice-ufrag:%s", local_ufrag);
+  sdp_attribute_append(sdp_attribute, "a=ice-pwd:%s", local_password);
+  sdp_attribute_append(sdp_attribute, "a=ice-options:trickle");
+  sdp_attribute_append(sdp_attribute, "a=fingerprint:sha-256 %s",
+   ice_agent->dtls_transport->fingerprint);
+  sdp_attribute_append(sdp_attribute, "a=setup:passive");
+
+  switch(ice_agent->media_stream->audio_codec) {
+    case CODEC_OPUS:
+      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:111 nack");
+      sdp_attribute_append(sdp_attribute, "a=rtpmap:111 opus/48000/2");
+      break;
+    case CODEC_H264:
+      sdp_attribute_append(sdp_attribute, "a=rtpmap:102 H264/90000");
+      sdp_attribute_append(sdp_attribute, "a=fmtp:102 packetization-mode=1");
+      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack");
+      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack pli");
+      //sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 goog-remb");
+      sdp_attribute_append(sdp_attribute, "a=fmtp:102 x-google-max-bitrate=6000;x-google-min-bitrate=2000;x-google-start-bitrate=4000");
+      break;
+    default:
+      break;
+  }
+
+
+
+
+#if 0
+  sdp_attribute_append(sdp_attribute, "v=0");
+  sdp_attribute_append(sdp_attribute, "o=- 1495799811084970 1495799811084970 IN IP4 0.0.0.0");
+  sdp_attribute_append(sdp_attribute, "s=- Stream Test");
+  sdp_attribute_append(sdp_attribute, "t=0 0");
+  sdp_attribute_append(sdp_attribute, "a=group:BUNDLE 0 1");
+  sdp_attribute_append(sdp_attribute, "a=msid-semantic: WMS");
+
+
+  switch(ice_agent->audio_codec) {
+    case CODEC_OPUS:
+      sdp_attribute_append(sdp_attribute, "m=audio 9 UDP/TLS/RTP/SAVP 111");
+      break;
+    case CODEC_H264:
+      sdp_attribute_append(sdp_attribute, "m=video 9 UDP/TLS/RTP/SAVPF 102");
+      break;
+    default:
+      break;
+  }
+
+  sdp_attribute_append(sdp_attribute, "c=IN IP4 0.0.0.0");
+
+  switch(ice_agent->direction) {
+    case SENDRECV:
+      sdp_attribute_append(sdp_attribute, "a=sendrecv");
+      break;
+    case RECVONLY:
+      sdp_attribute_append(sdp_attribute, "a=recvonly");
+      break;
+    default:
+      sdp_attribute_append(sdp_attribute, "a=sendonly");
+      break;
+  }
+
+  sdp_attribute_append(sdp_attribute, "a=mid:0");
+  sdp_attribute_append(sdp_attribute, "a=rtcp-mux");
+  sdp_attribute_append(sdp_attribute, "a=ice-ufrag:%s", local_ufrag);
+  sdp_attribute_append(sdp_attribute, "a=ice-pwd:%s", local_password);
+  sdp_attribute_append(sdp_attribute, "a=ice-options:trickle");
+  sdp_attribute_append(sdp_attribute, "a=fingerprint:sha-256 %s",
+   ice_agent->dtls_transport->fingerprint);
+  sdp_attribute_append(sdp_attribute, "a=setup:passive");
+
+  switch(ice_agent->audio_codec) {
+    case CODEC_OPUS:
+      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:111 nack");
+      sdp_attribute_append(sdp_attribute, "a=rtpmap:111 opus/48000/2");
+      break;
+    case CODEC_H264:
+      sdp_attribute_append(sdp_attribute, "a=rtpmap:102 H264/90000");
+      sdp_attribute_append(sdp_attribute, "a=fmtp:102 packetization-mode=1");
+      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack");
+      sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 nack pli");
+      //sdp_attribute_append(sdp_attribute, "a=rtcp-fb:102 goog-remb");
+      sdp_attribute_append(sdp_attribute, "a=fmtp:102 x-google-max-bitrate=6000;x-google-min-bitrate=2000;x-google-start-bitrate=4000");
+      break;
+    default:
+      break;
+  }
+
+  sdp_attribute_append(sdp_attribute, "m=audio 9 UDP/TLS/RTP/SAVP 111");
+  sdp_attribute_append(sdp_attribute, "c=IN IP4 0.0.0.0");
+
+  sdp_attribute_append(sdp_attribute, "a=setup:passive");
+  sdp_attribute_append(sdp_attribute, "a=mid:1"); 
+  sdp_attribute_append(sdp_attribute, "a=rtcp-mux");
+  sdp_attribute_append(sdp_attribute, "a=ice-ufrag:%s", local_ufrag);
+  sdp_attribute_append(sdp_attribute, "a=ice-pwd:%s", local_password);
+  sdp_attribute_append(sdp_attribute, "a=ice-options:trickle");
+  sdp_attribute_append(sdp_attribute, "a=fingerprint:sha-256 %s",
+   ice_agent->dtls_transport->fingerprint);
+  sdp_attribute_append(sdp_attribute, "a=rtcp-fb:111 nack");
+  sdp_attribute_append(sdp_attribute, "a=rtpmap:111 opus/48000/2");
+#endif
+
+  if(local_ufrag)
+    free(local_ufrag);
+
+  if(local_password)
+    free(local_password);
+
+  nice_candidates = nice_agent_get_local_candidates(ice_agent->nice_agent,
+   ice_agent->stream_id, ice_agent->component_id);
+
+  for(i = 0; i < g_slist_length(nice_candidates); ++i) {
+
+    nice_candidate = (NiceCandidate *)g_slist_nth(nice_candidates, i)->data;
+    nice_address_to_string(&nice_candidate->addr, nice_candidate_addr);
+    if(utils_is_valid_ip_address(nice_candidate_addr) > 0) {
+      nice_candidate_free(nice_candidate);
+      continue;
+    }
+
+    sdp_attribute_append(sdp_attribute, "a=candidate:%s 1 udp %u %s %d typ %s",
+     nice_candidate->foundation,
+     nice_candidate->priority,
+     nice_candidate_addr,
+     nice_address_get_port(&nice_candidate->addr),
+     CANDIDATE_TYPE_NAME[nice_candidate->type]);
+
+    nice_candidate_free(nice_candidate);
+  }
+
+  if(ice_agent->on_icecandidate != NULL) {
+    ice_agent->on_icecandidate(sdp_attribute_get_answer(sdp_attribute),
+     ice_agent->on_icecandidate_data);
+  }
+
+  if(nice_candidates)
+    g_slist_free(nice_candidates);
+#endif
 }
 
 static void* cb_component_state_chanaged(NiceAgent *agent,
@@ -233,7 +542,7 @@ int ice_agent_init(ice_agent_t *ice_agent, dtls_transport_t *dtls_transport) {
   ice_agent->on_iceconnectionstatechange = NULL;
   ice_agent->on_iceconnectionstatechange_data = NULL;
   ice_agent->h264_gop = 60;
-  ice_agent->codec = CODEC_NONE;
+  ice_agent->audio_codec = CODEC_NONE;
   ice_agent->direction = SENDONLY;
 
   dtls_transport_init(dtls_transport, ice_agent_bio_new(ice_agent));
@@ -285,8 +594,10 @@ int ice_agent_init(ice_agent_t *ice_agent, dtls_transport_t *dtls_transport) {
   return 0;
 }
 
-void ice_agent_add_stream(ice_agent_t *ice_agent, codec_t codec) {
-  ice_agent->codec = codec;
+void ice_agent_add_stream(ice_agent_t *ice_agent, MediaStream *media_stream) {
+
+  ice_agent->media_stream = media_stream;
+
 }
 
 void ice_agent_set_remote_sdp(ice_agent_t *ice_agent, char *remote_sdp_base64) {

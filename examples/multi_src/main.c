@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "h264_depacketizer.h"
+#include <gst/gst.h>
 
 #include "signal_service.h"
 #include "utils.h"
@@ -10,15 +10,20 @@
 
 #define MTU 1400
 
-rtp_decode_context_t *rtp_decode_context;
+GstElement *gst_element;
 char *g_sdp = NULL;
 static GCond g_cond;
 static GMutex g_mutex;
 PeerConnection *g_peer_connection = NULL;
 
+const char PIPE_LINE1[] = "v4l2src device=/dev/video1 ! videorate ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=pear-sink";
+
+const char PIPE_LINE2[] = "alsasrc device=hw:1 ! opusenc ! rtpopuspay pt=111 ! appsink name=pear-sink";
+
 static void on_iceconnectionstatechange(iceconnectionstate_t state, void *data) {
   if(state == FAILED) {
     LOG_INFO("Disconnect with browser... Stop streaming");
+    gst_element_set_state(gst_element, GST_STATE_PAUSED);
   }
 }
 
@@ -33,15 +38,12 @@ static void on_icecandidate(char *sdp, void *data) {
 
 static void on_transport_ready(void *data) {
 
-}
-
-
-void on_track(uint8_t *packet, size_t bytes, void *data) {
-
-  rtp_decode_frame(rtp_decode_context, packet, bytes);
+  gst_element_set_state(gst_element, GST_STATE_PLAYING);
 }
 
 char* on_offer_get_cb(char *offer, void *data) {
+
+  gst_element_set_state(gst_element, GST_STATE_PAUSED);
 
   g_mutex_lock(&g_mutex);
   peer_connection_destroy(g_peer_connection);
@@ -52,9 +54,6 @@ char* on_offer_get_cb(char *offer, void *data) {
 
   peer_connection_add_stream(g_peer_connection, media_stream);
 
-  transceiver_t transceiver = {.video = RECVONLY};
-  peer_connection_add_transceiver(g_peer_connection, transceiver);
-  peer_connection_ontrack(g_peer_connection, on_track, NULL);
   peer_connection_onicecandidate(g_peer_connection, on_icecandidate, NULL);
   peer_connection_set_on_transport_ready(g_peer_connection, &on_transport_ready, NULL);
   peer_connection_oniceconnectionstatechange(g_peer_connection, &on_iceconnectionstatechange, NULL);
@@ -65,6 +64,33 @@ char* on_offer_get_cb(char *offer, void *data) {
   g_mutex_unlock(&g_mutex);
 
   return g_sdp;
+}
+
+static GstFlowReturn new_sample(GstElement *sink, void *data) {
+
+  static uint8_t rtp_packet[MTU] = {0};
+  int bytes;
+
+  GstSample *sample;
+  GstBuffer *buffer;
+  GstMapInfo info;
+
+  g_signal_emit_by_name (sink, "pull-sample", &sample);
+  if(sample) {
+
+    buffer = gst_sample_get_buffer(sample);
+    gst_buffer_map(buffer, &info, GST_MAP_READ);
+
+    memset(rtp_packet, 0, sizeof(rtp_packet));
+    memcpy(rtp_packet, info.data, info.size);
+    bytes = info.size;
+
+    peer_connection_send_rtp_packet(g_peer_connection, rtp_packet, bytes);
+
+    gst_sample_unref(sample);
+    return GST_FLOW_OK;
+  }
+  return GST_FLOW_ERROR;
 }
 
 static void print_usage(const char *prog) {
@@ -110,13 +136,23 @@ int main(int argc, char **argv) {
   options_t options = {8000, "0.0.0.0", "root"};
   parse_argv(argc, argv, &options);
 
-  rtp_decode_context = create_rtp_decode_context();
+  GstElement *pear_sink;
+
+  gst_init(&argc, &argv);
+
+  gst_element = gst_parse_launch(PIPE_LINE2, NULL);
+  pear_sink = gst_bin_get_by_name(GST_BIN(gst_element), "pear-sink");
+  g_signal_connect(pear_sink, "new-sample", G_CALLBACK(new_sample), NULL);
+  g_object_set(pear_sink, "emit-signals", TRUE, NULL);
 
   if(signal_service_create(&signal_service, options)) {
     exit(1);
   }
   signal_service_on_offer_get(&signal_service, &on_offer_get_cb, NULL);
   signal_service_dispatch(&signal_service);
+
+  gst_element_set_state(gst_element, GST_STATE_NULL);
+  gst_object_unref(gst_element);
 
   return 0;
 }
