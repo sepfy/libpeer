@@ -16,7 +16,7 @@ static GCond g_cond;
 static GMutex g_mutex;
 PeerConnection *g_peer_connection = NULL;
 
-static void on_iceconnectionstatechange(iceconnectionstate_t state, void *data) {
+static void on_iceconnectionstatechange(IceConnectionState state, void *data) {
   if(state == FAILED) {
     LOG_INFO("Disconnect with browser... Stop streaming");
   }

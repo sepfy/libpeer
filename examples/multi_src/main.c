@@ -20,7 +20,7 @@ const char PIPE_LINE1[] = "v4l2src device=/dev/video1 ! videorate ! video/x-raw,
 
 const char PIPE_LINE2[] = "alsasrc device=hw:1 ! opusenc ! rtpopuspay pt=111 ! appsink name=pear-sink";
 
-static void on_iceconnectionstatechange(iceconnectionstate_t state, void *data) {
+static void on_iceconnectionstatechange(IceConnectionState state, void *data) {
   if(state == FAILED) {
     LOG_INFO("Disconnect with browser... Stop streaming");
     gst_element_set_state(gst_element, GST_STATE_PAUSED);
