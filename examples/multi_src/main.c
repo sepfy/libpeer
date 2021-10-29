@@ -10,20 +10,32 @@
 
 #define MTU 1400
 
-GstElement *gst_element;
+GstElement *audio_element;
+GstElement *video_element;
+
+GAsyncQueue *g_async_queue = NULL;
+
 char *g_sdp = NULL;
 static GCond g_cond;
 static GMutex g_mutex;
 PeerConnection *g_peer_connection = NULL;
 
-const char PIPE_LINE1[] = "v4l2src device=/dev/video1 ! videorate ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=pear-sink";
+const char VIDEO_PIPELINE[] = "v4l2src device=/dev/video0 ! videorate ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=video-app-sink";
 
-const char PIPE_LINE2[] = "alsasrc device=hw:1 ! opusenc ! rtpopuspay pt=111 ! appsink name=pear-sink";
+const char AUDIO_PIPELINE[] = "alsasrc device=hw:1 ! opusenc ! rtpopuspay pt=111 ssrc=12 ! appsink name=audio-app-sink";
+
+typedef struct GstRtpPacket {
+
+  uint8_t data[MTU];
+  size_t size;
+ 
+} GstRtpPacket;
 
 static void on_iceconnectionstatechange(IceConnectionState state, void *data) {
   if(state == FAILED) {
     LOG_INFO("Disconnect with browser... Stop streaming");
-    gst_element_set_state(gst_element, GST_STATE_PAUSED);
+    gst_element_set_state(audio_element, GST_STATE_PAUSED);
+    gst_element_set_state(video_element, GST_STATE_PAUSED);
   }
 }
 
@@ -36,14 +48,68 @@ static void on_icecandidate(char *sdp, void *data) {
   g_cond_signal(&g_cond);
 }
 
+static GstFlowReturn new_sample(GstElement *sink, void *data) {
+
+  //if(strcmp(gst_element_get_name(sink), "audio-app-sink") == 0)
+  //  return GST_FLOW_OK;
+
+  GstSample *sample;
+  GstBuffer *buffer;
+  GstMapInfo info;
+
+  g_signal_emit_by_name (sink, "pull-sample", &sample);
+
+  if(sample) {
+
+    buffer = gst_sample_get_buffer(sample);
+    gst_buffer_map(buffer, &info, GST_MAP_READ);
+
+    GstRtpPacket *gst_rtp_packet = g_new(GstRtpPacket, 1);
+    gst_rtp_packet->size = info.size;
+
+    memset(gst_rtp_packet->data, 0, MTU);
+    memcpy(gst_rtp_packet->data, info.data, info.size);
+
+    g_async_queue_lock(g_async_queue);
+    g_async_queue_push_unlocked(g_async_queue, gst_rtp_packet); 
+    g_async_queue_unlock(g_async_queue);
+
+    gst_sample_unref(sample);
+    return GST_FLOW_OK;
+  }
+  return GST_FLOW_ERROR;
+}
+
+void* srtp_transport_thread(void *data) {
+
+  while(1) {
+
+    g_async_queue_lock(g_async_queue);
+    GstRtpPacket *gst_rtp_packet = g_async_queue_pop_unlocked(g_async_queue);
+    g_async_queue_unlock(g_async_queue);
+
+    peer_connection_send_rtp_packet(g_peer_connection, gst_rtp_packet->data, gst_rtp_packet->size);
+    if(gst_rtp_packet) {
+      g_free(gst_rtp_packet);
+      gst_rtp_packet = NULL;
+    }
+
+  }
+
+  pthread_exit(NULL);
+
+}
+
 static void on_transport_ready(void *data) {
 
-  gst_element_set_state(gst_element, GST_STATE_PLAYING);
+  gst_element_set_state(audio_element, GST_STATE_PLAYING);
+  gst_element_set_state(video_element, GST_STATE_PLAYING);
 }
 
 char* on_offer_get_cb(char *offer, void *data) {
 
-  gst_element_set_state(gst_element, GST_STATE_PAUSED);
+  gst_element_set_state(audio_element, GST_STATE_PAUSED);
+  gst_element_set_state(video_element, GST_STATE_PAUSED);
 
   g_mutex_lock(&g_mutex);
   peer_connection_destroy(g_peer_connection);
@@ -51,6 +117,7 @@ char* on_offer_get_cb(char *offer, void *data) {
 
   MediaStream *media_stream = media_stream_new();
   media_stream_add_track(media_stream, CODEC_H264);
+  media_stream_add_track(media_stream, CODEC_OPUS);
 
   peer_connection_add_stream(g_peer_connection, media_stream);
 
@@ -64,33 +131,6 @@ char* on_offer_get_cb(char *offer, void *data) {
   g_mutex_unlock(&g_mutex);
 
   return g_sdp;
-}
-
-static GstFlowReturn new_sample(GstElement *sink, void *data) {
-
-  static uint8_t rtp_packet[MTU] = {0};
-  int bytes;
-
-  GstSample *sample;
-  GstBuffer *buffer;
-  GstMapInfo info;
-
-  g_signal_emit_by_name (sink, "pull-sample", &sample);
-  if(sample) {
-
-    buffer = gst_sample_get_buffer(sample);
-    gst_buffer_map(buffer, &info, GST_MAP_READ);
-
-    memset(rtp_packet, 0, sizeof(rtp_packet));
-    memcpy(rtp_packet, info.data, info.size);
-    bytes = info.size;
-
-    peer_connection_send_rtp_packet(g_peer_connection, rtp_packet, bytes);
-
-    gst_sample_unref(sample);
-    return GST_FLOW_OK;
-  }
-  return GST_FLOW_ERROR;
 }
 
 static void print_usage(const char *prog) {
@@ -136,23 +176,39 @@ int main(int argc, char **argv) {
   options_t options = {8000, "0.0.0.0", "root"};
   parse_argv(argc, argv, &options);
 
-  GstElement *pear_sink;
+  GstElement *audio_sink, *video_sink;
 
   gst_init(&argc, &argv);
 
-  gst_element = gst_parse_launch(PIPE_LINE2, NULL);
-  pear_sink = gst_bin_get_by_name(GST_BIN(gst_element), "pear-sink");
-  g_signal_connect(pear_sink, "new-sample", G_CALLBACK(new_sample), NULL);
-  g_object_set(pear_sink, "emit-signals", TRUE, NULL);
+  audio_element = gst_parse_launch(AUDIO_PIPELINE, NULL);
+  video_element = gst_parse_launch(VIDEO_PIPELINE, NULL);
+
+  audio_sink = gst_bin_get_by_name(GST_BIN(audio_element), "audio-app-sink");
+  video_sink = gst_bin_get_by_name(GST_BIN(video_element), "video-app-sink");
+
+  g_signal_connect(audio_sink, "new-sample", G_CALLBACK(new_sample), NULL);
+  g_signal_connect(video_sink, "new-sample", G_CALLBACK(new_sample), NULL);
+
+  g_object_set(audio_sink, "emit-signals", TRUE, NULL);
+  g_object_set(video_sink, "emit-signals", TRUE, NULL);
+
+
+  g_async_queue = g_async_queue_new();
+  pthread_t tid;
+  pthread_create(&tid, NULL, srtp_transport_thread, NULL);
 
   if(signal_service_create(&signal_service, options)) {
     exit(1);
   }
+
   signal_service_on_offer_get(&signal_service, &on_offer_get_cb, NULL);
   signal_service_dispatch(&signal_service);
 
-  gst_element_set_state(gst_element, GST_STATE_NULL);
-  gst_object_unref(gst_element);
+  gst_element_set_state(audio_element, GST_STATE_NULL);
+  gst_element_set_state(video_element, GST_STATE_NULL);
+
+  gst_object_unref(audio_element);
+  gst_object_unref(video_element);
 
   return 0;
 }

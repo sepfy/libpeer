@@ -112,6 +112,8 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
 
   session_description_add_codec(sdp, pc->media_stream->video_codec, pc->direction, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport));
 
+  session_description_add_codec(sdp, pc->media_stream->audio_codec, pc->direction, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport));
+
   if(local_ufrag)
     free(local_ufrag);
 

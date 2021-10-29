@@ -13,6 +13,13 @@ const char index_html[] = " \
   <body> \n \
     <video style='display:block; margin: 0 auto;' id='remoteVideos'></video> \n \
     <script> \n \
+      const mediaStream = new MediaStream(); \n \
+      let el = document.getElementById('remoteVideos'); \n \
+      el.srcObject = mediaStream; \n \
+      el.autoplay = true; \n \
+      el.controls = true; \n \
+      el.muted = true;   \n \
+\n \
       function jsonRpc(payload, cb) { \n \
         var xhttp = new XMLHttpRequest(); \n \
         xhttp.onreadystatechange = function() { \n \
@@ -31,13 +38,10 @@ const char index_html[] = " \
         console.log(msg); \n \
       }; \n \
  \n \
-      pc.ontrack = function (event) { \n \
+      pc.ontrack = (event) => { \n \
         var el = document.getElementById('remoteVideos'); \n \
-        el.srcObject = event.streams[0]; \n \
-        el.autoplay = true; \n \
-        el.controls = true; \n \
-        el.muted = true; \n \
-      }; \n \
+        el.srcObject.addTrack(event.streams[0].getTracks()[0]); \n \
+      } \n \
  \n \
       pc.oniceconnectionstatechange = e => log(pc.iceConnectionState); \n \
       function jsonRpcHandle(result) { \n \
@@ -46,6 +50,7 @@ const char index_html[] = " \
           return alert('Session Description must not be empty'); \n \
         } \n \
         try { \n \
+console.log(JSON.parse(atob(sdp))); \n \
           pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sdp)))); \n \
         } catch (e) { \n \
           alert(e); \n \

@@ -114,6 +114,8 @@ void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
       session_description_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 111");
       session_description_append(sdp, "a=rtcp-fb:111 nack");
       session_description_append(sdp, "a=rtpmap:111 opus/48000/2");
+      session_description_append(sdp, "a=ssrc:12 cname:YZcxBwerFFm6GH69");
+      break;
     default:
       return;
   }
@@ -141,4 +143,6 @@ void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
   session_description_append(sdp, "a=ice-options:trickle");
   session_description_append(sdp, "a=fingerprint:sha-256 %s", fingerprint);
   session_description_append(sdp, "a=setup:passive");
+
+  mid = (mid + 1)%2;
 }
