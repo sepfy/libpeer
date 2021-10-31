@@ -6,6 +6,7 @@
 #define SESSION_DESCRIPTION_H_
 
 #include <stdlib.h>
+#include <stdint.h>
 
 #include "media_stream.h"
 
@@ -76,5 +77,12 @@ char* session_description_get_content(SessionDescription *sdp);
  */
 void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
  transceiver_direction_t direction, const char *ufrag, const char *password, const char *fingerprint);
+
+/**
+ * @brief Find RTP ssrc of audio or video in SDP.
+ * @param Type is audio or video.
+ * @param The content of session description protocol.
+ */
+uint32_t session_description_find_ssrc(const char *type, const char *sdp);
 
 #endif // SESSION_DESCRIPTION_H_

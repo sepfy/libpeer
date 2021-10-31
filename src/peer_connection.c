@@ -27,7 +27,7 @@ struct PeerConnection {
 
   DtlsTransport *dtls_transport;
   SessionDescription *sdp;
-  transceiver_direction_t direction;
+  transceiver_t transceiver;
   int h264_gop;
 
   MediaStream *media_stream;
@@ -110,9 +110,9 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
     session_description_append(sdp, "a=group:BUNDLE 0");
 
 
-  session_description_add_codec(sdp, pc->media_stream->video_codec, pc->direction, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport));
+  session_description_add_codec(sdp, pc->media_stream->audio_codec, pc->transceiver.audio, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport));
 
-  session_description_add_codec(sdp, pc->media_stream->audio_codec, pc->direction, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport));
+  session_description_add_codec(sdp, pc->media_stream->video_codec, pc->transceiver.video, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport));
 
   if(local_ufrag)
     free(local_ufrag);
@@ -272,7 +272,8 @@ PeerConnection* peer_connection_create(void) {
 
   pc->on_transport_ready = NULL;
   pc->on_transport_ready_userdata = NULL;
-  pc->direction = SENDONLY;
+  pc->transceiver.video = SENDONLY;
+  pc->transceiver.audio = SENDONLY;
 
   if(peer_connection_nice_agent_setup(pc) == FALSE) {
     peer_connection_destroy(pc);
@@ -416,6 +417,6 @@ void peer_connection_ontrack(PeerConnection *pc, void (*ontrack), void *userdata
 }
 
 int peer_connection_add_transceiver(PeerConnection *pc, transceiver_t transceiver) {
-  //pc->transceiver = transceiver;
-  pc->direction = transceiver.video;
+  pc->transceiver = transceiver;
+
 }

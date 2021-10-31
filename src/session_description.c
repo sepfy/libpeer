@@ -116,6 +116,10 @@ void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
       session_description_append(sdp, "a=rtpmap:111 opus/48000/2");
       session_description_append(sdp, "a=ssrc:12 cname:YZcxBwerFFm6GH69");
       break;
+    case CODEC_PCMA:
+      session_description_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 8");
+      session_description_append(sdp, "a=rtpmap:8 PCMA/8000");
+      break;
     default:
       return;
   }
@@ -145,4 +149,21 @@ void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
   session_description_append(sdp, "a=setup:passive");
 
   mid = (mid + 1)%2;
+}
+
+uint32_t session_description_find_ssrc(const char *type, const char *sdp) {
+
+  char *media_line = strstr(sdp, type);
+  char *ssrc_pos = NULL;
+  int ssrc = 0;
+
+  if(media_line == NULL)
+    return ssrc;
+  ssrc_pos = strstr(media_line, "ssrc:");
+
+  if(ssrc_pos == NULL)
+    return ssrc;
+
+  ssrc = atoi(ssrc_pos + 5);
+  return ssrc;
 }

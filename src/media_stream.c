@@ -19,11 +19,12 @@ void media_stream_add_track(MediaStream* media_stream, MediaCodec codec) {
 
   switch(codec) {
     case CODEC_H264:
-      media_stream->video_codec = CODEC_H264;
+      media_stream->video_codec = codec;
       media_stream->tracks_num++;
       break;
     case CODEC_OPUS:
-      media_stream->audio_codec = CODEC_OPUS;
+    case CODEC_PCMA:
+      media_stream->audio_codec = codec;
       media_stream->tracks_num++;
       break;
     default:

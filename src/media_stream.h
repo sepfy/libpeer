@@ -12,6 +12,7 @@ typedef enum MediaCodec {
   CODEC_H264,
   /* Audio */
   CODEC_OPUS,
+  CODEC_PCMA,
   CODEC_NONE,
 
 } MediaCodec;
