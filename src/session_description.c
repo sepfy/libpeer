@@ -155,7 +155,7 @@ uint32_t session_description_find_ssrc(const char *type, const char *sdp) {
 
   char *media_line = strstr(sdp, type);
   char *ssrc_pos = NULL;
-  int ssrc = 0;
+  uint32_t ssrc = 0;
 
   if(media_line == NULL)
     return ssrc;
