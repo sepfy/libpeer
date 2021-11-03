@@ -28,7 +28,6 @@ struct PeerConnection {
   DtlsTransport *dtls_transport;
   SessionDescription *sdp;
   transceiver_t transceiver;
-  int h264_gop;
 
   MediaStream *media_stream;
 
@@ -194,13 +193,6 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
   else if(rtp_packet_validate(buf, len)) {
 
     dtls_transport_decrypt_rtp_packet(pc->dtls_transport, buf, &len);
-
-    static int frame_number = 0;
-    frame_number++;
-    if(frame_number % pc->h264_gop == 0) {
-      uint32_t ssrc = *(uint32_t*)(buf + 8);
-      peer_connection_send_rtcp_pil(pc, ssrc);
-    }
 
     if(pc->ontrack != NULL) {
       pc->ontrack(buf, len, pc->ontrack_userdata);

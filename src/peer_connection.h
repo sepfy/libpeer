@@ -38,6 +38,13 @@ PeerConnection* peer_connection_create();
 void peer_connection_destroy(PeerConnection *pc);
 
 /**
+ * @brief Let PeerConnection send RTCP PIL.
+ * @param PeerConnection
+ * @param RTP ssrc
+ */
+int peer_connection_send_rtcp_pil(PeerConnection *pc, uint32_t ssrc);
+
+/**
  * @brief Add audio or video stream to PeerConection.
  * @param A PeerConnection.
  * @param A MediaStream.

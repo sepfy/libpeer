@@ -6,7 +6,7 @@
 
 #include "signal_service.h"
 #include "utils.h"
-#include "pear.h"
+#include "peer_connection.h"
 
 #define MTU 1400
 

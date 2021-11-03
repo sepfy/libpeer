@@ -164,6 +164,6 @@ uint32_t session_description_find_ssrc(const char *type, const char *sdp) {
   if(ssrc_pos == NULL)
     return ssrc;
 
-  ssrc = atoi(ssrc_pos + 5);
+  ssrc = strtoul(ssrc_pos + 5, NULL, 0);
   return ssrc;
 }

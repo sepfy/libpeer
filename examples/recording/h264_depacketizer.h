@@ -6,7 +6,7 @@
 #include <rtp-packet.h>
 #include <rtp-payload.h>
 
-#include "pear.h"
+#include "peer_connection.h"
 
 typedef struct rtp_decode_context_t {
   struct rtp_payload_t handler;
