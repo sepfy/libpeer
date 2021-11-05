@@ -16,12 +16,14 @@ extern "C" {
 #include "media_stream.h"
 
 typedef enum IceConnectionState {
+
   DISCONNECTED,
   GATHERING,
   CONNECTING,
   CONNECTED,
   READY,
   FAILED,
+
 } IceConnectionState;
 
 typedef struct PeerConnection PeerConnection;
@@ -88,13 +90,20 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *sdp);
  * @param PeerConnection.
  * @param RtpTransceiver.
  */
-int peer_connection_add_transceiver(PeerConnection *pc, transceiver_t transceiver);
+int peer_connection_add_transceiver(PeerConnection *pc, Transceiver transceiver);
 
 /**
  * @brief PeerConnection creates an answer.
  * @param PeerConnection.
  */
 int peer_connection_create_answer(PeerConnection *pc);
+
+/**
+ * @brief Get audio and video ssrc from a PeerConnection after set remote description.
+ * @param PeerConnection.
+ * @param Media type of audio and video.
+ */
+uint32_t peer_connection_get_ssrc(PeerConnection *pc, const char *type);
 
 // To confirm:
 int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);

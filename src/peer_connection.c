@@ -25,10 +25,11 @@ struct PeerConnection {
   GMainLoop *gloop;
   GThread *gthread;
 
+  uint32_t audio_ssrc, video_ssrc;
+
   DtlsTransport *dtls_transport;
   SessionDescription *sdp;
-  transceiver_t transceiver;
-
+  Transceiver transceiver;
   MediaStream *media_stream;
 
   void (*onicecandidate)(char *sdp, void *userdata);
@@ -255,6 +256,8 @@ PeerConnection* peer_connection_create(void) {
   if(pc == NULL)
     return pc;
 
+  pc->audio_ssrc = 0;
+  pc->video_ssrc = 0;
 
   pc->onicecandidate = NULL;
   pc->onicecandidate_userdata = NULL;
@@ -313,6 +316,9 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
 
   remote_sdp = g_base64_decode(remote_sdp_base64, &len);
 
+  pc->audio_ssrc = session_description_find_ssrc("audio", remote_sdp);
+  pc->video_ssrc = session_description_find_ssrc("video", remote_sdp);
+
   // Remove mDNS
   SessionDescription *sdp = NULL;
   if(strstr(remote_sdp, "local") != NULL) {
@@ -358,12 +364,11 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
     g_slist_free_full(plist, (GDestroyNotify)&nice_candidate_free);
   }
 
-  if(sdp) {
+  if(sdp)
     session_description_destroy(sdp);
-  }
-  else {
+
+  if(remote_sdp)
     free(remote_sdp);
-  }
 
 }
 
@@ -408,7 +413,19 @@ void peer_connection_ontrack(PeerConnection *pc, void (*ontrack), void *userdata
 
 }
 
-int peer_connection_add_transceiver(PeerConnection *pc, transceiver_t transceiver) {
+int peer_connection_add_transceiver(PeerConnection *pc, Transceiver transceiver) {
   pc->transceiver = transceiver;
 
+}
+
+uint32_t peer_connection_get_ssrc(PeerConnection *pc, const char *type) {
+
+  if(strcmp(type, "audio") == 0) {
+    return pc->audio_ssrc;
+  }
+  else if(strcmp(type, "video") == 0) {
+    return pc->video_ssrc;
+  }
+
+  return 0;
 }

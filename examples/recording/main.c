@@ -52,7 +52,7 @@ char* on_offer_get_cb(char *offer, void *data) {
 
   peer_connection_add_stream(g_peer_connection, media_stream);
 
-  transceiver_t transceiver = {.video = RECVONLY};
+  Transceiver transceiver = {.video = RECVONLY};
   peer_connection_add_transceiver(g_peer_connection, transceiver);
   peer_connection_ontrack(g_peer_connection, on_track, NULL);
   peer_connection_onicecandidate(g_peer_connection, on_icecandidate, NULL);

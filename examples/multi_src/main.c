@@ -6,6 +6,7 @@
 
 #include "signal_service.h"
 #include "utils.h"
+#include "rtp_depacketizer.h"
 #include "peer_connection.h"
 
 #define MTU 1400
@@ -18,11 +19,22 @@ GAsyncQueue *g_async_queue = NULL;
 char *g_sdp = NULL;
 static GCond g_cond;
 static GMutex g_mutex;
+
 PeerConnection *g_peer_connection = NULL;
+
+typedef struct RtpDepacketizer {
+
+  rtp_decode_context_t *rtp_decode_context_audio;
+  rtp_decode_context_t *rtp_decode_context_video;
+
+} RtpDepacketizer;
+
+RtpDepacketizer g_rtp_depacketizer;
 
 const char VIDEO_PIPELINE[] = "v4l2src device=/dev/video0 ! videorate ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=video-app-sink";
 
-const char AUDIO_PIPELINE[] = "alsasrc device=hw:1 ! opusenc ! rtpopuspay pt=111 ssrc=12 ! appsink name=audio-app-sink";
+//const char AUDIO_PIPELINE[] = "alsasrc device=hw:1 ! opusenc ! rtpopuspay pt=111 ssrc=12 ! appsink name=audio-app-sink";
+const char AUDIO_PIPELINE[] = "alsasrc device=hw:1 ! audioconvert ! audioresample ! alawenc ! rtppcmapay pt=8 ssrc=12 ! appsink name=audio-app-sink";
 
 typedef struct GstRtpPacket {
 
@@ -106,6 +118,29 @@ static void on_transport_ready(void *data) {
   gst_element_set_state(video_element, GST_STATE_PLAYING);
 }
 
+void on_track(uint8_t *packet, size_t bytes, void *data) {
+
+  RtpDepacketizer *rtp_depacketizer = (RtpDepacketizer*)data;
+
+  uint32_t ssrc = (packet[8] << 24) | (packet[9] << 16) | (packet[10] << 8) | (packet[11]);
+
+  if(ssrc == peer_connection_get_ssrc(g_peer_connection, "audio")) {
+    rtp_decode_frame(rtp_depacketizer->rtp_decode_context_audio, packet, bytes); 
+  }
+  else if(ssrc == peer_connection_get_ssrc(g_peer_connection, "video")) {
+
+    static int video_count = 0;
+    video_count++;
+    if(video_count % 100 == 0) {
+      uint32_t rtcp_ssrc;
+      memcpy(&rtcp_ssrc, packet + 8, 4);
+      peer_connection_send_rtcp_pil(g_peer_connection, rtcp_ssrc);
+    }
+    rtp_decode_frame(rtp_depacketizer->rtp_decode_context_video, packet, bytes); 
+  }
+
+}
+
 char* on_offer_get_cb(char *offer, void *data) {
 
   gst_element_set_state(audio_element, GST_STATE_PAUSED);
@@ -117,10 +152,13 @@ char* on_offer_get_cb(char *offer, void *data) {
 
   MediaStream *media_stream = media_stream_new();
   media_stream_add_track(media_stream, CODEC_H264);
-  media_stream_add_track(media_stream, CODEC_OPUS);
-
+  media_stream_add_track(media_stream, CODEC_PCMA);
   peer_connection_add_stream(g_peer_connection, media_stream);
 
+  Transceiver transceiver = {.video = SENDRECV, .audio = SENDRECV};
+  peer_connection_add_transceiver(g_peer_connection, transceiver);
+
+  peer_connection_ontrack(g_peer_connection, on_track, &g_rtp_depacketizer);
   peer_connection_onicecandidate(g_peer_connection, on_icecandidate, NULL);
   peer_connection_set_on_transport_ready(g_peer_connection, &on_transport_ready, NULL);
   peer_connection_oniceconnectionstatechange(g_peer_connection, &on_iceconnectionstatechange, NULL);
@@ -196,6 +234,9 @@ int main(int argc, char **argv) {
   g_async_queue = g_async_queue_new();
   pthread_t tid;
   pthread_create(&tid, NULL, srtp_transport_thread, NULL);
+
+  g_rtp_depacketizer.rtp_decode_context_audio = create_rtp_decode_context("PCMA");
+  g_rtp_depacketizer.rtp_decode_context_video = create_rtp_decode_context("H264");
 
   if(signal_service_create(&signal_service, options)) {
     exit(1);

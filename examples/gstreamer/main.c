@@ -146,6 +146,7 @@ int main(int argc, char **argv) {
   if(signal_service_create(&signal_service, options)) {
     exit(1);
   }
+
   signal_service_on_offer_get(&signal_service, &on_offer_get_cb, NULL);
   signal_service_dispatch(&signal_service);
 

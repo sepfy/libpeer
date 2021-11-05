@@ -23,8 +23,8 @@ struct DtlsTransport {
 
   char fingerprint[160];
 
-  int handshake_done;
-
+  gboolean handshake_done;
+  gboolean srtp_init_done;
 };
 
 
@@ -171,7 +171,8 @@ int dtls_transport_init(DtlsTransport *dtls_transport, BIO *agent_write_bio) {
   SSL_set_tmp_ecdh(dtls_transport->ssl, ecdh);
   EC_KEY_free(ecdh);
 
-  dtls_transport->handshake_done = 0;
+  dtls_transport->handshake_done = FALSE;
+  dtls_transport->srtp_init_done = FALSE;
 
   if(srtp_init() != srtp_err_status_ok) {
     LOG_ERROR("libsrtp init failed");
@@ -212,7 +213,7 @@ void dtls_transport_do_handshake(DtlsTransport *dtls_transport) {
 
   SSL_set_accept_state(dtls_transport->ssl);
   SSL_do_handshake(dtls_transport->ssl);
-  dtls_transport->handshake_done = 1;
+  dtls_transport->handshake_done = TRUE;
 
 }
 
@@ -226,6 +227,9 @@ int dtls_transport_validate(char *buf) {
 
 
 void dtls_transport_incomming_msg(DtlsTransport *dtls_transport, char *buf, int len) {
+
+  if(dtls_transport->srtp_init_done)
+    return;
 
   int written = BIO_write(dtls_transport->read_bio, buf, len);
   if(written != len) {
@@ -253,8 +257,6 @@ void dtls_transport_incomming_msg(DtlsTransport *dtls_transport, char *buf, int 
   if(!SSL_is_init_finished(dtls_transport->ssl)) {
     return;
   }
-
-
 
   X509 *rcert = SSL_get_peer_certificate(dtls_transport->ssl);
   if(!rcert) {
@@ -322,6 +324,7 @@ void dtls_transport_incomming_msg(DtlsTransport *dtls_transport, char *buf, int 
     LOG_ERROR("Error creating outbound SRTP session");
   }
   LOG_INFO("Created outbound SRTP session");
+  dtls_transport->srtp_init_done = TRUE;
 
 }
 

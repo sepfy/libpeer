@@ -12,21 +12,6 @@
 
 #define SDP_ATTIBUTES_MAX 10240
 
-typedef enum transceiver_direction_t {
-
-  SENDRECV,
-  RECVONLY,
-  SENDONLY,
-
-} transceiver_direction_t;
-
-typedef struct transceiver_t {
-
-  transceiver_direction_t audio;
-  transceiver_direction_t video;
-
-} transceiver_t;
-
 typedef struct SessionDescription SessionDescription;
 
 /**
@@ -76,7 +61,7 @@ char* session_description_get_content(SessionDescription *sdp);
  * @param fingerprint of DTLS.
  */
 void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
- transceiver_direction_t direction, const char *ufrag, const char *password, const char *fingerprint);
+ TransceiverDirection direction, const char *ufrag, const char *password, const char *fingerprint);
 
 /**
  * @brief Find RTP ssrc of audio or video in SDP.

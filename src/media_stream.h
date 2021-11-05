@@ -6,6 +6,23 @@
 #ifndef MEDIA_STREAM_H_
 #define MEDIA_STREAM_H_
 
+typedef enum TransceiverDirection {
+
+  SENDRECV,
+  RECVONLY,
+  SENDONLY,
+
+} TransceiverDirection;
+
+
+typedef struct Transceiver {
+
+  TransceiverDirection audio;
+  TransceiverDirection video;
+
+} Transceiver;
+
+
 typedef enum MediaCodec {
 
   /* Video */

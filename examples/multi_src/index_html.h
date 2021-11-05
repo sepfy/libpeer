@@ -71,9 +71,13 @@ console.log(JSON.parse(atob(sdp))); \n \
           jsonRpc(payload, jsonRpcHandle); \n \
         } \n \
       }; \n \
-      pc.addTransceiver('video', {'direction': 'sendrecv'}) \n \
       pc.addTransceiver('audio', {'direction': 'sendrecv'}) \n \
-      pc.createOffer().then(d => {console.log(d); pc.setLocalDescription(d) }).catch(log); \n \
+      pc.addTransceiver('video', {'direction': 'sendrecv'}) \n \
+      navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }) \n \
+        .then(stream => { \n \
+          stream.getTracks().forEach(track => pc.addTrack(track, stream)); \n \
+            pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log) \n \
+          }).catch(log) \n \
       window.startSession = () => { \n \
         let sd = document.getElementById('remoteSessionDescription').value; \n \
       } \n \

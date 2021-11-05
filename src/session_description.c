@@ -97,7 +97,7 @@ char* session_description_get_content(SessionDescription *sdp) {
 
 
 void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
- transceiver_direction_t direction, const char *ufrag, const char *password, const char *fingerprint) {
+ TransceiverDirection direction, const char *ufrag, const char *password, const char *fingerprint) {
 
   static int mid = 0;
 
@@ -119,6 +119,7 @@ void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
     case CODEC_PCMA:
       session_description_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 8");
       session_description_append(sdp, "a=rtpmap:8 PCMA/8000");
+      session_description_append(sdp, "a=ssrc:12 cname:YZcxBwerFFm6GH69");
       break;
     default:
       return;
