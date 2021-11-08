@@ -4,6 +4,7 @@
 #define LEVEL_ERROR 0x00
 #define LEVEL_WARNING 0x01
 #define LEVEL_INFO 0x02
+#define LEVEL_DEBUG 0x03
 
 #define ERROR_TAG "ERROR"
 #define WARNING_TAG "WARNING"

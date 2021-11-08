@@ -1,3 +1,8 @@
+/**
+ * @file dtls_transport.h
+ * @brief Struct DtlsTransport
+ */
+
 #ifndef DTLS_TRANSPORT_H_
 #define DTLS_TRANSPORT_H_
 
@@ -13,33 +18,33 @@
 #include <openssl/ssl.h>
 #include <srtp.h> 
 
-typedef struct dtls_transport_t {
+typedef struct DtlsTransport DtlsTransport;
 
-  SSL *ssl;
-  SSL_CTX *ssl_ctx;
-  X509 *certificate;
-  EVP_PKEY *private_key;
-  BIO *read_bio;
-  BIO *write_bio;
 
-  srtp_policy_t remote_policy;
-  srtp_policy_t local_policy;
-  srtp_t srtp_in;
-  srtp_t srtp_out;
+DtlsTransport* dtls_transport_create(BIO *agent_write_bio);
 
-  char fingerprint[160];
 
-} dtls_transport_t;
+void dtls_transport_destroy(DtlsTransport *dtls_transport);
 
-dtls_transport_t* dtls_transport_create(BIO *agent_write_bio);
 
-int dtls_transport_init(dtls_transport_t *dtls_transport, BIO *agent_write_bio);
-void dtls_transport_destroy(dtls_transport_t *dtls_transport);
 int dtls_transport_validate(char *buf);
-void dtls_transport_incomming_msg(dtls_transport_t *dtls_transport, char *buf, int len);
-void dtls_transport_do_handshake(dtls_transport_t *dtls_transport);
-void dtls_transport_encrypt_rtp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes);
-void dtls_transport_decrypt_rtp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes);
-void dtls_transport_encrypt_rctp_packet(dtls_transport_t *dtls_transport, uint8_t *packet, int *bytes);
+
+
+void dtls_transport_incomming_msg(DtlsTransport *dtls_transport, char *buf, int len);
+
+
+void dtls_transport_do_handshake(DtlsTransport *dtls_transport);
+
+
+void dtls_transport_encrypt_rtp_packet(DtlsTransport *dtls_transport, uint8_t *packet, int *bytes);
+
+
+void dtls_transport_decrypt_rtp_packet(DtlsTransport *dtls_transport, uint8_t *packet, int *bytes);
+
+
+void dtls_transport_encrypt_rctp_packet(DtlsTransport *dtls_transport, uint8_t *packet, int *bytes);
+
+
+const char* dtls_transport_get_fingerprint(DtlsTransport *dtls_transport);
 
 #endif // DTLS_TRANSPORT_H_

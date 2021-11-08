@@ -6,6 +6,6 @@ int rtp_packet_validate(char *packet, size_t size) {
   if(size < 12)
     return 0;
 
-  rtp_header_t *rtp_header = (rtp_header_t*)packet;
+  RtpHeader *rtp_header = (RtpHeader*)packet;
   return ((rtp_header->type < 64) || (rtp_header->type >= 96));
 }

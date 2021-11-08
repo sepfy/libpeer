@@ -22,13 +22,13 @@ static void on_icecandidate(char *sdp, void *data) {
 }
 
 static void on_transport_ready(void *data) {
-
+printf("YA\n");
   g_transport_ready = 1;
 }
 
 void* send_video_thread(void *data) {
 
-  peer_connection_t *peer_connection = (peer_connection_t*)data;
+  PeerConnection *peer_connection = (PeerConnection*)data;
   static h264_frame_t sps_frame;
   static h264_frame_t pps_frame;
   int ret = 0;
@@ -92,19 +92,21 @@ int main(int argv, char *argc[]) {
 
   pthread_t send_video_thread_id = -1;
 
-  peer_connection_t peer_connection;
-  peer_connection_init(&peer_connection);
+  PeerConnection *peer_connection = peer_connection_create();
 
-  peer_connection_add_stream(&peer_connection, "H264");
-  peer_connection_set_on_icecandidate(&peer_connection, on_icecandidate, NULL);
-  peer_connection_set_on_transport_ready(&peer_connection, &on_transport_ready, NULL); 
+  MediaStream *media_stream = media_stream_new();
+  media_stream_add_track(media_stream, CODEC_H264);
 
-  peer_connection_create_answer(&peer_connection);
+  peer_connection_add_stream(peer_connection, media_stream);
+  peer_connection_onicecandidate(peer_connection, on_icecandidate, NULL);
+  peer_connection_set_on_transport_ready(peer_connection, &on_transport_ready, NULL); 
+
+  peer_connection_create_answer(peer_connection);
 
   FILE *fp = fopen("remote_sdp.txt", "r");
   if(fp != NULL ) { 
     fread(remote_sdp, sizeof(remote_sdp), 1, fp);
-    peer_connection_set_remote_description(&peer_connection, remote_sdp);  
+    peer_connection_set_remote_description(peer_connection, remote_sdp);  
     fclose(fp);  
   }
   else {
@@ -117,7 +119,7 @@ int main(int argv, char *argc[]) {
     sleep(1);
   }
 
-  pthread_create(&send_video_thread_id, NULL, send_video_thread, &peer_connection);
+  pthread_create(&send_video_thread_id, NULL, send_video_thread, peer_connection);
   pthread_join(send_video_thread_id, NULL);
 
   return 0;

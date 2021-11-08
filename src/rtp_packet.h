@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <endian.h>
 
-typedef struct rtp_header_t {
+typedef struct RtpHeader {
 #if __BYTE_ORDER == __BIG_ENDIAN
   uint16_t version:2;
   uint16_t padding:1;
@@ -24,9 +24,10 @@ typedef struct rtp_header_t {
   uint32_t timestamp;
   uint32_t ssrc;
   uint32_t csrc[16];
-} rtp_header_t;
+
+} RtpHeader;
 
 
 int rtp_packet_validate(char *packet, size_t size);
 
-#endif // RTP_H_
+#endif // RTP_PACKET_H_

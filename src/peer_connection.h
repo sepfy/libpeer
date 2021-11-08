@@ -1,45 +1,117 @@
+/**
+ * @file peer_connection.h
+ * @brief Struct PeerConnection
+ */
 #ifndef PEER_CONNECTION_H_
 #define PEER_CONNECTION_H_
 
-#include "sdp_attribute.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <agent.h>
+
+#include "session_description.h"
 #include "dtls_transport.h"
-#include "ice_agent.h"
+#include "media_stream.h"
 
-typedef struct peer_connection_t {
+typedef enum IceConnectionState {
 
-  ice_agent_t ice_agent;
-  dtls_transport_t dtls_transport;
-  transceiver_t transceiver;
+  DISCONNECTED,
+  GATHERING,
+  CONNECTING,
+  CONNECTED,
+  READY,
+  FAILED,
 
-} peer_connection_t;
+} IceConnectionState;
 
+typedef struct PeerConnection PeerConnection;
 
-peer_connection_t* peer_connection_create();
+/**
+ * @brief Create a struct PeerConnection and initialize it.
+ * @return Pointer of PeerConnection.
+ */
+PeerConnection* peer_connection_create();
 
-void peer_connection_destroy(peer_connection_t *peer_connection);
+/**
+ * @brief Destory a struct PeerConnection.
+ */
+void peer_connection_destroy(PeerConnection *pc);
 
-int peer_connection_init(peer_connection_t *peer_connection);
+/**
+ * @brief Let PeerConnection send RTCP PIL.
+ * @param PeerConnection
+ * @param RTP ssrc
+ */
+int peer_connection_send_rtcp_pil(PeerConnection *pc, uint32_t ssrc);
 
-void peer_connection_add_stream(peer_connection_t *peer_connection, const char *codec_name);
+/**
+ * @brief Add audio or video stream to PeerConection.
+ * @param A PeerConnection.
+ * @param A MediaStream.
+ */
+void peer_connection_add_stream(PeerConnection *pc, MediaStream *media_stream);
 
-int peer_connection_create_answer(peer_connection_t *peer_connection);
+/**
+ * @brief Set the callback function to handle onicecandidate event.
+ * @param A PeerConnection.
+ * @param A callback function to handle onicecandidate event.
+ * @param A userdata which is pass to callback function. 
+ */
+void peer_connection_onicecandidate(PeerConnection *pc, void (*onicecandidate), void  *userdata);
 
-void peer_connection_set_remote_description(peer_connection_t *peer_connection, char *sdp);
+/**
+ * @brief Set the callback function to handle oniceconnectionstatechange event.
+ * @param A PeerConnection.
+ * @param A callback function to handle oniceconnectionstatechange event.
+ * @param A userdata which is pass to callback function. 
+ */
+void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
+ void (*oniceconnectionstatechange), void *userdata);
 
-int peer_connection_send_rtp_packet(peer_connection_t *peer_connection, uint8_t *packet, int bytes);
+/**
+ * @brief Set the callback function to handle ontrack event.
+ * @param A PeerConnection.
+ * @param A callback function to handle ontrack event.
+ * @param A userdata which is pass to callback function. 
+ */
+void peer_connection_ontrack(PeerConnection *pc, void (*ontrack), void *userdata);
 
-int peer_connection_add_transceiver(peer_connection_t *pc, transceiver_t transceiver);
+/**
+ * @brief sets the specified session description as the remote peer's current offer or answer.
+ * @param PeerConnection.
+ * @param SDP string.
+ */
+void peer_connection_set_remote_description(PeerConnection *pc, char *sdp);
 
-void peer_connection_set_on_icecandidate(peer_connection_t *peer_connection,
- void (*on_icecandidate), void  *data);
+/**
+ * @brief Add a new RtpTransceiver to the set of transceivers associated with the PeerConnection.
+ * @param PeerConnection.
+ * @param RtpTransceiver.
+ */
+int peer_connection_add_transceiver(PeerConnection *pc, Transceiver transceiver);
 
-void peer_connection_set_on_iceconnectionstatechange(peer_connection_t *peer_connection,
-  void (*on_iceconnectionstatechange), void *data);
+/**
+ * @brief PeerConnection creates an answer.
+ * @param PeerConnection.
+ */
+int peer_connection_create_answer(PeerConnection *pc);
 
-void peer_connection_set_on_transport_ready(peer_connection_t *peer_connection,
- void (*on_transport_ready), void *data);
+/**
+ * @brief Get audio and video ssrc from a PeerConnection after set remote description.
+ * @param PeerConnection.
+ * @param Media type of audio and video.
+ */
+uint32_t peer_connection_get_ssrc(PeerConnection *pc, const char *type);
 
-void peer_connection_set_on_track(peer_connection_t *peer_connection,
- void (*on_track), void *data);
+// To confirm:
+int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);
+
+void peer_connection_set_on_transport_ready(PeerConnection *pc, void (*on_transport_ready), void *data);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // PEER_CONNECTION_H_

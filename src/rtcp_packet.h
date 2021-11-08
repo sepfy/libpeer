@@ -4,7 +4,8 @@
 #include <stdint.h>
 #include <endian.h>
 
-typedef enum {
+typedef enum RtcpType {
+
   RTCP_FIR = 192,
   RTCP_SR = 200,
   RTCP_RR = 201,
@@ -14,9 +15,11 @@ typedef enum {
   RTCP_RTPFB = 205,
   RTCP_PSFB = 206,
   RTCP_XR = 207,
-} rtcp_type_t;
 
-typedef struct rtcp_header_t {
+} RtcpType;
+
+typedef struct RtcpHeader {
+
 #if __BYTE_ORDER == __BIG_ENDIAN
   uint16_t version:2;
   uint16_t padding:1;
@@ -29,19 +32,24 @@ typedef struct rtcp_header_t {
   uint16_t type:8;
 #endif
   uint16_t length:16;
-} rtcp_header_t;
 
-typedef struct rtcp_fir_t {
+} RtcpHeader;
+
+typedef struct RtcpFir {
+
   uint32_t ssrc;
   uint32_t seqnr;
-} rtcp_fir_t;
 
-typedef struct rtcp_fb_t {
-  rtcp_header_t header;
+} RtcpFir;
+
+typedef struct RtcpFb {
+
+  RtcpHeader header;
   uint32_t ssrc;
   uint32_t media;
   char fci[1];
-} rtcp_fb_t;
+
+} RtcpFb;
 
 int rtcp_packet_validate(char *packet, size_t size);
 

@@ -6,7 +6,7 @@
 
 #include "signal_service.h"
 #include "utils.h"
-#include "pear.h"
+#include "peer_connection.h"
 
 #define MTU 1400
 
@@ -14,9 +14,9 @@ rtp_decode_context_t *rtp_decode_context;
 char *g_sdp = NULL;
 static GCond g_cond;
 static GMutex g_mutex;
-peer_connection_t *g_peer_connection = NULL;
+PeerConnection *g_peer_connection = NULL;
 
-static void on_iceconnectionstatechange(iceconnectionstate_t state, void *data) {
+static void on_iceconnectionstatechange(IceConnectionState state, void *data) {
   if(state == FAILED) {
     LOG_INFO("Disconnect with browser... Stop streaming");
   }
@@ -46,13 +46,18 @@ char* on_offer_get_cb(char *offer, void *data) {
   g_mutex_lock(&g_mutex);
   peer_connection_destroy(g_peer_connection);
   g_peer_connection = peer_connection_create();
-  peer_connection_add_stream(g_peer_connection, "H264");
-  transceiver_t transceiver = {.video = RECVONLY};
+
+  MediaStream *media_stream = media_stream_new();
+  media_stream_add_track(media_stream, CODEC_H264);
+
+  peer_connection_add_stream(g_peer_connection, media_stream);
+
+  Transceiver transceiver = {.video = RECVONLY};
   peer_connection_add_transceiver(g_peer_connection, transceiver);
-  peer_connection_set_on_track(g_peer_connection, on_track, NULL);
-  peer_connection_set_on_icecandidate(g_peer_connection, on_icecandidate, NULL);
+  peer_connection_ontrack(g_peer_connection, on_track, NULL);
+  peer_connection_onicecandidate(g_peer_connection, on_icecandidate, NULL);
   peer_connection_set_on_transport_ready(g_peer_connection, &on_transport_ready, NULL);
-  peer_connection_set_on_iceconnectionstatechange(g_peer_connection, &on_iceconnectionstatechange, NULL);
+  peer_connection_oniceconnectionstatechange(g_peer_connection, &on_iceconnectionstatechange, NULL);
   peer_connection_create_answer(g_peer_connection);
 
   g_cond_wait(&g_cond, &g_mutex);
