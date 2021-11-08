@@ -50,7 +50,6 @@ void* peer_connection_gather_thread(void *data) {
   PeerConnection *pc = (PeerConnection*)data;
 
   g_main_loop_run(pc->gloop);
-  g_main_loop_quit(pc->gloop);
 
   return NULL;
 
@@ -284,11 +283,23 @@ PeerConnection* peer_connection_create(void) {
 
 void peer_connection_destroy(PeerConnection *pc) {
 
-  if(pc != NULL) {
+  if(pc == NULL)
+    return;
 
+  g_main_loop_quit(pc->gloop);
+
+  g_thread_join(pc->gthread);
+
+  g_main_loop_unref(pc->gloop);
+
+  if(pc->nice_agent)
+    g_object_unref(pc->nice_agent);
+
+  if(pc->dtls_transport)
     dtls_transport_destroy(pc->dtls_transport);
-    free(pc);
-  }
+
+  free(pc);
+  pc = NULL;
 }
 
 void peer_connection_add_stream(PeerConnection *pc, MediaStream *media_stream) {
@@ -313,6 +324,7 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
   gchar* ufrag = NULL;
   gchar* pwd = NULL;
   GSList *plist;
+  int i;
 
   remote_sdp = g_base64_decode(remote_sdp_base64, &len);
 
@@ -323,24 +335,24 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
   SessionDescription *sdp = NULL;
   if(strstr(remote_sdp, "local") != NULL) {
     sdp = session_description_create();
-    char *token;
-    token = strtok(remote_sdp, "\r\n");
-    while(token != NULL) {
+    gchar **splits;
 
-      if(strstr(token, "candidate") != NULL && strstr(token, "local") != NULL) {
+    splits = g_strsplit(remote_sdp, "\r\n", 128);
+    for(i = 0; splits[i] != NULL; i++) {
+
+      if(strstr(splits[i], "candidate") != NULL && strstr(splits[i], "local") != NULL) {
         char buf[256] = {0};
-        if(session_description_update_mdns_of_candidate(token, buf, sizeof(buf)) != -1) {
+        if(session_description_update_mdns_of_candidate(splits[i], buf, sizeof(buf)) != -1) {
           session_description_append_newline(sdp, buf);
         }
       }
       else {
-        session_description_append_newline(sdp, token);
+        session_description_append_newline(sdp, splits[i]);
       }
-
-      token = strtok(NULL, "\r\n");
     }
 
-    remote_sdp = session_description_get_content(sdp);
+    free(remote_sdp);
+    remote_sdp = strdup(session_description_get_content(sdp));
   }
 
 
