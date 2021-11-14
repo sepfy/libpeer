@@ -10,7 +10,7 @@
 
 #include "media_stream.h"
 
-#define SDP_ATTIBUTES_MAX 10240
+#define SDP_MAX_SIZE 10240
 
 typedef struct SessionDescription SessionDescription;
 

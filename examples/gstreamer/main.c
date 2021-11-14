@@ -4,9 +4,10 @@
 
 #include <gst/gst.h>
 
-#include "signal_service.h"
+#include "index_html.h"
 #include "utils.h"
 #include "peer_connection.h"
+#include "signaling.h"
 
 #define MTU 1400
 
@@ -39,8 +40,9 @@ static void on_transport_ready(void *data) {
   gst_element_set_state(gst_element, GST_STATE_PLAYING);
 }
 
-char* on_offer_get_cb(char *offer, void *data) {
+void on_offer_get_cb(SignalingEvent event, char *msg, void *data) {
 
+#if 0
   gst_element_set_state(gst_element, GST_STATE_PAUSED);
 
   g_mutex_lock(&g_mutex);
@@ -60,8 +62,8 @@ char* on_offer_get_cb(char *offer, void *data) {
   g_cond_wait(&g_cond, &g_mutex);
   peer_connection_set_remote_description(g_peer_connection, offer);
   g_mutex_unlock(&g_mutex);
-
   return g_sdp;
+#endif
 }
 
 static GstFlowReturn new_sample(GstElement *sink, void *data) {
@@ -91,48 +93,17 @@ static GstFlowReturn new_sample(GstElement *sink, void *data) {
   return GST_FLOW_ERROR;
 }
 
-static void print_usage(const char *prog) {
-
-  printf("Usage: %s \n"
-   " -p      - port (default: 8080)\n"
-   " -H      - address to bind (default: 0.0.0.0)\n"
-   " -r      - document root\n"
-   " -h      - print help\n", prog);
-
-}
-
-void parse_argv(int argc, char **argv, options_t *options) {
-
-  int opt;
-
-  while((opt = getopt(argc, argv, "p:H:r:h")) != -1) {
-    switch(opt) {
-      case 'p':
-        options->port = atoi(optarg);
-        break;
-      case 'H':
-        options->host = optarg;
-        break;
-      case 'r':
-        options->root = optarg;
-        break;
-      case 'h':
-        print_usage(argv[0]);
-        exit(1);
-        break;
-      default :
-        printf("Unknown option %c\n", opt);
-        break;
-    }
-  }
-
-}
-
 int main(int argc, char **argv) {
 
-  signal_service_t signal_service;
-  options_t options = {8080, "0.0.0.0", "root"};
-  parse_argv(argc, argv, &options);
+  SignalingOption signaling_option = {SIGNALING_PROTOCOL_HTTP, "0.0.0.0", "demo", 8000, index_html};
+  Signaling *signaling = signaling_create_service(signaling_option);
+
+  if(!signaling) {
+    printf("Create signaling service failed\n");
+    return 0;
+  }
+
+  signaling_on_channel_event(signaling, &on_offer_get_cb, NULL);
 
   GstElement *pear_sink;
 
@@ -143,12 +114,10 @@ int main(int argc, char **argv) {
   g_signal_connect(pear_sink, "new-sample", G_CALLBACK(new_sample), NULL);
   g_object_set(pear_sink, "emit-signals", TRUE, NULL);
 
-  if(signal_service_create(&signal_service, options)) {
-    exit(1);
-  }
+  signaling_dispatch(signaling);
 
-  signal_service_on_offer_get(&signal_service, &on_offer_get_cb, NULL);
-  signal_service_dispatch(&signal_service);
+
+  signaling_destroy(signaling);
 
   gst_element_set_state(gst_element, GST_STATE_NULL);
   gst_object_unref(gst_element);

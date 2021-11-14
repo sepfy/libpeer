@@ -16,7 +16,7 @@
 #include <event2/keyvalq_struct.h>
 #include <glib.h>
 #include <cjson/cJSON.h>
-
+#if 0
 #include "index_html.h"
 #include "utils.h"
 #include "signal_service.h"
@@ -133,3 +133,4 @@ void signal_service_on_offer_get(signal_service_t *signal_service,
   signal_service->data = data;
   signal_service->on_offer_get = on_offer_get;
 }
+#endif

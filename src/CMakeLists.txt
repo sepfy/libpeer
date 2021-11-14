@@ -24,6 +24,10 @@ if(ENABLE_TEST)
   endforeach(sourcefile ${TEST_SRCS})
 endif(ENABLE_TEST)
 
+if(ENABLE_SIGNALING)
+  target_link_libraries(pear event cjson)
+endif(ENABLE_SIGNALING)
+
 file(GLOB HEADERS "*.h")
 set_target_properties(pear PROPERTIES PUBLIC_HEADER "${HEADERS}")
 

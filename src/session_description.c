@@ -10,7 +10,7 @@
 struct SessionDescription {
 
   size_t size;
-  char content[SDP_ATTIBUTES_MAX];
+  char content[SDP_MAX_SIZE];
 
 };
 

@@ -13,16 +13,20 @@ const char index_html[] = " \
   <body> \n \
     <video style='display:block; margin: 0 auto;' id='remoteVideos'></video> \n \
     <script> \n \
-      function jsonRpc(payload, cb) { \n \
+      function sendOfferToChannel(sdp) { \n \
         var xhttp = new XMLHttpRequest(); \n \
         xhttp.onreadystatechange = function() { \n \
           if (this.readyState == 4 && this.status == 200) { \n \
-            cb(this.responseText); \n \
+            let answer = JSON.parse(this.responseText); \n \
+            console.log(answer); \n \
+            if(answer.sdp !== undefined) { \n \
+              pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sdp)))); \n \
+            } \n \
           } \n \
         }; \n \
-        xhttp.open('POST', '/api'); \n \
+        xhttp.open('POST', '/channel/demo'); \n \
         xhttp.setRequestHeader('Content-Type', 'application/json'); \n \
-        xhttp.send(JSON.stringify(payload)); \n \
+        xhttp.send(JSON.stringify({'type': 'offer', 'sdp': btoa(sdp)})); \n \
       } \n \
       let pc = new RTCPeerConnection({ \n \
         iceServers: [{urls: 'stun:stun.l.google.com:19302'}] \n \
@@ -53,24 +57,11 @@ const char index_html[] = " \
       } \n \
       pc.onicecandidate = event => { \n \
         if (event.candidate === null) { \n \
-          var lines = pc.localDescription.sdp.split('\\n'); \n \
-          for(let i = 0; i < lines.length; i++) { \n \
-            // remove candidate which libnice cannot parse. \n \
-            if(lines[i].search('candidate') != -1 && lines[i].search('local') != -1) { \n \
-              lines.splice(i, 1); \n \
-              i--; \n \
-            } \n \
-          } \n \
-          sdp = lines.join('\\n'); \n \
-          var payload = {\"jsonrpc\": \"2.0\", \"method\": \"call\", \"params\": btoa(sdp)}; \n \
-          jsonRpc(payload, jsonRpcHandle); \n \
+          sendOfferToChannel(pc.localDescription.sdp) \n \
         } \n \
       }; \n \
       pc.addTransceiver('video', {'direction': 'sendrecv'}) \n \
       pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log); \n \
-      window.startSession = () => { \n \
-        let sd = document.getElementById('remoteSessionDescription').value; \n \
-      } \n \
     </script> \n \
   </body> \n \
 </html>";
