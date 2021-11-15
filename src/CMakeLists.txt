@@ -8,9 +8,9 @@ file(GLOB SRCS "*.c")
 file(GLOB TEST_SRCS "*test.c")
 list(REMOVE_ITEM SRCS ${TEST_SRCS})
 
-include_directories(${GLIB_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/third_party/libsrtp/include/ ${CMAKE_SOURCE_DIR}/third_party/libnice/agent ${CMAKE_SOURCE_DIR}/third_party/media-server/librtp/include ${CMAKE_SOURCE_DIR}/third_party/httpserver.h)
+include_directories(${GLIB_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/third_party/libsrtp/include/ ${CMAKE_SOURCE_DIR}/third_party/libnice/agent ${CMAKE_SOURCE_DIR}/third_party/media-server/librtp/include ${CMAKE_SOURCE_DIR}/third_party/httpserver.h ${CMAKE_SOURCE_DIR}/third_party/cJSON)
 
-link_directories(${CMAKE_SOURCE_DIR}/third_party/libnice/builddir/nice/ ${CMAKE_SOURCE_DIR}/third_party/libsrtp/build/ ${CMAKE_SOURCE_DIR}/third_party/media-server/librtp/debug.linux)
+link_directories(${CMAKE_SOURCE_DIR}/third_party/libnice/builddir/nice/ ${CMAKE_SOURCE_DIR}/third_party/libsrtp/build/ ${CMAKE_SOURCE_DIR}/third_party/media-server/librtp/debug.linux ${CMAKE_SOURCE_DIR}/third_party/cJSON)
 
 add_library(pear SHARED ${SRCS})
 

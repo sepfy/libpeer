@@ -7,3 +7,9 @@
 [submodule "third_party/media-server"]
 	path = third_party/media-server
 	url = https://github.com/ireader/media-server.git
+[submodule "third_party/httpserver.h"]
+	path = third_party/httpserver.h
+	url = https://github.com/jeremycw/httpserver.h.git
+[submodule "third_party/cJSON"]
+	path = third_party/cJSON
+	url = https://github.com/DaveGamble/cJSON.git

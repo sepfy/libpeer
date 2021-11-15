@@ -25,7 +25,7 @@ typedef struct CameraSend {
 
 } CameraSend;
 
-CameraSend g_camera_send;
+CameraSend g_camera_send = {0};
 
 
 static void on_iceconnectionstatechange(IceConnectionState state, void *data) {
@@ -94,7 +94,7 @@ static GstFlowReturn new_sample(GstElement *sink, void *data) {
     memcpy(rtp_packet, info.data, info.size);
     bytes = info.size;
 
-    //peer_connection_send_rtp_packet(g_camera_send.pc, rtp_packet, bytes);
+    peer_connection_send_rtp_packet(g_camera_send.pc, rtp_packet, bytes);
 
     gst_buffer_unmap(buffer, &info);
     gst_sample_unref(sample);
@@ -109,17 +109,18 @@ void signal_handler(int signal) {
   gst_element_set_state(g_camera_send.pipeline, GST_STATE_NULL);
   gst_object_unref(g_camera_send.sink);
   gst_object_unref(g_camera_send.pipeline);
-  signaling_destroy(g_camera_send.signaling);
-  peer_connection_destroy(g_camera_send.pc);
+ 
+  if(g_camera_send.signaling)
+    signaling_destroy(g_camera_send.signaling);
+
+  if(g_camera_send.pc)
+    peer_connection_destroy(g_camera_send.pc);
 
   exit(0);
 }
 
 int main(int argc, char *argv[]) {
 
-
-  g_camera_send.pc = peer_connection_create();
-  peer_connection_destroy(g_camera_send.pc);
   gst_init(&argc, &argv);
   signal(SIGINT, signal_handler);
 
@@ -133,13 +134,12 @@ int main(int argc, char *argv[]) {
 
   signaling_on_channel_event(g_camera_send.signaling, &on_channel_event, NULL);
 
-
-
   g_camera_send.pipeline = gst_parse_launch(PIPE_LINE, NULL);
   g_camera_send.sink = gst_bin_get_by_name(GST_BIN(g_camera_send.pipeline), "peer-connection-sink");
   g_signal_connect(g_camera_send.sink, "new-sample", G_CALLBACK(new_sample), NULL);
   g_object_set(g_camera_send.sink, "emit-signals", TRUE, NULL);
 
   signaling_dispatch(g_camera_send.signaling);
+
   return 0;
 }
