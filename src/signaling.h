@@ -1,31 +1,19 @@
 /**
  * @file singaling.h
- * @brief Struct Signaling
+ * @brief Struct Signaling.
  */
 #ifndef SIGNALING_H_
 #define SIGNALING_H_
 
 #include <stdint.h>
-
-#ifndef INDEX_HTML
-#define INDEX_HTML "test"
-#endif
+#include "signaling_observer.h"
+#include "signaling_http.h"
 
 typedef enum SignalingProtocol {
 
   SIGNALING_PROTOCOL_HTTP,
 
 } SignalingProtocol;
-
-
-typedef enum SignalingEvent {
-
-  SIGNALING_EVENT_CONNECTED,
-  SIGNALING_EVENT_GET_OFFER,
-  SIGNALING_EVENT_GET_ANSWER,
-
-
-} SignalingEvent;
 
 
 typedef struct SignalingOption {
@@ -43,19 +31,42 @@ typedef struct Signaling Signaling;
 
 /**
  * @brief Create a new Signaling.
- * @param signaling configuration.
+ * @param Signaling option.
  * @return Pointer of struct Signaling.
  */
-Signaling* signaling_create_service(SignalingOption signaling_option);
+Signaling* signaling_create(SignalingOption signaling_option);
 
+/**
+ * @brief Destroy a Signaling.
+ * @param Struct Signaling.
+ */
 void signaling_destroy(Signaling *signaling);
 
+/**
+ * @brief Dispatch Signaling service.
+ * @param Struct Signaling.
+ */
 void signaling_dispatch(Signaling *signaling);
 
-void signaling_send_channel_message(Signaling *signaling, char *message);
+/**
+ * @brief Shutdown Signaling service.
+ * @param Struct Signaling.
+ */
+void signaling_shutdown(Signaling *signaling);
 
-void signaling_notify_event(Signaling *signaling, SignalingEvent signaling_event, char *data);
+/**
+ * @brief Request signaling send an answer to channel.
+ * @param Struct Signaling.
+ * @param Session description of answer.
+ */
+void signaling_send_answer_to_channel(Signaling *signaling, char *sdp);
 
+/**
+ * @brief Register event of signaling service.
+ * @param Struct Signaling.
+ * @param Callback function of signaling if channel has new event.
+ * @param Userdata of signaling channel event.
+ */
 void signaling_on_channel_event(Signaling *signaling, void (*on_channel_event), void *userdata);
 
 #endif // SIGNALING_H_

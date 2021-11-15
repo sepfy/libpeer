@@ -5,13 +5,13 @@
 typedef struct Signaling {
 
   SignalingOption option;
+  SignalingObserver observer;
   void *impl;
-  void (*on_channel_event)(SignalingEvent signal_event, char *data, void *userdata);
-  void *on_channel_event_data;
 
 } Signaling;
 
-Signaling* signaling_create_service(SignalingOption signaling_option) {
+
+Signaling* signaling_create(SignalingOption signaling_option) {
 
   Signaling *signaling = (Signaling*)malloc(sizeof(Signaling));
 
@@ -25,22 +25,15 @@ Signaling* signaling_create_service(SignalingOption signaling_option) {
 
   switch(signaling->option.protocol) {
     case SIGNALING_PROTOCOL_HTTP:
-      {
-        SignalingHttp *signaling_http = signaling_http_create(signaling->option.host,
-         signaling->option.port, signaling->option.channel, signaling->option.index_html, signaling);
-
-        if(signaling_http) {
-          signaling->impl = (void*)signaling_http;
-          impl_created = TRUE;
-        }
-      }
+      signaling->impl = (void*)signaling_http_create(signaling->option.host, signaling->option.port,
+       signaling->option.channel, signaling->option.index_html, &signaling->observer);
       break;
     default:
       break;
   }
 
 
-  if(!impl_created) {
+  if(!signaling->impl) {
     free(signaling);
     return NULL;
   }
@@ -52,10 +45,7 @@ void signaling_destroy(Signaling *signaling) {
 
   switch(signaling->option.protocol) {
     case SIGNALING_PROTOCOL_HTTP:
-      {
-        SignalingHttp *signaling_http = (SignalingHttp*)signaling->impl;
-        signaling_http_destroy(signaling_http);
-      }
+      signaling_http_destroy((SignalingHttp*)signaling->impl);
       break;
     default:
       break;
@@ -67,18 +57,38 @@ void signaling_dispatch(Signaling *signaling) {
 
   switch(signaling->option.protocol) {
     case SIGNALING_PROTOCOL_HTTP:
-      {
-        SignalingHttp *signaling_http = (SignalingHttp*)signaling->impl;
-        signaling_http_dispatch(signaling_http);
-      }
+      signaling_http_dispatch((SignalingHttp*)signaling->impl);
       break;
     default:
       break;
   }
-
 }
 
-void signaling_send_channel_message(Signaling *signaling, char *message) {
+void signaling_shutdown(Signaling *signaling) {
 
+  switch(signaling->option.protocol) {
+    case SIGNALING_PROTOCOL_HTTP:
+      signaling_http_shutdown((SignalingHttp*)signaling->impl);
+      break;
+    default:
+      break;
+  }
+}
+
+void signaling_on_channel_event(Signaling *signaling, void (*on_channel_event), void *userdata) {
+
+  signaling->observer.on_channel_event = on_channel_event;
+  signaling->observer.on_channel_event_data = userdata;
+}
+
+void signaling_send_answer_to_channel(Signaling *signaling, char *sdp) {
+
+  switch(signaling->option.protocol) {
+    case SIGNALING_PROTOCOL_HTTP:
+      signaling_http_set_answer((SignalingHttp*)signaling->impl, sdp);
+      break;
+    default:
+      break;
+  }
 }
 

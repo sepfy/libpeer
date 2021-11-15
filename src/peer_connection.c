@@ -144,15 +144,9 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
 
   if(pc->onicecandidate != NULL) {
 
-    char *answer = NULL;
-    const char *sdp_content = session_description_get_content(pc->sdp);
-    answer = (char*)malloc(strlen(sdp_content) + 30);
-    sprintf(answer, "{\"type\": \"answer\", \"sdp\": \"%s\"}", sdp_content);
+    char *sdp_content = session_description_get_content(pc->sdp);
+    pc->onicecandidate(sdp_content, pc->onicecandidate_userdata);
 
-    pc->onicecandidate(answer, pc->onicecandidate_userdata);
-
-    if(answer)
-      free(answer);
   }
 
   if(nice_candidates)
@@ -298,6 +292,9 @@ void peer_connection_destroy(PeerConnection *pc) {
   if(pc->dtls_transport)
     dtls_transport_destroy(pc->dtls_transport);
 
+  if(pc->sdp)
+    session_description_destroy(pc->sdp);
+
   free(pc);
   pc = NULL;
 }
@@ -317,16 +314,15 @@ int peer_connection_create_answer(PeerConnection *pc) {
   return 0;
 }
 
-void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp_base64) {
+void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp) {
 
-  guchar *remote_sdp = NULL;
   gsize len;
   gchar* ufrag = NULL;
   gchar* pwd = NULL;
   GSList *plist;
   int i;
 
-  remote_sdp = g_base64_decode(remote_sdp_base64, &len);
+  if(!remote_sdp) return;
 
   pc->audio_ssrc = session_description_find_ssrc("audio", remote_sdp);
   pc->video_ssrc = session_description_find_ssrc("video", remote_sdp);
@@ -351,10 +347,8 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
       }
     }
 
-    free(remote_sdp);
-    remote_sdp = strdup(session_description_get_content(sdp));
+    remote_sdp = session_description_get_content(sdp);
   }
-
 
   plist = nice_agent_parse_remote_stream_sdp(pc->nice_agent,
    pc->component_id, (gchar*)remote_sdp, &ufrag, &pwd);
@@ -378,9 +372,6 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
 
   if(sdp)
     session_description_destroy(sdp);
-
-  if(remote_sdp)
-    free(remote_sdp);
 
 }
 

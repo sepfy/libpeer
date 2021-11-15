@@ -11,6 +11,7 @@ extern "C" {
 
 #include <agent.h>
 
+#include "utils.h"
 #include "session_description.h"
 #include "dtls_transport.h"
 #include "media_stream.h"

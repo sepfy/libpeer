@@ -8,7 +8,7 @@ file(GLOB SRCS "*.c")
 file(GLOB TEST_SRCS "*test.c")
 list(REMOVE_ITEM SRCS ${TEST_SRCS})
 
-include_directories(${GLIB_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/third_party/libsrtp/include/ ${CMAKE_SOURCE_DIR}/third_party/libnice/agent ${CMAKE_SOURCE_DIR}/third_party/media-server/librtp/include)
+include_directories(${GLIB_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/third_party/libsrtp/include/ ${CMAKE_SOURCE_DIR}/third_party/libnice/agent ${CMAKE_SOURCE_DIR}/third_party/media-server/librtp/include ${CMAKE_SOURCE_DIR}/third_party/httpserver.h)
 
 link_directories(${CMAKE_SOURCE_DIR}/third_party/libnice/builddir/nice/ ${CMAKE_SOURCE_DIR}/third_party/libsrtp/build/ ${CMAKE_SOURCE_DIR}/third_party/media-server/librtp/debug.linux)
 
@@ -24,9 +24,7 @@ if(ENABLE_TEST)
   endforeach(sourcefile ${TEST_SRCS})
 endif(ENABLE_TEST)
 
-if(ENABLE_SIGNALING)
-  target_link_libraries(pear event cjson)
-endif(ENABLE_SIGNALING)
+target_link_libraries(pear cjson)
 
 file(GLOB HEADERS "*.h")
 set_target_properties(pear PROPERTIES PUBLIC_HEADER "${HEADERS}")

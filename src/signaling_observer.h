@@ -9,8 +9,13 @@ typedef enum SignalingEvent {
 } SignalingEvent;
 
 
-typedef struct SignalingObserver SignalingObserver;
+typedef struct SignalingObserver {
 
-void signaling_observer_notify(SignalingObserver *signaling_observer, SignalingEvent signaling_event, char *msg);
+  void (*on_channel_event)(SignalingEvent signaling_event, char *msg, void *on_channel_event_data);
+  void *on_channel_event_data;
+
+} SignalingObserver;
+
+void signaling_observer_notify_event(SignalingObserver *signaling_observer, SignalingEvent signaling_event, char *msg);
 
 #endif // SIGNALING_OBSERVER_H_

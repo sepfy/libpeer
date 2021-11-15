@@ -1,102 +1,73 @@
 #include <string.h>
-#include <event2/event.h>
-#include <event2/http.h>
-#include <event2/buffer.h>
-#include <event2/util.h>
-#include <event2/keyvalq_struct.h>
 #include <cjson/cJSON.h>
+#define HTTPSERVER_IMPL
+#ifdef _POSIX_C_SOURCE
+#undef _POSIX_C_SOURCE
+#endif
+#include <httpserver.h>
 
-#include "signaling.h"
+#include "signaling_observer.h"
 #include "signaling_http.h"
 #include "session_description.h"
 #include "utils.h"
 
 struct SignalingHttp {
 
-  Signaling *signaling;
+  SignalingObserver *signaling_observer;
 
-  struct event_base *base;
-  struct evhttp *http;
-  struct evhttp_bound_socket *handle;
+  char channel[128];
+  struct http_server_s *server; 
+  char *answer;
 
-  char answer[SDP_MAX_SIZE];
-  gboolean answer_used;
+  const char *index_html;
 
 };
 
-gboolean signaling_http_get_answer(SignalingHttp *signaling_http, char *answer, size_t size) {
+size_t signaling_http_get_answer(SignalingHttp *signaling_http, char *answer, size_t size) {
 
-  if(signaling_http->answer_used)
-    return FALSE;
-
+  size_t len;
   memset(answer, 0, size);
-  snprintf(answer, size, "%s", signaling_http->answer);
-  return TRUE;
+
+  if(signaling_http->answer) {
+    len = strlen(signaling_http->answer);
+    snprintf(answer, size, "%s", signaling_http->answer);
+    free(signaling_http->answer);
+    signaling_http->answer = NULL;
+  }
+  else {
+    snprintf(answer, size, "{}");
+    len = strlen(answer);
+  }
+  
+  return len;
 }
 
-gboolean signaling_http_set_answer(SignalingHttp *signaling_http, const char *answer) {
+void signaling_http_set_answer(SignalingHttp *signaling_http, const char *sdp) {
 
-  memset(signaling_http->answer, 0, SDP_MAX_SIZE);
-  snprintf(signaling_http->answer, SDP_MAX_SIZE, "%s", answer);
-  signaling_http->answer_used = FALSE;
-  return TRUE;
-}
+  char answer[SDP_MAX_SIZE] = {0};
+  snprintf(answer, SDP_MAX_SIZE, "{\"type\": \"answer\", \"sdp\": \"%s\"}", sdp);
 
-void signaling_http_index_request(struct evhttp_request *req, void *arg) {
-
-  const char *index_html = (const char*)arg;
-
-  struct evbuffer *evb = NULL;
-
-  if(evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
-    evhttp_send_error(req, HTTP_BADMETHOD, 0);
-    return;
+  if(signaling_http->answer) {
+    free(signaling_http->answer);
   }
 
-  evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "text/html");
-  evb = evbuffer_new();
-  evbuffer_add(evb, index_html, strlen(index_html));
-  evhttp_send_reply(req, HTTP_OK, "OK", evb);
+  signaling_http->answer = g_base64_encode(answer, strlen(answer));
 
-  if(evb)
-    evbuffer_free(evb);
 }
 
-void signaling_http_channel_request(struct evhttp_request *req, void *arg) {
+void signaling_http_channel_request(SignalingObserver *signaling_observer, const char *body, size_t len) {
 
-  SignalingHttp *signaling_http = (SignalingHttp*)arg;
-  Signaling *signaling = signaling_http->signaling;
-
-  struct evbuffer *evb = NULL;
-  struct evbuffer *buf = NULL;
   cJSON *json = NULL;
   cJSON *type = NULL;
   cJSON *sdp = NULL;
-  char *payload = NULL;
-  char *anwser = NULL;
-  size_t len;
 
-  if(evhttp_request_get_command(req) != EVHTTP_REQ_POST) {
-    evhttp_send_error(req, HTTP_BADMETHOD, 0);
-    return;
-  }
-
-  buf = evhttp_request_get_input_buffer(req);
-
-  len = evbuffer_get_length(buf);
-
-  payload = (char*)malloc(len);
-
-  if(payload == NULL) {
-    evhttp_send_error(req, HTTP_INTERNAL, 0);
-    return;
-  }
-
-  evbuffer_remove(buf, payload, len);
+  guchar *offer = g_base64_decode(body, &len);
+  if(!offer) return;
 
   do {
 
-    json = cJSON_Parse(payload);
+    json = cJSON_Parse(offer);
+    if(!json) return;
 
     type = cJSON_GetObjectItemCaseSensitive(json, "type");
     if(!cJSON_IsString(type) || (type->valuestring == NULL)) {
@@ -109,82 +80,60 @@ void signaling_http_channel_request(struct evhttp_request *req, void *arg) {
     }
 
     else if(strcmp(type->valuestring, "offer") == 0) {
-printf("%s\n", sdp->valuestring);
-      signaling_notify_event(signaling, SIGNALING_EVENT_GET_OFFER, sdp->valuestring);
+      signaling_observer_notify_event(signaling_observer, SIGNALING_EVENT_GET_OFFER, sdp->valuestring);
     }
 
   } while(0);
 
-
-  if(payload)
-    free(payload);
 
   cJSON_Delete(json);
-
-  evb = evbuffer_new();
-
-  // HTTP only support answer
-  char answer[SDP_MAX_SIZE] = {0};
-  if(signaling_http_get_answer(signaling_http, answer, SDP_MAX_SIZE)) {
-    evbuffer_add_printf(evb, "{\"type\": \"answer\", \"sdp\": \"%s\"}", answer);
-  }
-  else {
-    evbuffer_add_printf(evb, "{}");
-  }
-
-  evhttp_send_reply(req, HTTP_OK, "OK", evb);
-
-  if(evb)
-    evbuffer_free(evb);
+  free(offer);
 }
 
-SignalingHttp* signaling_http_create(const char *host, int port, const char *channel, const char *html, Signaling *signaling) {
+void signaling_http_handle_request(struct http_request_s* request) {
+
+  SignalingHttp *signaling_http = request->server->data;
+
+  struct http_response_s* response = http_response_init();
+  http_response_status(response, 200);
+
+  http_string_t url = http_request_target(request);
+  if(url.len == strlen(signaling_http->channel)
+   && memcmp(url.buf, signaling_http->channel, url.len) == 0) {
+    // channel
+    http_string_t body = http_request_body(request);
+    signaling_http_channel_request(signaling_http->signaling_observer, body.buf, body.len);
+    http_response_header(response, "Content-Type", "text/plain");
+    char answer[SDP_MAX_SIZE] = {0};
+    int len = signaling_http_get_answer(signaling_http, answer, SDP_MAX_SIZE);
+    http_response_body(response, answer, len);
+  }
+  else {
+    // index
+    http_response_header(response, "Content-Type", "text/html");
+    if(signaling_http->index_html != NULL)
+      http_response_body(response, signaling_http->index_html, strlen(signaling_http->index_html));
+    else
+      http_response_body(response, "", 0);
+  }
+
+  http_respond(request, response);
+}
+
+SignalingHttp* signaling_http_create(const char *host, int port, const char *channel,
+ const char *index_html, SignalingObserver *signaling_observer) {
 
   SignalingHttp *signaling_http = (SignalingHttp*)malloc(sizeof(SignalingHttp));
-
-  signaling_http->answer_used = TRUE;
-  signaling_http->signaling = signaling;
-
-  char http_channel[128] = {0};
-  snprintf(http_channel, sizeof(http_channel), "/channel/%s", channel);
-
-  if(signaling_http == NULL)
+  if(!signaling_http)
     return NULL;
 
-  do {
+  snprintf(signaling_http->channel, sizeof(signaling_http->channel), "/channel/%s", channel);
+  signaling_http->index_html = index_html;
+  signaling_http->server = http_server_init(8000, signaling_http_handle_request);
+  http_server_set_userdata(signaling_http->server, signaling_http);
 
-    signaling_http->base = event_base_new();
-    if(!signaling_http->base) {
-      LOG_ERROR("Couldn't create http event base.");
-      break;
-    }
-
-    signaling_http->http = evhttp_new(signaling_http->base);
-    if(!signaling_http->http) {
-      LOG_ERROR("Couldn't create evhttp. Exiting.");
-      break;
-    }
-
-    if(html)
-      evhttp_set_cb(signaling_http->http, "/", signaling_http_index_request, (void*)html);
-
-    evhttp_set_cb(signaling_http->http, http_channel, signaling_http_channel_request, signaling_http);
-
-    signaling_http->handle = evhttp_bind_socket_with_handle(signaling_http->http, host, port);
-
-    if(!signaling_http->handle) {
-      LOG_ERROR("couldn't bind to %s:%d. Exiting.\n", host, port);
-      break;
-    }
-
-
-    return signaling_http;
-
-  } while(0);
-
-  free(signaling_http);
-  return NULL;
-
+  signaling_http->signaling_observer = signaling_observer;
+  return signaling_http;
 }
 
 void signaling_http_destroy(SignalingHttp *signaling_http) {
@@ -192,11 +141,9 @@ void signaling_http_destroy(SignalingHttp *signaling_http) {
   if(!signaling_http)
     return;
 
-  if(signaling_http->http)
-    evhttp_free(signaling_http->http);
-
-  if(signaling_http->base)
-    event_base_free(signaling_http->base);
+  if(signaling_http->server) {
+    free(signaling_http->server);
+  }
 
   free(signaling_http);
   signaling_http = NULL;
@@ -204,6 +151,9 @@ void signaling_http_destroy(SignalingHttp *signaling_http) {
 
 void signaling_http_dispatch(SignalingHttp *signaling_http) {
 
-  event_base_dispatch(signaling_http->base);
+  http_server_listen(signaling_http->server);
 }
 
+void signaling_http_shutdown(SignalingHttp *signaling_http) {
+
+}

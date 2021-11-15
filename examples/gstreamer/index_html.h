@@ -13,28 +13,25 @@ const char index_html[] = " \
   <body> \n \
     <video style='display:block; margin: 0 auto;' id='remoteVideos'></video> \n \
     <script> \n \
+      var pc = new RTCPeerConnection({ \n \
+        iceServers: [{urls: 'stun:stun.l.google.com:19302'}] \n \
+      }); \n \
+      var log = msg => { console.log(msg); }; \n \
       function sendOfferToChannel(sdp) { \n \
         var xhttp = new XMLHttpRequest(); \n \
         xhttp.onreadystatechange = function() { \n \
           if (this.readyState == 4 && this.status == 200) { \n \
-            let answer = JSON.parse(this.responseText); \n \
-            console.log(answer); \n \
-            if(answer.sdp !== undefined) { \n \
-              pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sdp)))); \n \
+            let res = JSON.parse(atob(this.responseText)); \n \
+            console.log(res); \n \
+            if(res.type == 'answer') { \n \
+              pc.setRemoteDescription(new RTCSessionDescription(res)); \n \
             } \n \
           } \n \
         }; \n \
         xhttp.open('POST', '/channel/demo'); \n \
-        xhttp.setRequestHeader('Content-Type', 'application/json'); \n \
-        xhttp.send(JSON.stringify({'type': 'offer', 'sdp': btoa(sdp)})); \n \
+        xhttp.setRequestHeader('Content-Type', 'plain/text'); \n \
+        xhttp.send(btoa(JSON.stringify({'type': 'offer', 'sdp': sdp}))); \n \
       } \n \
-      let pc = new RTCPeerConnection({ \n \
-        iceServers: [{urls: 'stun:stun.l.google.com:19302'}] \n \
-      }); \n \
-      let log = msg => { \n \
-        console.log(msg); \n \
-      }; \n \
- \n \
       pc.ontrack = function (event) { \n \
         var el = document.getElementById('remoteVideos'); \n \
         el.srcObject = event.streams[0]; \n \
@@ -42,23 +39,9 @@ const char index_html[] = " \
         el.controls = true; \n \
         el.muted = true; \n \
       }; \n \
- \n \
       pc.oniceconnectionstatechange = e => log(pc.iceConnectionState); \n \
-      function jsonRpcHandle(result) { \n \
-        let sdp = JSON.parse(result).result; \n \
-        if (sdp === '') { \n \
-          return alert('Session Description must not be empty'); \n \
-        } \n \
-        try { \n \
-          pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sdp)))); \n \
-        } catch (e) { \n \
-          alert(e); \n \
-        } \n \
-      } \n \
       pc.onicecandidate = event => { \n \
-        if (event.candidate === null) { \n \
-          sendOfferToChannel(pc.localDescription.sdp) \n \
-        } \n \
+        if(event.candidate === null) sendOfferToChannel(pc.localDescription.sdp) \n \
       }; \n \
       pc.addTransceiver('video', {'direction': 'sendrecv'}) \n \
       pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log); \n \
