@@ -103,15 +103,23 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
   session_description_append(sdp, "t=0 0");
   session_description_append(sdp, "a=msid-semantic: WMS");
 
-  if(pc->media_stream->tracks_num > 1)
+  if(pc->media_stream->tracks_num > 1) {
     session_description_append(sdp, "a=group:BUNDLE 0 1");
-  else
+
+    session_description_add_codec(sdp, pc->media_stream->audio_codec, pc->transceiver.audio, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
+
+    session_description_add_codec(sdp, pc->media_stream->video_codec, pc->transceiver.video, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 1);
+
+  }
+  else {
     session_description_append(sdp, "a=group:BUNDLE 0");
 
+    session_description_add_codec(sdp, pc->media_stream->audio_codec, pc->transceiver.audio, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
 
-  session_description_add_codec(sdp, pc->media_stream->audio_codec, pc->transceiver.audio, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport));
+    session_description_add_codec(sdp, pc->media_stream->video_codec, pc->transceiver.video, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
 
-  session_description_add_codec(sdp, pc->media_stream->video_codec, pc->transceiver.video, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport));
+
+  }
 
   if(local_ufrag)
     free(local_ufrag);
@@ -348,6 +356,7 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
     }
 
     remote_sdp = session_description_get_content(sdp);
+    session_description_destroy(sdp);
   }
 
   plist = nice_agent_parse_remote_stream_sdp(pc->nice_agent,

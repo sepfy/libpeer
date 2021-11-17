@@ -18,7 +18,7 @@ SessionDescription* session_description_create(void) {
 
   SessionDescription *sdp = NULL;
   sdp = (SessionDescription*)malloc(sizeof(SessionDescription));
-  if(sdp == NULL)
+  if(!sdp)
     return sdp;
 
   memset(sdp->content, 0, sizeof(sdp->content));
@@ -27,7 +27,7 @@ SessionDescription* session_description_create(void) {
 
 void session_description_destroy(SessionDescription *sdp) {
 
-  if(sdp != NULL) {
+  if(sdp) {
     free(sdp);
   }
 }
@@ -97,9 +97,7 @@ char* session_description_get_content(SessionDescription *sdp) {
 
 
 void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
- TransceiverDirection direction, const char *ufrag, const char *password, const char *fingerprint) {
-
-  static int mid = 0;
+ TransceiverDirection direction, const char *ufrag, const char *password, const char *fingerprint, int mid) {
 
   switch(codec) {
     case CODEC_H264:
@@ -149,7 +147,6 @@ void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
   session_description_append(sdp, "a=fingerprint:sha-256 %s", fingerprint);
   session_description_append(sdp, "a=setup:passive");
 
-  mid = (mid + 1)%2;
 }
 
 uint32_t session_description_find_ssrc(const char *type, const char *sdp) {

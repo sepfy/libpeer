@@ -20,4 +20,4 @@ make -j4
 
 # Build cJSON
 cd $BASE_DIR/third_party/cJSON
-make -j4
+make static

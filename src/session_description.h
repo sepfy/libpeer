@@ -59,9 +59,10 @@ char* session_description_get_content(SessionDescription *sdp);
  * @param ufrag of DTLS.
  * @param password of DTLS.
  * @param fingerprint of DTLS.
+ * @param mid.
  */
 void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
- TransceiverDirection direction, const char *ufrag, const char *password, const char *fingerprint);
+ TransceiverDirection direction, const char *ufrag, const char *password, const char *fingerprint, int mid);
 
 /**
  * @brief Find RTP ssrc of audio or video in SDP.
