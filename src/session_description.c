@@ -29,6 +29,7 @@ void session_description_destroy(SessionDescription *sdp) {
 
   if(sdp) {
     free(sdp);
+    sdp = NULL;
   }
 }
 

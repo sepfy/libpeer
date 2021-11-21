@@ -1,5 +1,5 @@
-#ifndef DISPLAY_INDEX_HTML_H_
-#define DISPLAY_INDEX_HTML_H_
+#ifndef SCREEN_RECV_INDEX_HTML_H_
+#define SCREEN_RECV_INDEX_HTML_H_
  
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,52 +8,41 @@ const char index_html[] = " \
 <!DOCTYPE html> \n \
 <html> \n \
   <head> \n \
-    <title>Display</title> \n \
+    <title>Camera Send</title> \n \
   </head> \n \
   <body> \n \
-    <video style='display:block; margin: 0 auto;' id='localVideo' autoplay muted></video> \n \
+    <video style='display:block; margin: 0 auto;' id='localVideo'></video> \n \
     <script> \n \
-      function jsonRpc(payload, cb) { \n \
+      var pc = new RTCPeerConnection({ \n \
+        iceServers: [{urls: 'stun:stun.l.google.com:19302'}] \n \
+      }); \n \
+      var log = msg => { console.log(msg); }; \n \
+      function sendOfferToChannel(sdp) { \n \
         var xhttp = new XMLHttpRequest(); \n \
         xhttp.onreadystatechange = function() { \n \
           if (this.readyState == 4 && this.status == 200) { \n \
-            cb(this.responseText); \n \
+            let res = JSON.parse(atob(this.responseText)); \n \
+            console.log(res); \n \
+            if(res.type == 'answer') { \n \
+              pc.setRemoteDescription(new RTCSessionDescription(res)); \n \
+            } \n \
           } \n \
         }; \n \
-        xhttp.open('POST', '/api'); \n \
-        xhttp.setRequestHeader('Content-Type', 'application/json'); \n \
-        xhttp.send(JSON.stringify(payload)); \n \
+        xhttp.open('POST', '/channel/demo'); \n \
+        xhttp.setRequestHeader('Content-Type', 'plain/text'); \n \
+        xhttp.send(btoa(JSON.stringify({'type': 'offer', 'sdp': sdp}))); \n \
       } \n \
-      let pc = new RTCPeerConnection({ \n \
-        iceServers: [{urls: 'stun:stun.l.google.com:19302'}] \n \
-      }); \n \
-      let log = msg => { \n \
-        console.log(msg); \n \
+      pc.ontrack = function (event) { \n \
+        var el = document.getElementById('remoteVideos'); \n \
+        el.srcObject = event.streams[0]; \n \
+        el.autoplay = true; \n \
+        el.controls = true; \n \
+        el.muted = true; \n \
       }; \n \
- \n \
       pc.oniceconnectionstatechange = e => log(pc.iceConnectionState); \n \
-      function jsonRpcHandle(result) { \n \
-        let sdp = JSON.parse(result).result; \n \
-        if (sdp === '') { \n \
-          return alert('Session Description must not be empty'); \n \
-        } \n \
-        try { \n \
-console.log(JSON.parse(atob(sdp))); \n\
-          pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sdp)))); \n \
-        } catch (e) { \n \
-          alert(e); \n \
-        } \n \
-      } \n \
       pc.onicecandidate = event => { \n \
-        if (event.candidate === null) { \n \
-          let sdp = pc.localDescription.sdp; \n \
-          var payload = {\"jsonrpc\": \"2.0\", \"method\": \"call\", \"params\": btoa(sdp)}; \n \
-          jsonRpc(payload, jsonRpcHandle); \n \
-        } \n \
+        if(event.candidate === null) sendOfferToChannel(pc.localDescription.sdp) \n \
       }; \n \
-      window.startSession = () => { \n \
-        let sd = document.getElementById('remoteSessionDescription').value; \n \
-      } \n \
       navigator.mediaDevices.getDisplayMedia({ video: true, audio: false }) \n \
         .then(stream => { \n \
           document.getElementById('localVideo').srcObject = stream \n \
@@ -64,4 +53,4 @@ console.log(JSON.parse(atob(sdp))); \n\
   </body> \n \
 </html>";
 
-#endif // GSTREAMER_INDEX_HTML_H_
+#endif // SCREEN_RECV_INDEX_HTML_H_

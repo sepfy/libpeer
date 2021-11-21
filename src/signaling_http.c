@@ -1,5 +1,5 @@
 #include <string.h>
-#include <cjson/cJSON.h>
+#include <cJSON.h>
 #define HTTPSERVER_IMPL
 #ifdef _POSIX_C_SOURCE
 #undef _POSIX_C_SOURCE
@@ -144,6 +144,10 @@ void signaling_http_destroy(SignalingHttp *signaling_http) {
 
   if(signaling_http->server) {
     free(signaling_http->server);
+  }
+
+  if(signaling_http->answer) {
+    free(signaling_http->answer);
   }
 
   free(signaling_http);

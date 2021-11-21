@@ -10,7 +10,7 @@
 
 #define MTU 1400
 
-const char PIPE_LINE[] = "v4l2src device=/dev/video2 ! videorate ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=peer-connection-sink";
+const char PIPE_LINE[] = "v4l2src ! videorate ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=peer-connection-sink";
 
 typedef struct CameraSend {
 
@@ -53,6 +53,7 @@ void on_channel_event(SignalingEvent signaling_event, char *msg, void *data) {
 
     printf("Get offer from singaling\n");
     g_mutex_lock(&g_camera_send.mutex);
+    gst_element_set_state(g_camera_send.pipeline, GST_STATE_PAUSED);
 
     peer_connection_destroy(g_camera_send.pc);
 

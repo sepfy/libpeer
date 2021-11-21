@@ -8,20 +8,12 @@
 
 #include "peer_connection.h"
 
-typedef struct rtp_encode_context_t {
-  struct rtp_payload_t handler;
-  void* encoder;
-  PeerConnection *peer_connection;
-} rtp_encode_context_t;
+typedef struct H264Packetizer H264Packetizer;
 
-static void* rtp_encode_alloc(void* param, int bytes);
+H264Packetizer* h264_packetizer_create(PeerConnection *pc);
 
-static void rtp_encode_free(void* param, void *packet);
+void h264_packetizer_destroy(H264Packetizer *h264_packetizer);
 
-static int rtp_encode_packet(void* param, const void *packet, int bytes, uint32_t timestamp, int flags);
-
-struct rtp_encode_context_t* create_rtp_encode_context(PeerConnection *peer_connection);
-
-void rtp_encode_frame(struct rtp_encode_context_t *rtp_encode_context, uint8_t *buf, size_t size, unsigned long timestamp);
+void h264_packetizer_send(H264Packetizer *h264_packetizer, uint8_t *buf, size_t size, unsigned long timestamp);
 
 #endif // H264_PACKETIZER_H_

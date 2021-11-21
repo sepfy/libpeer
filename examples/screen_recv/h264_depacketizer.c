@@ -2,7 +2,14 @@
 
 #include "h264_depacketizer.h"
 
-static void* rtp_decode_alloc(void* param, int bytes) {
+struct H264Depacketizer {
+  
+  struct rtp_payload_t handler;
+  void* decoder;
+
+};
+
+static void* h264_depacketizer_alloc(void* param, int bytes) {
 
   static uint8_t buffer[2 * 1024 * 1024 + 4] = { 0, 0, 0, 1, };
   if((sizeof(buffer) - 4) <= bytes) {
@@ -13,12 +20,12 @@ static void* rtp_decode_alloc(void* param, int bytes) {
   return buffer + 4;
 }
 
-static void rtp_decode_free(void* param, void *packet) {
+static void h264_depacketizer_free(void* param, void *packet) {
 }
 
-static int rtp_decode_packet(void* param, const void *packet, int bytes, uint32_t timestamp, int flags) {
+static int h264_depacketizer_packet(void* param, const void *packet, int bytes, uint32_t timestamp, int flags) {
 
-  rtp_decode_context_t *rtp_decode_context = (struct rtp_decode_context_t*)param;
+  H264Depacketizer *h264_depacketizer = (H264Depacketizer*)param;
 
   uint8_t *data = (uint8_t*)packet;
 
@@ -46,19 +53,31 @@ static int rtp_decode_packet(void* param, const void *packet, int bytes, uint32_
   return 0;
 }
 
-struct rtp_decode_context_t* create_rtp_decode_context() {
+H264Depacketizer* h264_depacketizer_create() {
 
-  struct rtp_decode_context_t *rtp_decode_context = NULL;
-  rtp_decode_context = (rtp_decode_context_t*)malloc(sizeof(struct rtp_decode_context_t));
-  rtp_decode_context->handler.alloc = rtp_decode_alloc;
-  rtp_decode_context->handler.free = rtp_decode_free;
-  rtp_decode_context->handler.packet = rtp_decode_packet;
-  rtp_decode_context->decoder = rtp_payload_decode_create(102, "H264", &rtp_decode_context->handler, rtp_decode_context);
+  H264Depacketizer *h264_depacketizer = NULL;
+  h264_depacketizer = (H264Depacketizer*)malloc(sizeof(H264Depacketizer));
+  h264_depacketizer->handler.alloc = h264_depacketizer_alloc;
+  h264_depacketizer->handler.free = h264_depacketizer_free;
+  h264_depacketizer->handler.packet = h264_depacketizer_packet;
+  h264_depacketizer->decoder = rtp_payload_decode_create(102, "H264", &h264_depacketizer->handler, h264_depacketizer);
 
-  return rtp_decode_context;
+  return h264_depacketizer;
 }
 
-void rtp_decode_frame(struct rtp_decode_context_t *rtp_decode_context, uint8_t *buf, size_t size) {
-  rtp_payload_decode_input(rtp_decode_context->decoder, buf, size);
+void h264_depacketizer_destroy(H264Depacketizer *h264_depacketizer) {
+
+  if(h264_depacketizer) {
+    if(h264_depacketizer->decoder)
+      rtp_payload_decode_destroy(h264_depacketizer->decoder);
+    free(h264_depacketizer);
+    h264_depacketizer = NULL;
+  }
+}
+
+
+void h264_depacketizer_recv(H264Depacketizer *h264_depacketizer, uint8_t *buf, size_t size) {
+
+  rtp_payload_decode_input(h264_depacketizer->decoder, buf, size);
 }
 

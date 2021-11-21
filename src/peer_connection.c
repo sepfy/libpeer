@@ -300,6 +300,9 @@ void peer_connection_destroy(PeerConnection *pc) {
   if(pc->dtls_transport)
     dtls_transport_destroy(pc->dtls_transport);
 
+  if(pc->media_stream)
+    media_stream_free(pc->media_stream);
+
   if(pc->sdp)
     session_description_destroy(pc->sdp);
 
@@ -338,6 +341,7 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
   // Remove mDNS
   SessionDescription *sdp = NULL;
   if(strstr(remote_sdp, "local") != NULL) {
+
     sdp = session_description_create();
     gchar **splits;
 
@@ -356,7 +360,6 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
     }
 
     remote_sdp = session_description_get_content(sdp);
-    session_description_destroy(sdp);
   }
 
   plist = nice_agent_parse_remote_stream_sdp(pc->nice_agent,
@@ -381,7 +384,6 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
 
   if(sdp)
     session_description_destroy(sdp);
-
 }
 
 

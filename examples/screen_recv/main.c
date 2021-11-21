@@ -2,33 +2,35 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "index_html.h"
 #include "h264_depacketizer.h"
-
-#include "signal_service.h"
-#include "utils.h"
+#include "signaling.h"
 #include "peer_connection.h"
 
-#define MTU 1400
+typedef struct ScreenRecv {
 
-rtp_decode_context_t *rtp_decode_context;
-char *g_sdp = NULL;
-static GCond g_cond;
-static GMutex g_mutex;
-PeerConnection *g_peer_connection = NULL;
+  GCond cond;
+  GMutex mutex;
+
+  PeerConnection *pc;
+  Signaling *signaling;
+  H264Depacketizer *h264_depacketizer;
+
+} ScreenRecv;
+
+ScreenRecv g_screen_recv = {0};
 
 static void on_iceconnectionstatechange(IceConnectionState state, void *data) {
+
   if(state == FAILED) {
-    LOG_INFO("Disconnect with browser... Stop streaming");
+    printf("Disconnect with browser.");
   }
 }
 
 static void on_icecandidate(char *sdp, void *data) {
 
-  if(g_sdp)
-    g_free(g_sdp);
-
-  g_sdp = g_base64_encode((const char *)sdp, strlen(sdp));
-  g_cond_signal(&g_cond);
+  signaling_send_answer_to_channel(g_screen_recv.signaling, sdp);
+  g_cond_signal(&g_screen_recv.cond);
 }
 
 static void on_transport_ready(void *data) {
@@ -38,85 +40,73 @@ static void on_transport_ready(void *data) {
 
 void on_track(uint8_t *packet, size_t bytes, void *data) {
 
-  rtp_decode_frame(rtp_decode_context, packet, bytes);
+  h264_depacketizer_recv(g_screen_recv.h264_depacketizer, packet, bytes);
 }
 
-char* on_offer_get_cb(char *offer, void *data) {
+void on_channel_event(SignalingEvent signaling_event, char *msg, void *data) {
 
-  g_mutex_lock(&g_mutex);
-  peer_connection_destroy(g_peer_connection);
-  g_peer_connection = peer_connection_create();
+  if(signaling_event == SIGNALING_EVENT_GET_OFFER) {
 
-  MediaStream *media_stream = media_stream_new();
-  media_stream_add_track(media_stream, CODEC_H264);
+    printf("Get offer from singaling\n");
+    g_mutex_lock(&g_screen_recv.mutex);
 
-  peer_connection_add_stream(g_peer_connection, media_stream);
+    if(g_screen_recv.pc)
+      peer_connection_destroy(g_screen_recv.pc);
 
-  Transceiver transceiver = {.video = RECVONLY};
-  peer_connection_add_transceiver(g_peer_connection, transceiver);
-  peer_connection_ontrack(g_peer_connection, on_track, NULL);
-  peer_connection_onicecandidate(g_peer_connection, on_icecandidate, NULL);
-  peer_connection_set_on_transport_ready(g_peer_connection, &on_transport_ready, NULL);
-  peer_connection_oniceconnectionstatechange(g_peer_connection, &on_iceconnectionstatechange, NULL);
-  peer_connection_create_answer(g_peer_connection);
+    g_screen_recv.pc = peer_connection_create();
 
-  g_cond_wait(&g_cond, &g_mutex);
-  peer_connection_set_remote_description(g_peer_connection, offer);
-  g_mutex_unlock(&g_mutex);
+    MediaStream *media_stream = media_stream_new();
+    media_stream_add_track(media_stream, CODEC_H264);
 
-  return g_sdp;
-}
+    peer_connection_add_stream(g_screen_recv.pc, media_stream);
+    Transceiver transceiver = {.video = RECVONLY};
+    peer_connection_add_transceiver(g_screen_recv.pc, transceiver);
 
-static void print_usage(const char *prog) {
+    peer_connection_ontrack(g_screen_recv.pc, on_track, NULL);
+    peer_connection_onicecandidate(g_screen_recv.pc, on_icecandidate, NULL);
+    peer_connection_oniceconnectionstatechange(g_screen_recv.pc, &on_iceconnectionstatechange, NULL);
+    peer_connection_set_on_transport_ready(g_screen_recv.pc, &on_transport_ready, NULL);
+    peer_connection_create_answer(g_screen_recv.pc);
 
-  printf("Usage: %s \n"
-   " -p      - port (default: 8080)\n"
-   " -H      - address to bind (default: 0.0.0.0)\n"
-   " -r      - document root\n"
-   " -h      - print help\n", prog);
-
-}
-
-void parse_argv(int argc, char **argv, options_t *options) {
-
-  int opt;
-
-  while((opt = getopt(argc, argv, "p:H:r:h")) != -1) {
-    switch(opt) {
-      case 'p':
-        options->port = atoi(optarg);
-        break;
-      case 'H':
-        options->host = optarg;
-        break;
-      case 'r':
-        options->root = optarg;
-        break;
-      case 'h':
-        print_usage(argv[0]);
-        exit(1);
-        break;
-      default :
-        printf("Unknown option %c\n", opt);
-        break;
-    }
+    g_cond_wait(&g_screen_recv.cond, &g_screen_recv.mutex);
+    peer_connection_set_remote_description(g_screen_recv.pc, msg);
+    g_mutex_unlock(&g_screen_recv.mutex);
   }
 
 }
 
-int main(int argc, char **argv) {
 
-  signal_service_t signal_service;
-  options_t options = {8000, "0.0.0.0", "root"};
-  parse_argv(argc, argv, &options);
+void signal_handler(int signal) {
 
-  rtp_decode_context = create_rtp_decode_context();
+  if(g_screen_recv.h264_depacketizer)
+    h264_depacketizer_destroy(g_screen_recv.h264_depacketizer);
 
-  if(signal_service_create(&signal_service, options)) {
-    exit(1);
+  if(g_screen_recv.signaling)
+    signaling_destroy(g_screen_recv.signaling);
+
+  if(g_screen_recv.pc)
+    peer_connection_destroy(g_screen_recv.pc);
+
+  exit(0);
+}
+
+int main(int argc, char *argv[]) {
+
+  signal(SIGINT, signal_handler);
+
+  g_screen_recv.h264_depacketizer = h264_depacketizer_create();
+
+  SignalingOption signaling_option = {SIGNALING_PROTOCOL_HTTP, "0.0.0.0", "demo", 8000, index_html};
+
+  g_screen_recv.signaling = signaling_create(signaling_option);
+  if(!g_screen_recv.signaling) {
+    printf("Create signaling service failed\n");
+    return 0;
   }
-  signal_service_on_offer_get(&signal_service, &on_offer_get_cb, NULL);
-  signal_service_dispatch(&signal_service);
+
+  signaling_on_channel_event(g_screen_recv.signaling, &on_channel_event, NULL);
+  signaling_dispatch(g_screen_recv.signaling);
 
   return 0;
 }
+

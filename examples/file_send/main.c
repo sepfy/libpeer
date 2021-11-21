@@ -29,11 +29,12 @@ FileSend g_file_send;
 
 void* send_h264_thread(void *data) {
 
-  rtp_encode_context_t *rtp_encode_context;
-  rtp_encode_context = create_rtp_encode_context(g_file_send.pc);
+  H264Packetizer *h264_packetizer;
+  h264_packetizer = h264_packetizer_create(g_file_send.pc);
 
   uint8_t buf[FILE_MAX_SIZE] = {0};
   FILE *fp = NULL;
+  size_t prev = 0;
 
   fp = fopen(FILE_NAME, "rb");
   if(fp == NULL) {
@@ -43,46 +44,53 @@ void* send_h264_thread(void *data) {
 
   fread(buf, 1, sizeof(buf), fp);
   fclose(fp);
-
   static unsigned long timestamp = 0;
-  static H264Frame sps_frame;
-  static H264Frame pps_frame;
-  H264Frame *h264_frame;
+
+  H264Frame *sps_frame = NULL;
+  H264Frame *pps_frame = NULL;
+  H264Frame *h264_frame = NULL;
 
   while(g_file_send.sending_data) {
 
-    h264_frame = h264_parser_get_next_frame(buf, sizeof(buf));
+    h264_frame = h264_parser_get_next_frame(buf, sizeof(buf), &prev);
     if(h264_frame == NULL) break;
 
     if(h264_frame->buf[4] == 0x67) {
-      sps_frame.size = h264_frame->size;
-      sps_frame.buf = (uint8_t*)malloc(h264_frame->size);
-      memcpy(sps_frame.buf, h264_frame->buf, h264_frame->size);
+
+      if(sps_frame)
+        h264_frame_free(sps_frame);
+      sps_frame = h264_frame;
+      continue;
+
     }
     else if(h264_frame->buf[4] == 0x68) {
-      pps_frame.size = h264_frame->size;
-      pps_frame.buf = (uint8_t*)malloc(h264_frame->size);
-      memcpy(pps_frame.buf, h264_frame->buf, h264_frame->size);
+
+      if(pps_frame)
+        h264_frame_free(pps_frame);
+      pps_frame = h264_frame;
+      continue;
+
     }
     else if(h264_frame->buf[4] == 0x65) {
-      int size_tmp = h264_frame->size;
-      uint8_t *buf_tmp = NULL;
-      buf_tmp = (uint8_t*)malloc(size_tmp);
-      memcpy(buf_tmp, h264_frame->buf, size_tmp);
-
-      h264_frame->size = size_tmp + sps_frame.size + pps_frame.size;
-      h264_frame->buf = (uint8_t*)realloc(h264_frame->buf, size_tmp + sps_frame.size + pps_frame.size);
-      memcpy(h264_frame->buf, sps_frame.buf, sps_frame.size);
-      memcpy(h264_frame->buf + sps_frame.size, pps_frame.buf, pps_frame.size);
-      memcpy(h264_frame->buf + sps_frame.size + pps_frame.size, buf_tmp, size_tmp);
-      free(buf_tmp);
+      h264_packetizer_send(h264_packetizer, sps_frame->buf, sps_frame->size, timestamp);
+      h264_packetizer_send(h264_packetizer, pps_frame->buf, pps_frame->size, timestamp);
     }
-    rtp_encode_frame(rtp_encode_context, h264_frame->buf, h264_frame->size, timestamp);
+
+    h264_packetizer_send(h264_packetizer, h264_frame->buf, h264_frame->size, timestamp);
     timestamp += 33000;
 
     h264_frame_free(h264_frame);
     usleep(33000);
   }
+
+  if(sps_frame)
+    h264_frame_free(sps_frame);
+
+  if(pps_frame)
+    h264_frame_free(pps_frame);
+
+  if(h264_packetizer)
+    h264_packetizer_destroy(h264_packetizer);
 
   printf("End of send video thread\n");
 
@@ -139,7 +147,25 @@ void on_channel_event(SignalingEvent signaling_event, char *msg, void *data) {
   }
 }
 
+void signal_handler(int signal) {
+
+  if(g_file_send.sending_data) {
+    g_file_send.sending_data = FALSE;
+    pthread_join(g_file_send.thread, NULL);
+  }
+
+  if(g_file_send.signaling)
+    signaling_destroy(g_file_send.signaling);
+
+  if(g_file_send.pc)
+    peer_connection_destroy(g_file_send.pc);
+
+  exit(0);
+}
+
 int main(int argv, char *argc[]) {
+
+  signal(SIGINT, signal_handler);
 
   SignalingOption signaling_option = {SIGNALING_PROTOCOL_HTTP, "0.0.0.0", "demo", 8000, index_html};
 

@@ -1,26 +1,19 @@
 #ifndef H264_DEPACKETIZER_H_
 #define H264_DEPACKETIZER_H_
 
+#include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
 
 #include <rtp-packet.h>
 #include <rtp-payload.h>
 
-#include "peer_connection.h"
+typedef struct H264Depacketizer H264Depacketizer;
 
-typedef struct rtp_decode_context_t {
-  struct rtp_payload_t handler;
-  void* decoder;
-} rtp_decode_context_t;
+H264Depacketizer* h264_depacketizer_create();
 
-static void* rtp_decode_alloc(void* param, int bytes);
+void h264_depacketizer_destroy(H264Depacketizer *h264_depacketizer);
 
-static void rtp_decode_free(void* param, void *packet);
-
-static int rtp_decode_packet(void* param, const void *packet, int bytes, uint32_t timestamp, int flags);
-
-struct rtp_decode_context_t* create_rtp_decode_context();
-
-void rtp_decode_frame(struct rtp_decode_context_t *rtp_decode_context, uint8_t *buf, size_t size);
+void h264_depacketizer_recv(H264Depacketizer *h264_depacketizer, uint8_t *buf, size_t size);
 
 #endif // H264_PACKETIZER_H_

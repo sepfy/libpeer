@@ -1,5 +1,5 @@
-#ifndef GSTREAMER_INDEX_HTML_H_
-#define GSTREAMER_INDEX_HTML_H_
+#ifndef CAMERA_SEND_INDEX_HTML_H_
+#define CAMERA_SEND_INDEX_HTML_H_
  
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,7 +8,7 @@ const char index_html[] = " \
 <!DOCTYPE html> \n \
 <html> \n \
   <head> \n \
-    <title>GStreamer</title> \n \
+    <title>Camera Send</title> \n \
   </head> \n \
   <body> \n \
     <video style='display:block; margin: 0 auto;' id='remoteVideos'></video> \n \
@@ -49,4 +49,4 @@ const char index_html[] = " \
   </body> \n \
 </html>";
 
-#endif // GSTREAMER_INDEX_HTML_H_
+#endif // CAMERA_SEND_INDEX_HTML_H_
