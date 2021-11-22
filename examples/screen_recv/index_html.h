@@ -8,7 +8,7 @@ const char index_html[] = " \
 <!DOCTYPE html> \n \
 <html> \n \
   <head> \n \
-    <title>Camera Send</title> \n \
+    <title>Screen Recv</title> \n \
   </head> \n \
   <body> \n \
     <video style='display:block; margin: 0 auto;' id='localVideo'></video> \n \
