@@ -12,7 +12,7 @@
 
 const char VIDEO_PIPELINE[] = "v4l2src device=/dev/video0 ! videorate ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=video-app-sink";
 
-const char AUDIO_PIPELINE[] = "alsasrc device=hw:1 ! audioconvert ! audioresample ! alawenc ! rtppcmapay pt=8 ssrc=12 ! appsink name=audio-app-sink";
+const char AUDIO_PIPELINE[] = "alsasrc ! audioconvert ! audioresample ! alawenc ! rtppcmapay pt=8 ssrc=12 ! appsink name=audio-app-sink";
 
 typedef struct GstRtpPacket {
 

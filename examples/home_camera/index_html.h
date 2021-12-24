@@ -1,5 +1,5 @@
-#ifndef BIDIRECTION_INDEX_HTML_H_
-#define BIDIRECTION_INDEX_HTML_H_
+#ifndef HOME_CAMERA_INDEX_HTML_H_
+#define HOME_CAMERA_INDEX_HTML_H_
  
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,10 +8,10 @@ const char index_html[] = " \
 <!DOCTYPE html> \n \
 <html> \n \
   <head> \n \
-    <title>Bidirection</title> \n \
+    <title>Home Camera</title> \n \
   </head> \n \
   <body> \n \
-    <video style='display:block; margin: 0 auto;' id='remoteVideo'></video> \n \
+    <video style='display:block; margin: 0 auto;' id='remoteCamera'></video> \n \
     <script> \n \
       var mediaStream = new MediaStream(); \n \
       var pc = new RTCPeerConnection({ \n \
@@ -34,7 +34,7 @@ const char index_html[] = " \
         xhttp.send(btoa(JSON.stringify({'type': 'offer', 'sdp': sdp}))); \n \
       } \n \
       pc.ontrack = function (event) { \n \
-        var el = document.getElementById('remoteVideo'); \n \
+        var el = document.getElementById('remoteCamera'); \n \
         mediaStream.addTrack(event.track); \n \
         el.srcObject = mediaStream \n \
         el.autoplay = true; \n \
@@ -47,7 +47,7 @@ const char index_html[] = " \
       }; \n \
       pc.addTransceiver('audio', {'direction': 'sendrecv'}) \n \
       pc.addTransceiver('video', {'direction': 'sendrecv'}) \n \
-      navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }) \n \
+      navigator.mediaDevices.getUserMedia({ video: false, audio: true }) \n \
         .then(stream => { \n \
           stream.getTracks().forEach(track => pc.addTrack(track, stream)); \n \
             pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log) \n \
@@ -56,4 +56,4 @@ const char index_html[] = " \
   </body> \n \
 </html>";
 
-#endif // BIDIRECTION_INDEX_HTML_H_
+#endif // HOME_CAMERA_INDEX_HTML_H_
