@@ -25,6 +25,8 @@ struct PeerConnection {
   GMainLoop *gloop;
   GThread *gthread;
 
+  gboolean mdns_enabled;
+
   uint32_t audio_ssrc, video_ssrc;
 
   DtlsTransport *dtls_transport;
@@ -255,6 +257,8 @@ PeerConnection* peer_connection_create(void) {
   if(pc == NULL)
     return pc;
 
+  pc->mdns_enabled = FALSE;
+
   pc->audio_ssrc = 0;
   pc->video_ssrc = 0;
 
@@ -279,6 +283,11 @@ PeerConnection* peer_connection_create(void) {
   pc->sdp = session_description_create();
 
   return pc;
+}
+
+void peer_connection_enable_mdns(PeerConnection *pc, gboolean b_enabled) {
+
+  pc->mdns_enabled = b_enabled;
 }
 
 void peer_connection_destroy(PeerConnection *pc) {
@@ -341,9 +350,12 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
     for(i = 0; splits[i] != NULL; i++) {
 
       if(strstr(splits[i], "candidate") != NULL && strstr(splits[i], "local") != NULL) {
-        char buf[256] = {0};
-        if(session_description_update_mdns_of_candidate(splits[i], buf, sizeof(buf)) != -1) {
-          session_description_append_newline(sdp, buf);
+
+        if(pc->mdns_enabled) {
+          char buf[256] = {0};
+          if(session_description_update_mdns_of_candidate(splits[i], buf, sizeof(buf)) != -1) {
+            session_description_append_newline(sdp, buf);
+          }
         }
       }
       else {
@@ -354,7 +366,6 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
     free(remote_sdp);
     remote_sdp = strdup(session_description_get_content(sdp));
   }
-
 
   plist = nice_agent_parse_remote_stream_sdp(pc->nice_agent,
    pc->component_id, (gchar*)remote_sdp, &ufrag, &pwd);
