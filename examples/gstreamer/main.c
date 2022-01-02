@@ -86,6 +86,7 @@ static GstFlowReturn new_sample(GstElement *sink, void *data) {
     peer_connection_send_rtp_packet(g_peer_connection, rtp_packet, bytes);
 
     gst_sample_unref(sample);
+    gst_buffer_unmap(buffer,&info);
     return GST_FLOW_OK;
   }
   return GST_FLOW_ERROR;
