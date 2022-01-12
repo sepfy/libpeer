@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#include "rtp_packet.h"
 #include "media_stream.h"
 
 #define SDP_MAX_SIZE 10240
@@ -70,5 +71,11 @@ void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
  * @param The content of session description protocol.
  */
 uint32_t session_description_find_ssrc(const char *type, const char *sdp);
+
+/**
+ * @brief Parse RTP map of SDP.
+ * @param The content of session description protocol.
+ */
+RtpMap session_description_parse_rtpmap(const char *sdp);
 
 #endif // SESSION_DESCRIPTION_H_

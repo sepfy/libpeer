@@ -27,6 +27,13 @@ typedef struct RtpHeader {
 
 } RtpHeader;
 
+typedef struct RtpMap {
+
+  int pt_h264;
+  int pt_opus;
+  int pt_pcma;
+
+} RtpMap;
 
 int rtp_packet_validate(char *packet, size_t size);
 

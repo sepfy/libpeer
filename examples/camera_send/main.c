@@ -10,10 +10,11 @@
 
 #define MTU 1400
 
-const char PIPE_LINE[] = "v4l2src ! videorate ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=peer-connection-sink";
+const char PIPE_LINE[] = "v4l2src ! videorate ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! rtph264pay name=rtp mtu=1400 config-interval=-1 ! appsink name=peer-connection-sink";
 
 typedef struct CameraSend {
 
+  GstElement *rtp;
   GstElement *pipeline;
   GstElement *sink;
 
@@ -44,6 +45,14 @@ static void on_icecandidate(char *sdp, void *data) {
 
 static void on_transport_ready(void *data) {
 
+  static int pt = -1;
+  // Update payload type of rtph264pay
+  int gst_pt = gst_pt = peer_connection_get_rtpmap(g_camera_send.pc, CODEC_H264);
+
+  if(pt != gst_pt) {
+    pt = gst_pt;
+    g_object_set(g_camera_send.rtp, "pt", pt, NULL);
+  }
   gst_element_set_state(g_camera_send.pipeline, GST_STATE_PLAYING);
 }
 
@@ -137,6 +146,7 @@ int main(int argc, char *argv[]) {
 
   g_camera_send.pipeline = gst_parse_launch(PIPE_LINE, NULL);
   g_camera_send.sink = gst_bin_get_by_name(GST_BIN(g_camera_send.pipeline), "peer-connection-sink");
+  g_camera_send.rtp = gst_bin_get_by_name(GST_BIN(g_camera_send.pipeline), "rtp");
   g_signal_connect(g_camera_send.sink, "new-sample", G_CALLBACK(new_sample), NULL);
   g_object_set(g_camera_send.sink, "emit-signals", TRUE, NULL);
 

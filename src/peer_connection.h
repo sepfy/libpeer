@@ -106,6 +106,13 @@ int peer_connection_create_answer(PeerConnection *pc);
  */
 uint32_t peer_connection_get_ssrc(PeerConnection *pc, const char *type);
 
+/**
+ * @brief Get payload type of codec in SDP.
+ * @param PeerConnection.
+ * @param Media Codec of audio or video.
+ */
+int peer_connection_get_rtpmap(PeerConnection *pc, MediaCodec codec);
+
 // To confirm:
 int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);
 

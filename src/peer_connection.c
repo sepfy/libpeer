@@ -31,6 +31,7 @@ struct PeerConnection {
   SessionDescription *sdp;
   Transceiver transceiver;
   MediaStream *media_stream;
+  RtpMap rtp_map;
 
   void (*onicecandidate)(char *sdp, void *userdata);
   void (*oniceconnectionstatechange)(IceConnectionState state, void *userdata);
@@ -362,6 +363,8 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
     remote_sdp = session_description_get_content(sdp);
   }
 
+  pc->rtp_map = session_description_parse_rtpmap(remote_sdp);
+
   plist = nice_agent_parse_remote_stream_sdp(pc->nice_agent,
    pc->component_id, (gchar*)remote_sdp, &ufrag, &pwd);
 
@@ -442,4 +445,21 @@ uint32_t peer_connection_get_ssrc(PeerConnection *pc, const char *type) {
   }
 
   return 0;
+}
+
+int peer_connection_get_rtpmap(PeerConnection *pc, MediaCodec codec) {
+
+  switch(codec) {
+
+    case CODEC_H264:
+      return pc->rtp_map.pt_h264;
+    case CODEC_OPUS:
+      return pc->rtp_map.pt_opus;
+    case CODEC_PCMA:
+      return pc->rtp_map.pt_pcma;
+    default:
+     return -1;
+  }
+
+   return -1;
 }

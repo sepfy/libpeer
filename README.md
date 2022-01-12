@@ -2,16 +2,25 @@
 
 ![pear-ci](https://github.com/sepfy/pear/actions/workflows/pear-ci.yml/badge.svg)
 
-Pear is a WebRTC SDK written in C. The SDK aims to integrate IoT/Embedded device with WebRTC applications.
+Pear is a WebRTC SDK written in C. The SDK aims to integrate IoT/Embedded device video/audio streaming with WebRTC.
 
-<b>Notice: This project is a work in progress. Currently, only support streaming H264 video or OPUS audio to browser.</b>
+### Features
+
+- Vdieo/Audio Codec Support
+  - H264
+  - G.711 PCM (A-law)
+  - Opus
+- Browser Tested
+  - Chrome
+  - Safari
 
 ### Dependencies
 
 * [libsrtp](https://github.com/cisco/libsrtp)
 * [libnice](https://github.com/libnice/libnice)
 * [librtp](https://github.com/ireader/media-server)
-
+* [httpserver.h](https://github.com/jeremycw/httpserver.h.git) (Option)
+* [cJSON](https://github.com/DaveGamble/cJSON.git) (Option)
 
 ### Getting Started
 

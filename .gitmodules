@@ -1,6 +1,6 @@
 [submodule "third_party/libnice"]
 	path = third_party/libnice
-	url = https://gitlab.freedesktop.org/libnice/libnice.git
+	url = https://github.com/libnice/libnice.git
 [submodule "third_party/libsrtp"]
 	path = third_party/libsrtp
 	url = https://github.com/cisco/libsrtp.git
