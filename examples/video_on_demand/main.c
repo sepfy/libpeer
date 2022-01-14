@@ -11,7 +11,7 @@
 #define FILE_MAX_SIZE 5*1024*1024
 const char* FILE_NAME = "test.264";
 
-typedef struct FileSend {
+typedef struct VideoOnDemand {
 
   GCond cond;
   GMutex mutex;
@@ -22,9 +22,9 @@ typedef struct FileSend {
   pthread_t thread;
   gboolean sending_data;
 
-} FileSend;
+} VideoOnDemand;
 
-FileSend g_file_send;
+VideoOnDemand g_file_send;
 
 
 void* send_h264_thread(void *data) {

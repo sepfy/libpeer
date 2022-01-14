@@ -1,34 +1,20 @@
-# Recording
+# Screencast
 
-A HTTP server based on libevent for SDP exchange and record screen to file.
+Cast your entire screen or chrome tab to Raspberry Pi and display on the monitor.
 
-### Pre-requisite
+### Hardware Configuration
 
-Install dependencies
-```
-sudo apt-get install -y libglib2.0-dev libevent-dev
-```
+* Raspberry Pi 4B
+* HDMI Monitor
 
-Install JSON parser library
-```
-git clone https://github.com/DaveGamble/cJSON.git
-cd cJSON
-make
-sudo make install
-sudo cp libcjson* /usr/lib/
-```
+### Run Example
 
-### Build example
 ```
 cd pear && mkdir cmake && cd cmake
 cmake -DENABLE_EXAMPLES=on ..
 make
-./examples/recording
+./examples/screencast/screencast
 ```
 
-Open google-chrome and go to \<ip address\>:8080. Choose entire screen. It will save your screen to record.h264.
+Open Google-Chrome and go to https://raspberrypi.local. Choose entire screen or Chrome tab. Raspberry Pi will display the content on the HDMI
 
-Play the video with the following command:
-```
-ffplay record.h264
-```

@@ -1,5 +1,5 @@
-#ifndef FILE_SEND_INDEX_HTML_H_
-#define FILE_SEND_INDEX_HTML_H_
+#ifndef SURVEILLANCE_INDEX_HTML_H_
+#define SURVEILLANCE_INDEX_HTML_H_
  
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,7 +8,7 @@ const char index_html[] = " \
 <!DOCTYPE html> \n \
 <html> \n \
   <head> \n \
-    <title>File Send</title> \n \
+    <title>Surveillance</title> \n \
   </head> \n \
   <body> \n \
     <video style='display:block; margin: 0 auto;' id='remoteVideos'></video> \n \
@@ -49,4 +49,4 @@ const char index_html[] = " \
   </body> \n \
 </html>";
 
-#endif // FILE_SEND_INDEX_HTML_H_
+#endif // SURVEILLANCE_INDEX_HTML_H_

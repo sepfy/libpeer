@@ -1,5 +1,5 @@
-#ifndef BIDIRECTION_INDEX_HTML_H_
-#define BIDIRECTION_INDEX_HTML_H_
+#ifndef MEETING_INDEX_HTML_H_
+#define MEETING_INDEX_HTML_H_
  
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,10 +8,10 @@ const char index_html[] = " \
 <!DOCTYPE html> \n \
 <html> \n \
   <head> \n \
-    <title>Bidirection</title> \n \
+    <title>Meeting</title> \n \
   </head> \n \
   <body> \n \
-    <video style='display:block; margin: 0 auto;' id='remoteVideo'></video> \n \
+    <video id='remoteVideo'></video> \n \
     <script> \n \
       var mediaStream = new MediaStream(); \n \
       var pc = new RTCPeerConnection({ \n \
@@ -56,4 +56,4 @@ const char index_html[] = " \
   </body> \n \
 </html>";
 
-#endif // BIDIRECTION_INDEX_HTML_H_
+#endif // MEETING_INDEX_HTML_H_

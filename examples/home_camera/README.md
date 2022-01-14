@@ -1,30 +1,23 @@
-# Bidirection
+# Home Camera
 
-Receivce screen video and audio from browser and send v4l2 webcam video and audio to browser.
+Build Raspberry Pi as a home camera. Support video camera, 2-way audio.
 
-### Pre-requisite
+### Hardware Configuration
 
-Install dependencies
-```
-sudo apt-get install -y gstreamer1.0-tools gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-plugins-good libgstreamer1.0-dev libglib2.0-dev libgstreamer-plugins-bad1.0-dev libevent-dev
-```
+* [Raspberry Pi 3A+](https://www.raspberrypi.com/products/raspberry-pi-3-model-a-plus/)
+* [Camera Module](https://www.raspberrypi.com/products/camera-module-v2/)
+* [ReSpeaker 2-Mics Pi HAT](https://wiki.seeedstudio.com/ReSpeaker_2_Mics_Pi_HAT_Raspberry/)
+* Speaker
 
-Install JSON parser library
-```
-git clone https://github.com/DaveGamble/cJSON.git
-cd cJSON
-make
-sudo make install
-sudo cp libcjson* /usr/lib/
-```
+### Run Example
 
-### Build example
 ```
 cd pear && mkdir cmake && cd cmake
 cmake -DENABLE_EXAMPLES=on ..
 make
-./examples/bidirection/bidirection
+./examples/home_camera/home_camera
 ```
 
-Open google-chrome and go to \<ip address\>:8000.
+Open Google-Chrome and go to https://raspberrypi.local. You can communication with Raspberry Pi and watch the camera video remotely.
+
 
