@@ -8,7 +8,7 @@
 #include "peer_connection.h"
 #include "signaling.h"
 
-const char PIPE_LINE[] = "v4l2src ! videorate ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! rtph264pay name=rtp config-interval=-1 ! appsink name=peer-connection-sink";
+const char PIPE_LINE[] = "v4l2src ! video/x-raw,width=1920,height=1072,framerate=30/1 ! omxh264enc ! rtph264pay name=rtp config-interval=-1 ! appsink name=peer-connection-sink";
 
 typedef struct Surveillance {
 
@@ -114,7 +114,7 @@ static GstFlowReturn new_sample(GstElement *sink, void *data) {
 
 void signal_handler(int signal) {
 
-  gst_element_set_state(g_surveillance.pipeline, GST_STATE_NULL);
+  gst_element_set_state(g_surveillance.pipeline, GST_STATE_PAUSED);
   gst_object_unref(g_surveillance.sink);
   gst_object_unref(g_surveillance.pipeline);
  

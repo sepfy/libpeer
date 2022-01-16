@@ -7,9 +7,9 @@
 #include "peer_connection.h"
 #include "signaling.h"
 
-const char VIDEO_SINK_PIPELINE[] = "v4l2src device=/dev/video0 ! videorate ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue ! h264parse ! queue ! rtph264pay config-interval=-1 pt=102 seqnum-offset=0 timestamp-offset=0 mtu=1400 ! appsink name=video-app-sink";
+const char VIDEO_SINK_PIPELINE[] = "v4l2src ! video/x-raw,width=1920,height=1072,framerate=30/1 ! omxh264enc ! rtph264pay config-interval=-1 name=video-rtp ! appsink name=video-app-sink";
 
-const char AUDIO_SINK_PIPELINE[] = "alsasrc ! audioconvert ! audioresample ! alawenc ! rtppcmapay pt=8 ssrc=12 ! appsink name=audio-app-sink";
+const char AUDIO_SINK_PIPELINE[] = "alsasrc ! audioconvert ! audioresample ! alawenc ! rtppcmapay name=audio-rtp ! appsink name=audio-app-sink";
 
 const char AUDIO_SRC_PIPELINE[] = "appsrc name=audio-app-src format=time ! application/x-rtp,clock-rate=8000,encoding-name=PCMA ! rtppcmadepay ! alawdec ! alsasink";
 
@@ -19,8 +19,11 @@ typedef struct HomeCamera {
 
   GstElement *audio_src, *audio_sink, *video_sink;
 
+  GstElement *audio_rtp, *video_rtp;
+
   GCond cond;
   GMutex mutex;
+  GMutex srtp_lock;
 
   Signaling *signaling;
   PeerConnection *pc;
@@ -46,7 +49,6 @@ static void on_icecandidate(char *sdp, void *data) {
 }
 
 static void need_data(GstElement *src, guint size, void *data) {
-  printf("need data\n");
 }
 
 static GstFlowReturn new_sample(GstElement *sink, void *data) {
@@ -68,9 +70,9 @@ static GstFlowReturn new_sample(GstElement *sink, void *data) {
     size = info.size;
     memcpy(packet, info.data, info.size);
 
-    g_mutex_lock(&g_home_camera.mutex);
+    g_mutex_lock(&g_home_camera.srtp_lock);
     peer_connection_send_rtp_packet(g_home_camera.pc, packet, size);
-    g_mutex_unlock(&g_home_camera.mutex);
+    g_mutex_unlock(&g_home_camera.srtp_lock);
 
     gst_buffer_unmap(buffer, &info);
     gst_sample_unref(sample);
@@ -83,9 +85,29 @@ static GstFlowReturn new_sample(GstElement *sink, void *data) {
 
 static void on_transport_ready(void *data) {
 
+  static int audio_pt = -1;
+  static int video_pt = -1;
+  int gst_pt;
+
+  // Update payload type of rtph264pay and rtppcmapay
+  gst_pt = peer_connection_get_rtpmap(g_home_camera.pc, CODEC_H264);
+
+  if(video_pt != gst_pt) {
+    video_pt = gst_pt;
+    g_object_set(g_home_camera.video_rtp, "pt", video_pt, NULL);
+  }
+
+  gst_pt = peer_connection_get_rtpmap(g_home_camera.pc, CODEC_PCMA);
+
+  if(audio_pt != gst_pt) {
+    audio_pt = gst_pt;
+    g_object_set(g_home_camera.audio_rtp, "pt", audio_pt, NULL);
+  }
+
   gst_element_set_state(g_home_camera.audio_src_pipeline, GST_STATE_PLAYING);
   gst_element_set_state(g_home_camera.audio_sink_pipeline, GST_STATE_PLAYING);
   gst_element_set_state(g_home_camera.video_sink_pipeline, GST_STATE_PLAYING);
+
 }
 
 
@@ -118,10 +140,9 @@ void on_channel_event(SignalingEvent signaling_event, char *msg, void *data) {
     printf("Get offer from singaling\n");
     g_mutex_lock(&g_home_camera.mutex);
 
+    gst_element_set_state(g_home_camera.video_sink_pipeline, GST_STATE_PAUSED);
     gst_element_set_state(g_home_camera.audio_src_pipeline, GST_STATE_PAUSED);
     gst_element_set_state(g_home_camera.audio_sink_pipeline, GST_STATE_PAUSED);
-    gst_element_set_state(g_home_camera.video_sink_pipeline, GST_STATE_PAUSED);
-
     if(g_home_camera.pc)
       peer_connection_destroy(g_home_camera.pc);
 
@@ -150,9 +171,9 @@ void on_channel_event(SignalingEvent signaling_event, char *msg, void *data) {
 
 void signal_handler(int signal) {
 
-  gst_element_set_state(g_home_camera.audio_src_pipeline, GST_STATE_NULL);
-  gst_element_set_state(g_home_camera.audio_sink_pipeline, GST_STATE_NULL);
-  gst_element_set_state(g_home_camera.video_sink_pipeline, GST_STATE_NULL);
+  gst_element_set_state(g_home_camera.video_sink_pipeline, GST_STATE_PAUSED);
+  gst_element_set_state(g_home_camera.audio_src_pipeline, GST_STATE_PAUSED);
+  gst_element_set_state(g_home_camera.audio_sink_pipeline, GST_STATE_PAUSED);
 
   gst_object_unref(g_home_camera.audio_src);
   gst_object_unref(g_home_camera.audio_sink);
@@ -193,6 +214,9 @@ int main(int argc, char **argv) {
   g_object_set(g_home_camera.audio_src, "emit-signals", TRUE, NULL);
   g_object_set(g_home_camera.audio_sink, "emit-signals", TRUE, NULL);
   g_object_set(g_home_camera.video_sink, "emit-signals", TRUE, NULL);
+
+  g_home_camera.video_rtp = gst_bin_get_by_name(GST_BIN(g_home_camera.video_sink_pipeline), "video-rtp");
+  g_home_camera.audio_rtp = gst_bin_get_by_name(GST_BIN(g_home_camera.audio_sink_pipeline), "audio-rtp");
 
   SignalingOption signaling_option = {SIGNALING_PROTOCOL_HTTP, "0.0.0.0", "demo", 8000, index_html};
 

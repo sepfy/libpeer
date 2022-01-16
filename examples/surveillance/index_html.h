@@ -11,7 +11,7 @@ const char index_html[] = " \
     <title>Surveillance</title> \n \
   </head> \n \
   <body> \n \
-    <video style='display:block; margin: 0 auto;' id='remoteVideos'></video> \n \
+    <video width='100%' id='remoteCamera'></video> \n \
     <script> \n \
       var pc = new RTCPeerConnection({ \n \
         iceServers: [{urls: 'stun:stun.l.google.com:19302'}] \n \
@@ -33,7 +33,7 @@ const char index_html[] = " \
         xhttp.send(btoa(JSON.stringify({'type': 'offer', 'sdp': sdp}))); \n \
       } \n \
       pc.ontrack = function (event) { \n \
-        var el = document.getElementById('remoteVideos'); \n \
+        var el = document.getElementById('remoteCamera'); \n \
         el.srcObject = event.streams[0]; \n \
         el.autoplay = true; \n \
         el.controls = true; \n \

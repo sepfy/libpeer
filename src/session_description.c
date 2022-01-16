@@ -182,7 +182,7 @@ RtpMap session_description_parse_rtpmap(const char *sdp) {
   char *pt_start, *codec_start, *codec_end;
 
   gchar **splits;
-  splits = g_strsplit(sdp, "\r\n", 128);
+  splits = g_strsplit(sdp, "\r\n", 256);
   for(i = 0; splits[i] != NULL; i++) {
     if(strstr(splits[i], "rtpmap") == NULL)
       continue;

@@ -11,7 +11,7 @@ const char index_html[] = " \
     <title>Home Camera</title> \n \
   </head> \n \
   <body> \n \
-    <video style='display:block; margin: 0 auto;' id='remoteCamera'></video> \n \
+    <video width='100%' id='remoteCamera'></video> \n \
     <script> \n \
       var mediaStream = new MediaStream(); \n \
       var pc = new RTCPeerConnection({ \n \

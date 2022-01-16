@@ -346,7 +346,7 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
     sdp = session_description_create();
     gchar **splits;
 
-    splits = g_strsplit(remote_sdp, "\r\n", 128);
+    splits = g_strsplit(remote_sdp, "\r\n", 256);
     for(i = 0; splits[i] != NULL; i++) {
 
       if(strstr(splits[i], "candidate") != NULL && strstr(splits[i], "local") != NULL) {
