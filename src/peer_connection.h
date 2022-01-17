@@ -48,7 +48,7 @@ void peer_connection_destroy(PeerConnection *pc);
 int peer_connection_send_rtcp_pil(PeerConnection *pc, uint32_t ssrc);
 
 /**
- * @brief Add audio or video stream to PeerConection.
+ * @brief Add audio or video stream to PeerConnection.
  * @param A PeerConnection.
  * @param A MediaStream.
  */
@@ -112,6 +112,13 @@ uint32_t peer_connection_get_ssrc(PeerConnection *pc, const char *type);
  * @param Media Codec of audio or video.
  */
 int peer_connection_get_rtpmap(PeerConnection *pc, MediaCodec codec);
+
+/**
+ * @brief Support to resolve mDNS candidate.
+ * @param PeerConnection.
+ * @param Boolean. Default is FALSE.
+ */
+void peer_connection_enable_mdns(PeerConnection *pc, gboolean b_enabled);
 
 // To confirm:
 int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);
