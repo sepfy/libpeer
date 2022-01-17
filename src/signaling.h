@@ -20,7 +20,7 @@ typedef struct SignalingOption {
 
   SignalingProtocol protocol;
   const char *host;
-  const char *channel;
+  const char *call;
   uint16_t port;
   const char *index_html;
 
@@ -55,18 +55,18 @@ void signaling_dispatch(Signaling *signaling);
 void signaling_shutdown(Signaling *signaling);
 
 /**
- * @brief Request signaling send an answer to channel.
+ * @brief Request signaling send an answer to call.
  * @param Struct Signaling.
  * @param Session description of answer.
  */
-void signaling_send_answer_to_channel(Signaling *signaling, char *sdp);
+void signaling_send_answer_to_call(Signaling *signaling, char *sdp);
 
 /**
  * @brief Register event of signaling service.
  * @param Struct Signaling.
- * @param Callback function of signaling if channel has new event.
- * @param Userdata of signaling channel event.
+ * @param Callback function of signaling if call has new event.
+ * @param Userdata of signaling call event.
  */
-void signaling_on_channel_event(Signaling *signaling, void (*on_channel_event), void *userdata);
+void signaling_on_call_event(Signaling *signaling, void (*on_call_event), void *userdata);
 
 #endif // SIGNALING_H_

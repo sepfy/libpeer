@@ -37,7 +37,7 @@ static void on_iceconnectionstatechange(IceConnectionState state, void *data) {
 
 static void on_icecandidate(char *sdp, void *data) {
 
-  signaling_send_answer_to_channel(g_surveillance.signaling, sdp);
+  signaling_send_answer_to_call(g_surveillance.signaling, sdp);
   g_cond_signal(&g_surveillance.cond);
 }
 
@@ -54,7 +54,7 @@ static void on_transport_ready(void *data) {
   gst_element_set_state(g_surveillance.pipeline, GST_STATE_PLAYING);
 }
 
-void on_channel_event(SignalingEvent signaling_event, char *msg, void *data) {
+void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
 
   if(signaling_event == SIGNALING_EVENT_GET_OFFER) {
 
@@ -140,7 +140,7 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  signaling_on_channel_event(g_surveillance.signaling, &on_channel_event, NULL);
+  signaling_on_call_event(g_surveillance.signaling, &on_call_event, NULL);
 
   g_surveillance.pipeline = gst_parse_launch(PIPE_LINE, NULL);
   g_surveillance.sink = gst_bin_get_by_name(GST_BIN(g_surveillance.pipeline), "peer-connection-sink");

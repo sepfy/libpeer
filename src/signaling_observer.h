@@ -11,8 +11,8 @@ typedef enum SignalingEvent {
 
 typedef struct SignalingObserver {
 
-  void (*on_channel_event)(SignalingEvent signaling_event, char *msg, void *on_channel_event_data);
-  void *on_channel_event_data;
+  void (*on_call_event)(SignalingEvent signaling_event, char *msg, void *on_call_event_data);
+  void *on_call_event_data;
 
 } SignalingObserver;
 

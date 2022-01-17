@@ -45,7 +45,7 @@ server {
       proxy_pass http://localhost:8000;
   }
 
-  location /channel/demo {
+  location /call/demo {
       proxy_pass http://localhost:8000;
   }
 

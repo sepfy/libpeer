@@ -26,7 +26,7 @@ Signaling* signaling_create(SignalingOption signaling_option) {
   switch(signaling->option.protocol) {
     case SIGNALING_PROTOCOL_HTTP:
       signaling->impl = (void*)signaling_http_create(signaling->option.host, signaling->option.port,
-       signaling->option.channel, signaling->option.index_html, &signaling->observer);
+       signaling->option.call, signaling->option.index_html, &signaling->observer);
       break;
     default:
       break;
@@ -75,13 +75,13 @@ void signaling_shutdown(Signaling *signaling) {
   }
 }
 
-void signaling_on_channel_event(Signaling *signaling, void (*on_channel_event), void *userdata) {
+void signaling_on_call_event(Signaling *signaling, void (*on_call_event), void *userdata) {
 
-  signaling->observer.on_channel_event = on_channel_event;
-  signaling->observer.on_channel_event_data = userdata;
+  signaling->observer.on_call_event = on_call_event;
+  signaling->observer.on_call_event_data = userdata;
 }
 
-void signaling_send_answer_to_channel(Signaling *signaling, char *sdp) {
+void signaling_send_answer_to_call(Signaling *signaling, char *sdp) {
 
   switch(signaling->option.protocol) {
     case SIGNALING_PROTOCOL_HTTP:

@@ -7,7 +7,7 @@
 
 typedef struct SignalingHttp SignalingHttp;
 
-SignalingHttp* signaling_http_create(const char *host, int port, const char *channel, const char *index_html, SignalingObserver *signaling_observer);
+SignalingHttp* signaling_http_create(const char *host, int port, const char *call, const char *index_html, SignalingObserver *signaling_observer);
 
 void signaling_http_destroy(SignalingHttp *signaling_http);
 

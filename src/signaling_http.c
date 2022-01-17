@@ -15,7 +15,7 @@ struct SignalingHttp {
 
   SignalingObserver *signaling_observer;
 
-  char channel[128];
+  char call[128];
   struct http_server_s *server; 
   char *answer;
 
@@ -55,7 +55,7 @@ void signaling_http_set_answer(SignalingHttp *signaling_http, const char *sdp) {
 
 }
 
-void signaling_http_channel_request(SignalingObserver *signaling_observer, const char *body, size_t len) {
+void signaling_http_call_request(SignalingObserver *signaling_observer, const char *body, size_t len) {
 
   cJSON *json = NULL;
   cJSON *type = NULL;
@@ -98,11 +98,11 @@ void signaling_http_handle_request(struct http_request_s* request) {
   http_response_status(response, 200);
 
   http_string_t url = http_request_target(request);
-  if(url.len == strlen(signaling_http->channel)
-   && memcmp(url.buf, signaling_http->channel, url.len) == 0) {
-    // channel
+  if(url.len == strlen(signaling_http->call)
+   && memcmp(url.buf, signaling_http->call, url.len) == 0) {
+    // call
     http_string_t body = http_request_body(request);
-    signaling_http_channel_request(signaling_http->signaling_observer, body.buf, body.len);
+    signaling_http_call_request(signaling_http->signaling_observer, body.buf, body.len);
     http_response_header(response, "Content-Type", "text/plain");
     char answer[SDP_MAX_SIZE] = {0};
     int len = signaling_http_get_answer(signaling_http, answer, SDP_MAX_SIZE);
@@ -120,14 +120,14 @@ void signaling_http_handle_request(struct http_request_s* request) {
   http_respond(request, response);
 }
 
-SignalingHttp* signaling_http_create(const char *host, int port, const char *channel,
+SignalingHttp* signaling_http_create(const char *host, int port, const char *call,
  const char *index_html, SignalingObserver *signaling_observer) {
 
   SignalingHttp *signaling_http = (SignalingHttp*)malloc(sizeof(SignalingHttp));
   if(!signaling_http)
     return NULL;
 
-  snprintf(signaling_http->channel, sizeof(signaling_http->channel), "/channel/%s", channel);
+  snprintf(signaling_http->call, sizeof(signaling_http->call), "/call/%s", call);
   signaling_http->index_html = index_html;
   signaling_http->answer = NULL;
   signaling_http->server = http_server_init(8000, signaling_http_handle_request);

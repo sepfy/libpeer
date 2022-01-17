@@ -4,9 +4,9 @@ void signaling_observer_notify_event(SignalingObserver *signaling_observer, Sign
 
   switch(signaling_event) {
     case SIGNALING_EVENT_GET_OFFER:
-      if(signaling_observer->on_channel_event) {
-        signaling_observer->on_channel_event(signaling_event, msg,
-         signaling_observer->on_channel_event_data);
+      if(signaling_observer->on_call_event) {
+        signaling_observer->on_call_event(signaling_event, msg,
+         signaling_observer->on_call_event_data);
       }
       break;
     case SIGNALING_EVENT_GET_ANSWER:

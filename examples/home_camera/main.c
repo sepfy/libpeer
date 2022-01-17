@@ -44,7 +44,7 @@ static void on_iceconnectionstatechange(IceConnectionState state, void *data) {
 
 static void on_icecandidate(char *sdp, void *data) {
 
-  signaling_send_answer_to_channel(g_home_camera.signaling, sdp);
+  signaling_send_answer_to_call(g_home_camera.signaling, sdp);
   g_cond_signal(&g_home_camera.cond);
 }
 
@@ -133,7 +133,7 @@ void on_track(uint8_t *packet, size_t bytes, void *data) {
   //printf("Got packet %ld\n", bytes);
 }
 
-void on_channel_event(SignalingEvent signaling_event, char *msg, void *data) {
+void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
 
   if(signaling_event == SIGNALING_EVENT_GET_OFFER) {
 
@@ -226,7 +226,7 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  signaling_on_channel_event(g_home_camera.signaling, &on_channel_event, NULL);
+  signaling_on_call_event(g_home_camera.signaling, &on_call_event, NULL);
   signaling_dispatch(g_home_camera.signaling);
 
   return 0;

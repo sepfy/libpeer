@@ -18,7 +18,7 @@ const char index_html[] = " \
         iceServers: [{urls: 'stun:stun.l.google.com:19302'}] \n \
       }); \n \
       var log = msg => { console.log(msg); }; \n \
-      function sendOfferToChannel(sdp) { \n \
+      function sendOfferToCall(sdp) { \n \
         var xhttp = new XMLHttpRequest(); \n \
         xhttp.onreadystatechange = function() { \n \
           if (this.readyState == 4 && this.status == 200) { \n \
@@ -29,7 +29,7 @@ const char index_html[] = " \
             } \n \
           } \n \
         }; \n \
-        xhttp.open('POST', '/channel/demo'); \n \
+        xhttp.open('POST', '/call/demo'); \n \
         xhttp.setRequestHeader('Content-Type', 'plain/text'); \n \
         xhttp.send(btoa(JSON.stringify({'type': 'offer', 'sdp': sdp}))); \n \
       } \n \
@@ -43,7 +43,7 @@ const char index_html[] = " \
       }; \n \
       pc.oniceconnectionstatechange = e => log(pc.iceConnectionState); \n \
       pc.onicecandidate = event => { \n \
-        if(event.candidate === null) sendOfferToChannel(pc.localDescription.sdp) \n \
+        if(event.candidate === null) sendOfferToCall(pc.localDescription.sdp) \n \
       }; \n \
       pc.addTransceiver('audio', {'direction': 'sendrecv'}) \n \
       pc.addTransceiver('video', {'direction': 'sendrecv'}) \n \
