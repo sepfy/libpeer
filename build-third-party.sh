@@ -18,3 +18,6 @@ ninja -C builddir
 cd $BASE_DIR/third_party/media-server/librtp/
 make -j4
 
+# Build cJSON
+cd $BASE_DIR/third_party/cJSON
+make static

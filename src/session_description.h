@@ -8,9 +8,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#include "rtp_packet.h"
 #include "media_stream.h"
 
-#define SDP_ATTIBUTES_MAX 10240
+#define SDP_MAX_SIZE 10240
 
 typedef struct SessionDescription SessionDescription;
 
@@ -59,9 +60,10 @@ char* session_description_get_content(SessionDescription *sdp);
  * @param ufrag of DTLS.
  * @param password of DTLS.
  * @param fingerprint of DTLS.
+ * @param mid.
  */
 void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
- TransceiverDirection direction, const char *ufrag, const char *password, const char *fingerprint);
+ TransceiverDirection direction, const char *ufrag, const char *password, const char *fingerprint, int mid);
 
 /**
  * @brief Find RTP ssrc of audio or video in SDP.
@@ -69,5 +71,11 @@ void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
  * @param The content of session description protocol.
  */
 uint32_t session_description_find_ssrc(const char *type, const char *sdp);
+
+/**
+ * @brief Parse RTP map of SDP.
+ * @param The content of session description protocol.
+ */
+RtpMap session_description_parse_rtpmap(const char *sdp);
 
 #endif // SESSION_DESCRIPTION_H_

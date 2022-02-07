@@ -1,9 +1,15 @@
 [submodule "third_party/libnice"]
 	path = third_party/libnice
-	url = https://gitlab.freedesktop.org/libnice/libnice.git
+	url = https://github.com/libnice/libnice.git
 [submodule "third_party/libsrtp"]
 	path = third_party/libsrtp
 	url = https://github.com/cisco/libsrtp.git
 [submodule "third_party/media-server"]
 	path = third_party/media-server
 	url = https://github.com/ireader/media-server.git
+[submodule "third_party/httpserver.h"]
+	path = third_party/httpserver.h
+	url = https://github.com/jeremycw/httpserver.h.git
+[submodule "third_party/cJSON"]
+	path = third_party/cJSON
+	url = https://github.com/DaveGamble/cJSON.git

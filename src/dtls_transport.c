@@ -196,6 +196,7 @@ void dtls_transport_destroy(DtlsTransport *dtls_transport) {
 
   if(dtls_transport == NULL)
     return;
+
   SSL_CTX_free(dtls_transport->ssl_ctx);
   SSL_free(dtls_transport->ssl);
   X509_free(dtls_transport->certificate);
@@ -207,6 +208,8 @@ void dtls_transport_destroy(DtlsTransport *dtls_transport) {
     srtp_dealloc(dtls_transport->srtp_out);
 
   srtp_shutdown();
+
+  free(dtls_transport);
 }
 
 void dtls_transport_do_handshake(DtlsTransport *dtls_transport) {

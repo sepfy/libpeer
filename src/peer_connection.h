@@ -11,6 +11,7 @@ extern "C" {
 
 #include <agent.h>
 
+#include "utils.h"
 #include "session_description.h"
 #include "dtls_transport.h"
 #include "media_stream.h"
@@ -47,7 +48,7 @@ void peer_connection_destroy(PeerConnection *pc);
 int peer_connection_send_rtcp_pil(PeerConnection *pc, uint32_t ssrc);
 
 /**
- * @brief Add audio or video stream to PeerConection.
+ * @brief Add audio or video stream to PeerConnection.
  * @param A PeerConnection.
  * @param A MediaStream.
  */
@@ -104,6 +105,20 @@ int peer_connection_create_answer(PeerConnection *pc);
  * @param Media type of audio and video.
  */
 uint32_t peer_connection_get_ssrc(PeerConnection *pc, const char *type);
+
+/**
+ * @brief Get payload type of codec in SDP.
+ * @param PeerConnection.
+ * @param Media Codec of audio or video.
+ */
+int peer_connection_get_rtpmap(PeerConnection *pc, MediaCodec codec);
+
+/**
+ * @brief Support to resolve mDNS candidate.
+ * @param PeerConnection.
+ * @param Boolean. Default is FALSE.
+ */
+void peer_connection_enable_mdns(PeerConnection *pc, gboolean b_enabled);
 
 // To confirm:
 int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);

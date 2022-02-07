@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <glib.h>
 
 #include "utils.h"
 #include "media_stream.h"
@@ -10,7 +11,7 @@
 struct SessionDescription {
 
   size_t size;
-  char content[SDP_ATTIBUTES_MAX];
+  char content[SDP_MAX_SIZE];
 
 };
 
@@ -18,7 +19,7 @@ SessionDescription* session_description_create(void) {
 
   SessionDescription *sdp = NULL;
   sdp = (SessionDescription*)malloc(sizeof(SessionDescription));
-  if(sdp == NULL)
+  if(!sdp)
     return sdp;
 
   memset(sdp->content, 0, sizeof(sdp->content));
@@ -27,8 +28,9 @@ SessionDescription* session_description_create(void) {
 
 void session_description_destroy(SessionDescription *sdp) {
 
-  if(sdp != NULL) {
+  if(sdp) {
     free(sdp);
+    sdp = NULL;
   }
 }
 
@@ -97,9 +99,7 @@ char* session_description_get_content(SessionDescription *sdp) {
 
 
 void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
- TransceiverDirection direction, const char *ufrag, const char *password, const char *fingerprint) {
-
-  static int mid = 0;
+ TransceiverDirection direction, const char *ufrag, const char *password, const char *fingerprint, int mid) {
 
   switch(codec) {
     case CODEC_H264:
@@ -149,7 +149,6 @@ void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
   session_description_append(sdp, "a=fingerprint:sha-256 %s", fingerprint);
   session_description_append(sdp, "a=setup:passive");
 
-  mid = (mid + 1)%2;
 }
 
 uint32_t session_description_find_ssrc(const char *type, const char *sdp) {
@@ -167,4 +166,48 @@ uint32_t session_description_find_ssrc(const char *type, const char *sdp) {
 
   ssrc = strtoul(ssrc_pos + 5, NULL, 0);
   return ssrc;
+}
+
+RtpMap session_description_parse_rtpmap(const char *sdp) {
+
+  //a=rtpmap:111 opus/48000/2
+  //a=rtpmap:8 PCMA/8000
+  //a=rtpmap:108 H264/90000
+  RtpMap rtp_map;
+  int pt = 0;
+  int i;
+
+  char codec[16];
+
+  char *pt_start, *codec_start, *codec_end;
+
+  gchar **splits;
+  splits = g_strsplit(sdp, "\r\n", 256);
+  for(i = 0; splits[i] != NULL; i++) {
+    if(strstr(splits[i], "rtpmap") == NULL)
+      continue;
+
+    pt_start = strstr(splits[i], ":");
+    codec_start = strstr(splits[i], " ") + 1;
+    codec_end = strstr(splits[i], "/");
+
+    if(!pt_start && !codec_start && !codec_end)
+      continue;
+
+    pt = atoi(pt_start + 1);
+    memset(codec, 0, sizeof(codec));
+    strncpy(codec, codec_start, codec_end - codec_start);
+
+    if(strcmp(codec, "H264") == 0) {
+      rtp_map.pt_h264 = pt;
+    }
+    else if(strcmp(codec, "PCMA") == 0) {
+      rtp_map.pt_pcma = pt;
+    }
+    else if(strcmp(codec, "opus") == 0) {
+      rtp_map.pt_opus = pt;
+    }
+  }
+
+  return rtp_map;
 }

@@ -2,16 +2,26 @@
 
 ![pear-ci](https://github.com/sepfy/pear/actions/workflows/pear-ci.yml/badge.svg)
 
-Pear is a WebRTC SDK written in C. The SDK aims to integrate IoT/Embedded device with WebRTC applications.
+Pear is a WebRTC SDK written in C. The SDK aims to integrate IoT/Embedded device video/audio streaming with WebRTC.
 
-<b>Notice: This project is a work in progress. Currently, only support streaming H264 video or OPUS audio to browser.</b>
+### Features
+
+- Vdieo/Audio Codec Support
+  - H264
+  - G.711 PCM (A-law)
+  - Opus
+- Browser Tested
+  - Chrome
+  - Safari
+  - Edge
 
 ### Dependencies
 
 * [libsrtp](https://github.com/cisco/libsrtp)
 * [libnice](https://github.com/libnice/libnice)
 * [librtp](https://github.com/ireader/media-server)
-
+* [httpserver.h](https://github.com/jeremycw/httpserver.h.git) (Option)
+* [cJSON](https://github.com/DaveGamble/cJSON.git) (Option)
 
 ### Getting Started
 
@@ -27,7 +37,7 @@ Pear is a WebRTC SDK written in C. The SDK aims to integrate IoT/Embedded device
 ```
 
 ### Examples
-- [Local file](https://github.com/sepfy/pear/tree/main/examples/local_file): Stream h264 file to browser and exchange SDP by copy and paste.
-- [GStreamer](https://github.com/sepfy/pear/tree/main/examples/gstreamer): Stream v4l2 source to browser with GStreamer and exchange SDP by libevent HTTP server.
-- [Recording](https://github.com/sepfy/pear/tree/main/examples/recording): Record your screen and save as a file.
-- [Bidirection](https://github.com/sepfy/pear/tree/main/examples/bidirection): Record your screen and stream v4l2 source to browser
+- [Video On Demand](https://github.com/sepfy/pear/tree/main/examples/video_on_demand): Stream sigle video file from device to browser.
+- [Surveillance](https://github.com/sepfy/pear/tree/main/examples/surveillance): Stream single camera from device to browser.
+- [Home Camera](https://github.com/sepfy/pear/tree/main/examples/home_camera): Stream camera video from devcie and two way audio.
+- [Screencast](https://github.com/sepfy/pear/tree/main/examples/screencast): Stream single video content from Browser to device.

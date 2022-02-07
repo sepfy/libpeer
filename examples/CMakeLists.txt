@@ -1,15 +1,13 @@
-cmake_minimum_required(VERSION 3.1)
 project(examples)
 
-option(ENABLE_EXAMPLES "Build examples" OFF)
+pkg_check_modules(GST REQUIRED gstreamer-1.0>=1.4 gstreamer-base-1.0>=1.4)
 
-include_directories(${GLIB_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/third_party/libsrtp/include/ ${CMAKE_SOURCE_DIR}/third_party/libnice/agent ${CMAKE_SOURCE_DIR}/third_party/media-server/librtp/include/ ${CMAKE_SOURCE_DIR}/src/)
+include_directories(${CMAKE_SOURCE_DIR}/src ${GST_INCLUDE_DIRS})
 
-link_directories(${CMAKE_SOURCE_DIR}/third_party/libnice/builddir/nice/ ${CMAKE_SOURCE_DIR}/third_party/libsrtp/build/ ${CMAKE_SOURCE_DIR}/third_party/media-server/librtp/debug.linux)
-
-add_subdirectory(local_file)
 if(ENABLE_EXAMPLES)
-  add_subdirectory(gstreamer)
-  add_subdirectory(recording)
-  add_subdirectory(bidirection)
+  add_subdirectory(video_on_demand)
+  add_subdirectory(surveillance)
+  add_subdirectory(screencast)
+  add_subdirectory(home_camera)
+  add_subdirectory(meeting)
 endif(ENABLE_EXAMPLES)
