@@ -1,5 +1,6 @@
 #include "signaling.h"
 #include "signaling_http.h"
+#include "signaling_mqtt.h"
 #include "utils.h"
 
 typedef struct Signaling {
@@ -28,6 +29,10 @@ Signaling* signaling_create(SignalingOption signaling_option) {
       signaling->impl = (void*)signaling_http_create(signaling->option.host, signaling->option.port,
        signaling->option.call, signaling->option.index_html, &signaling->observer);
       break;
+    case SIGNALING_PROTOCOL_MQTT:
+      signaling->impl = (void*)signaling_mqtt_create(signaling->option.host, signaling->option.port,
+       signaling->option.call, signaling->option.tls,
+       signaling->option.username, signaling->option.password, &signaling->observer);
     default:
       break;
   }
@@ -59,6 +64,9 @@ void signaling_dispatch(Signaling *signaling) {
     case SIGNALING_PROTOCOL_HTTP:
       signaling_http_dispatch((SignalingHttp*)signaling->impl);
       break;
+    case SIGNALING_PROTOCOL_MQTT:
+      signaling_mqtt_dispatch((SignalingMqtt*)signaling->impl);
+      break;
     default:
       break;
   }
@@ -69,6 +77,9 @@ void signaling_shutdown(Signaling *signaling) {
   switch(signaling->option.protocol) {
     case SIGNALING_PROTOCOL_HTTP:
       signaling_http_shutdown((SignalingHttp*)signaling->impl);
+      break;
+    case SIGNALING_PROTOCOL_MQTT:
+      signaling_mqtt_shutdown((SignalingMqtt*)signaling->impl);
       break;
     default:
       break;
@@ -86,6 +97,9 @@ void signaling_send_answer_to_call(Signaling *signaling, char *sdp) {
   switch(signaling->option.protocol) {
     case SIGNALING_PROTOCOL_HTTP:
       signaling_http_set_answer((SignalingHttp*)signaling->impl, sdp);
+      break;
+    case SIGNALING_PROTOCOL_MQTT:
+      signaling_mqtt_set_answer((SignalingMqtt*)signaling->impl, sdp);
       break;
     default:
       break;

@@ -12,6 +12,7 @@
 typedef enum SignalingProtocol {
 
   SIGNALING_PROTOCOL_HTTP,
+  SIGNALING_PROTOCOL_MQTT,
 
 } SignalingProtocol;
 
@@ -23,6 +24,10 @@ typedef struct SignalingOption {
   const char *call;
   uint16_t port;
   const char *index_html;
+
+  const char *tls;
+  const char *username;
+  const char *password;
 
 } SignalingOption;
 

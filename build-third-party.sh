@@ -21,3 +21,10 @@ make -j4
 # Build cJSON
 cd $BASE_DIR/third_party/cJSON
 make static
+
+# Build paho.mqtt.c
+cd $BASE_PATH/third_party/paho.mqtt.c
+mkdir -p build && cd build
+cmake -DPAHO_WITH_SSL=on -DPAHO_BUILD_STATIC=on ..
+make -j4
+
