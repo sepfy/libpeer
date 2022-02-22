@@ -226,7 +226,7 @@ int main(int argc, char **argv) {
   g_home_camera.audio_rtp = gst_bin_get_by_name(GST_BIN(g_home_camera.audio_sink_pipeline), "audio-rtp");
 
   char topic[128] = {0};
-  snprintf(topic, sizeof(topic), "topic/%s", DEVICE_CODE);
+  snprintf(topic, sizeof(topic), "/call/%s", DEVICE_CODE);
   SignalingOption signaling_option = {SIGNALING_PROTOCOL_MQTT, BROKER, topic, PORT, NULL, CERTS, DEVICE_CODE, DEVICE_KEY};
 
   g_home_camera.signaling = signaling_create(signaling_option);

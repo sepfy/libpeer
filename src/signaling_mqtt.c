@@ -20,6 +20,7 @@ struct SignalingMqtt {
   gint qos;
   gboolean dispatching;
 
+  char *answer;
 };
 
 void signaling_mqtt_message_delivered(void *context, MQTTClient_deliveryToken dt) {
@@ -39,10 +40,9 @@ int signaling_mqtt_message_arrived(void *context, char *topic_name, int topic_le
   cJSON *sdp = NULL;
 
   guchar *offer = NULL;
-  LOG_DEBUG("%s", payload_ptr);
+  //LOG_DEBUG("%s", payload_ptr);
 
   do {
-
     offer = g_base64_decode(payload_ptr, &payload_len);
     if(!offer)
       break;
@@ -65,7 +65,7 @@ int signaling_mqtt_message_arrived(void *context, char *topic_name, int topic_le
       break;
     }
 
-    else if(strcmp(type->valuestring, "offer") == 0) {
+    if(strcmp(type->valuestring, "offer") == 0) {
       signaling_observer_notify_event(signaling_mqtt->signaling_observer,
        SIGNALING_EVENT_GET_OFFER, sdp->valuestring);
     }
@@ -93,6 +93,26 @@ void signaling_mqtt_connection_lost(void *context, char *cause) {
 
 void signaling_mqtt_set_answer(SignalingMqtt *signaling_mqtt, const char *sdp) {
 
+  MQTTClient_deliveryToken token;
+
+  MQTTClient_message pubmsg = MQTTClient_message_initializer;
+
+  char answer[SDP_MAX_SIZE] = {0};
+  snprintf(answer, SDP_MAX_SIZE, "{\"type\": \"answer\", \"sdp\": \"%s\"}", sdp);
+
+  if(signaling_mqtt->answer) {
+    free(signaling_mqtt->answer);
+  }
+
+  signaling_mqtt->answer = g_base64_encode(answer, strlen(answer));
+
+  pubmsg.payload = signaling_mqtt->answer;
+  pubmsg.payloadlen = strlen(signaling_mqtt->answer);
+  pubmsg.qos = signaling_mqtt->qos;
+  pubmsg.retained = 0;
+
+  MQTTClient_publishMessage(signaling_mqtt->client, signaling_mqtt->topic, &pubmsg, &token);
+  MQTTClient_waitForCompletion(signaling_mqtt->client, token, 1);
 }
 
 
@@ -133,6 +153,11 @@ SignalingMqtt* signaling_mqtt_create(const char *host, int port, const char *top
   }
 
   signaling_mqtt->dispatching = FALSE;
+
+  signaling_mqtt->qos = 1;
+  signaling_mqtt->answer = NULL;
+
+  signaling_mqtt->signaling_observer = signaling_observer;
 
   if(MQTTClient_connect(signaling_mqtt->client, &signaling_mqtt->conn_opts) != MQTTCLIENT_SUCCESS) {
     LOG_ERROR("Cannot connect to %s", broker);
