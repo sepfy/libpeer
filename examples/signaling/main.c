@@ -11,10 +11,10 @@
 const char BROKER[] = "localhost";
 const uint16_t PORT = 8883;
 const char DEVICE_CODE[] = "test";
-const char DEVICE_KEY[] = "123456";
+const char DEVICE_KEY[] = "PVqrsYIcnY_hJNnW3E34XOWTIKuKLLBbrTwQ2IviSwE";
 const char CERTS[] = "root.crt";
 
-const char VIDEO_SINK_PIPELINE[] = "v4l2src ! video/x-raw,width=1920,height=1072,framerate=30/1 ! nvh264enc ! rtph264pay config-interval=-1 name=video-rtp ! appsink name=video-app-sink";
+const char VIDEO_SINK_PIPELINE[] = "v4l2src ! videorate ! video/x-raw,width=640,height=360,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! rtph264pay config-interval=-1 name=video-rtp ! appsink name=video-app-sink";
 
 const char AUDIO_SINK_PIPELINE[] = "alsasrc ! audioconvert ! audioresample ! alawenc ! rtppcmapay name=audio-rtp ! appsink name=audio-app-sink";
 
@@ -43,9 +43,9 @@ static void on_iceconnectionstatechange(IceConnectionState state, void *data) {
 
   if(state == FAILED) {
     LOG_INFO("Disconnect with browser... Stop streaming");
-    gst_element_set_state(g_home_camera.audio_src_pipeline, GST_STATE_PAUSED);
-    gst_element_set_state(g_home_camera.audio_sink_pipeline, GST_STATE_PAUSED);
-    gst_element_set_state(g_home_camera.video_sink_pipeline, GST_STATE_PAUSED);
+    gst_element_set_state(g_home_camera.audio_src_pipeline, GST_STATE_NULL);
+    gst_element_set_state(g_home_camera.audio_sink_pipeline, GST_STATE_NULL);
+    gst_element_set_state(g_home_camera.video_sink_pipeline, GST_STATE_NULL);
   }
 }
 
@@ -147,9 +147,9 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
     printf("Get offer from singaling\n");
     g_mutex_lock(&g_home_camera.mutex);
 
-    gst_element_set_state(g_home_camera.video_sink_pipeline, GST_STATE_PAUSED);
-    gst_element_set_state(g_home_camera.audio_src_pipeline, GST_STATE_PAUSED);
-    gst_element_set_state(g_home_camera.audio_sink_pipeline, GST_STATE_PAUSED);
+    gst_element_set_state(g_home_camera.video_sink_pipeline, GST_STATE_NULL);
+    gst_element_set_state(g_home_camera.audio_src_pipeline, GST_STATE_NULL);
+    gst_element_set_state(g_home_camera.audio_sink_pipeline, GST_STATE_NULL);
     if(g_home_camera.pc)
       peer_connection_destroy(g_home_camera.pc);
 
@@ -167,10 +167,10 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
     peer_connection_ontrack(g_home_camera.pc, on_track, NULL);
     peer_connection_oniceconnectionstatechange(g_home_camera.pc, &on_iceconnectionstatechange, NULL);
     peer_connection_set_on_transport_ready(g_home_camera.pc, &on_transport_ready, NULL);
+    peer_connection_set_remote_description(g_home_camera.pc, msg);
     peer_connection_create_answer(g_home_camera.pc);
 
     g_cond_wait(&g_home_camera.cond, &g_home_camera.mutex);
-    peer_connection_set_remote_description(g_home_camera.pc, msg);
     g_mutex_unlock(&g_home_camera.mutex);
   }
 }
@@ -178,9 +178,9 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
 
 void signal_handler(int signal) {
 
-  gst_element_set_state(g_home_camera.video_sink_pipeline, GST_STATE_PAUSED);
-  gst_element_set_state(g_home_camera.audio_src_pipeline, GST_STATE_PAUSED);
-  gst_element_set_state(g_home_camera.audio_sink_pipeline, GST_STATE_PAUSED);
+  gst_element_set_state(g_home_camera.video_sink_pipeline, GST_STATE_NULL);
+  gst_element_set_state(g_home_camera.audio_src_pipeline, GST_STATE_NULL);
+  gst_element_set_state(g_home_camera.audio_sink_pipeline, GST_STATE_NULL);
 
   gst_object_unref(g_home_camera.audio_src);
   gst_object_unref(g_home_camera.audio_sink);

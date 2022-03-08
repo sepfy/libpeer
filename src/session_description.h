@@ -62,7 +62,7 @@ char* session_description_get_content(SessionDescription *sdp);
  * @param fingerprint of DTLS.
  * @param mid.
  */
-void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
+void session_description_add_media(SessionDescription *sdp, MediaType type,
  TransceiverDirection direction, const char *ufrag, const char *password, const char *fingerprint, int mid);
 
 /**
@@ -76,6 +76,10 @@ uint32_t session_description_find_ssrc(const char *type, const char *sdp);
  * @brief Parse RTP map of SDP.
  * @param The content of session description protocol.
  */
-RtpMap session_description_parse_rtpmap(const char *sdp);
+RtpMap session_description_get_rtpmap(SessionDescription *sdp);
+
+void session_description_parse_sdp_text(SessionDescription *sdp, const char *sdp_text, int mdns_enabled);
+
+MediaType* session_description_get_mid(SessionDescription *sdp);
 
 #endif // SESSION_DESCRIPTION_H_

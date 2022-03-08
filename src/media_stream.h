@@ -6,6 +6,15 @@
 #ifndef MEDIA_STREAM_H_
 #define MEDIA_STREAM_H_
 
+
+typedef enum MediaType {
+
+  MEDIA_TYPE_NONE,
+  MEDIA_TYPE_AUDIO,
+  MEDIA_TYPE_VIDEO,
+
+} MediaType;
+
 typedef enum TransceiverDirection {
 
   SENDRECV,

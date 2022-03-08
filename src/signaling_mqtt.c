@@ -25,7 +25,6 @@ struct SignalingMqtt {
 
 void signaling_mqtt_message_delivered(void *context, MQTTClient_deliveryToken dt) {
 
-    LOG_INFO("Message with token value %d delivery confirmed\n", dt);
 }
 
 int signaling_mqtt_message_arrived(void *context, char *topic_name, int topic_len,
@@ -184,7 +183,7 @@ void signaling_mqtt_destroy(SignalingMqtt *signaling_mqtt) {
 void signaling_mqtt_dispatch(SignalingMqtt *signaling_mqtt) {
 
   LOG_INFO("Dispatching");
-  LOG_INFO("Subscribe topic %s", signaling_mqtt->topic);
+  LOG_DEBUG("Subscribe topic %s", signaling_mqtt->topic);
 
   MQTTClient_subscribe(signaling_mqtt->client, signaling_mqtt->topic, signaling_mqtt->qos);
   signaling_mqtt->dispatching = TRUE;

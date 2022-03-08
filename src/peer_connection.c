@@ -31,6 +31,10 @@ struct PeerConnection {
 
   DtlsTransport *dtls_transport;
   SessionDescription *sdp;
+
+  SessionDescription *local_sdp;
+  SessionDescription *remote_sdp;
+
   Transceiver transceiver;
   MediaStream *media_stream;
   RtpMap rtp_map;
@@ -92,7 +96,15 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
   NiceCandidate *nice_candidate;
   char nice_candidate_addr[INET6_ADDRSTRLEN];
 
-  SessionDescription *sdp = pc->sdp;
+  if(!pc->remote_sdp) {
+    LOG_WARNING("No offer. Can not create anwser");
+    return NULL;
+  }
+
+  if(pc->local_sdp)
+    session_description_destroy(pc->local_sdp);
+
+  pc->local_sdp = session_description_create();
 
   if(!nice_agent_get_local_credentials(pc->nice_agent,
    pc->stream_id, &local_ufrag, &local_password)) {
@@ -100,28 +112,34 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
     return NULL;
   }
 
-  session_description_append(sdp, "v=0");
-  session_description_append(sdp, "o=- 1495799811084970 1495799811084970 IN IP4 0.0.0.0");
-  session_description_append(sdp, "s=-");
-  session_description_append(sdp, "t=0 0");
-  session_description_append(sdp, "a=msid-semantic: WMS");
+  session_description_append(pc->local_sdp, "v=0");
+  session_description_append(pc->local_sdp, "o=- 1495799811084970 1495799811084970 IN IP4 0.0.0.0");
+  session_description_append(pc->local_sdp, "s=-");
+  session_description_append(pc->local_sdp, "t=0 0");
+  session_description_append(pc->local_sdp, "a=msid-semantic: WMS");
 
-  if(pc->media_stream->tracks_num > 1) {
-    session_description_append(sdp, "a=group:BUNDLE 0 1");
+  int mid = 0;
+  MediaType *media_type = session_description_get_mid(pc->remote_sdp);
 
-    session_description_add_codec(sdp, pc->media_stream->audio_codec, pc->transceiver.audio, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
+  if(media_type[0] > MEDIA_TYPE_NONE && media_type[1] > MEDIA_TYPE_NONE)
+    session_description_append(pc->local_sdp, "a=group:BUNDLE 0 1");
+  else
+    session_description_append(pc->local_sdp, "a=group:BUNDLE 0");
 
-    session_description_add_codec(sdp, pc->media_stream->video_codec, pc->transceiver.video, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 1);
+  while(mid < 2) {
 
-  }
-  else {
-    session_description_append(sdp, "a=group:BUNDLE 0");
+    if(media_type[mid] == MEDIA_TYPE_AUDIO) {
 
-    session_description_add_codec(sdp, pc->media_stream->audio_codec, pc->transceiver.audio, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
+      session_description_add_media(pc->local_sdp, MEDIA_TYPE_AUDIO, pc->transceiver.audio, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), mid++);
+    }
+    else if(media_type[mid] == MEDIA_TYPE_VIDEO) {
 
-    session_description_add_codec(sdp, pc->media_stream->video_codec, pc->transceiver.video, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
+      session_description_add_media(pc->local_sdp, MEDIA_TYPE_VIDEO, pc->transceiver.video, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), mid++);
 
-
+    }
+    else {
+      mid++;
+    }
   }
 
   if(local_ufrag)
@@ -143,7 +161,7 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
       continue;
     }
 
-    session_description_append(sdp, "a=candidate:%s 1 udp %u %s %d typ %s",
+    session_description_append(pc->local_sdp, "a=candidate:%s 1 udp %u %s %d typ %s",
      nice_candidate->foundation,
      nice_candidate->priority,
      nice_candidate_addr,
@@ -155,9 +173,8 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
 
   if(pc->onicecandidate != NULL) {
 
-    char *sdp_content = session_description_get_content(pc->sdp);
+    char *sdp_content = session_description_get_content(pc->local_sdp);
     pc->onicecandidate(sdp_content, pc->onicecandidate_userdata);
-
   }
 
   if(nice_candidates)
@@ -185,7 +202,6 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
   PeerConnection *pc = (PeerConnection*)data;
 
   if(rtcp_packet_validate(buf, len)) {
-
      if(pc->on_transport_ready != NULL) {
       pc->on_transport_ready((void*)pc->on_transport_ready_userdata);
      }
@@ -283,7 +299,8 @@ PeerConnection* peer_connection_create(void) {
 
   pc->dtls_transport = dtls_transport_create(nice_agent_bio_new(pc->nice_agent, pc->stream_id, pc->component_id));
 
-  pc->sdp = session_description_create();
+  pc->remote_sdp = NULL;
+  pc->local_sdp = NULL;
 
   return pc;
 }
@@ -313,8 +330,11 @@ void peer_connection_destroy(PeerConnection *pc) {
   if(pc->media_stream)
     media_stream_free(pc->media_stream);
 
-  if(pc->sdp)
-    session_description_destroy(pc->sdp);
+  if(pc->remote_sdp)
+    session_description_destroy(pc->remote_sdp);
+
+  if(pc->local_sdp)
+    session_description_destroy(pc->local_sdp);
 
   free(pc);
   pc = NULL;
@@ -335,7 +355,7 @@ int peer_connection_create_answer(PeerConnection *pc) {
   return 0;
 }
 
-void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp) {
+void peer_connection_set_remote_description(PeerConnection *pc, char *sdp_text) {
 
   gsize len;
   gchar* ufrag = NULL;
@@ -343,62 +363,42 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
   GSList *plist;
   int i;
 
-  if(!remote_sdp) return;
+  if(!sdp_text) return;
 
-  pc->audio_ssrc = session_description_find_ssrc("audio", remote_sdp);
-  pc->video_ssrc = session_description_find_ssrc("video", remote_sdp);
+  pc->audio_ssrc = session_description_find_ssrc("audio", sdp_text);
+  pc->video_ssrc = session_description_find_ssrc("video", sdp_text);
 
-  // Remove mDNS
-  SessionDescription *sdp = NULL;
-  if(strstr(remote_sdp, "local") != NULL) {
+  if(pc->remote_sdp)
+    session_description_destroy(pc->remote_sdp);
 
-    sdp = session_description_create();
-    gchar **splits;
+  pc->remote_sdp = session_description_create();
 
-    splits = g_strsplit(remote_sdp, "\r\n", 256);
-    for(i = 0; splits[i] != NULL; i++) {
+  session_description_parse_sdp_text(pc->remote_sdp, sdp_text, pc->mdns_enabled);  
 
-      if(strstr(splits[i], "candidate") != NULL && strstr(splits[i], "local") != NULL) {
-
-        if(pc->mdns_enabled) {
-          char buf[256] = {0};
-          if(session_description_update_mdns_of_candidate(splits[i], buf, sizeof(buf)) != -1) {
-            session_description_append_newline(sdp, buf);
-          }
-        }
-      }
-      else {
-        session_description_append_newline(sdp, splits[i]);
-      }
-    }
-
-    remote_sdp = session_description_get_content(sdp);
-  }
-
-  pc->rtp_map = session_description_parse_rtpmap(remote_sdp);
+  sdp_text = session_description_get_content(pc->remote_sdp);
 
   plist = nice_agent_parse_remote_stream_sdp(pc->nice_agent,
-   pc->component_id, (gchar*)remote_sdp, &ufrag, &pwd);
+   pc->component_id, (gchar*)sdp_text, &ufrag, &pwd);
 
   if(ufrag && pwd && g_slist_length(plist) > 0) {
+
     ufrag[strlen(ufrag) - 1] = '\0';
     pwd[strlen(pwd) - 1] = '\0';
     NiceCandidate* c = (NiceCandidate*)g_slist_nth(plist, 0)->data;
-    if(!nice_agent_set_remote_credentials(pc->nice_agent, 1, ufrag, pwd))
-    {
+
+    if(!nice_agent_set_remote_credentials(pc->nice_agent, 1, ufrag, pwd)) {
       LOG_WARNING("failed to set remote credentials");
     }
     if(nice_agent_set_remote_candidates(pc->nice_agent, pc->stream_id,
      pc->component_id, plist) < 1) {
       LOG_WARNING("failed to set remote candidates");
     }
+
     g_free(ufrag);
     g_free(pwd);
     g_slist_free_full(plist, (GDestroyNotify)&nice_candidate_free);
   }
 
-  if(sdp)
-    session_description_destroy(sdp);
 }
 
 
@@ -461,14 +461,15 @@ uint32_t peer_connection_get_ssrc(PeerConnection *pc, const char *type) {
 
 int peer_connection_get_rtpmap(PeerConnection *pc, MediaCodec codec) {
 
+  RtpMap rtp_map = session_description_get_rtpmap(pc->remote_sdp);
   switch(codec) {
 
     case CODEC_H264:
-      return pc->rtp_map.pt_h264;
+      return rtp_map.pt_h264;
     case CODEC_OPUS:
-      return pc->rtp_map.pt_opus;
+      return rtp_map.pt_opus;
     case CODEC_PCMA:
-      return pc->rtp_map.pt_pcma;
+      return rtp_map.pt_pcma;
     default:
      return -1;
   }
