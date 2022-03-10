@@ -123,6 +123,7 @@ SignalingMqtt* signaling_mqtt_create(const char *host, int port, const char *top
 
   gchar broker[128];
   g_snprintf(broker, sizeof(broker), "ssl://%s:%d", host, port);
+  memset(signaling_mqtt->topic, 0, sizeof(signaling_mqtt->topic));
   strncpy(signaling_mqtt->topic, topic, strlen(topic));
 
   signaling_mqtt->conn_opts = (MQTTClient_connectOptions)MQTTClient_connectOptions_initializer;
@@ -164,6 +165,7 @@ SignalingMqtt* signaling_mqtt_create(const char *host, int port, const char *top
     return NULL;
   }
 
+  LOG_INFO("Connected");
   return signaling_mqtt;
 }
 
@@ -182,7 +184,6 @@ void signaling_mqtt_destroy(SignalingMqtt *signaling_mqtt) {
 
 void signaling_mqtt_dispatch(SignalingMqtt *signaling_mqtt) {
 
-  LOG_INFO("Dispatching");
   LOG_DEBUG("Subscribe topic %s", signaling_mqtt->topic);
 
   MQTTClient_subscribe(signaling_mqtt->client, signaling_mqtt->topic, signaling_mqtt->qos);

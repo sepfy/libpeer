@@ -3,18 +3,16 @@
 #include <unistd.h>
 #include <gst/gst.h>
 
-
-#define LOG_LEVEL 0x02
 #include "peer_connection.h"
 #include "signaling.h"
 
-const char BROKER[] = "localhost";
+const char BROKER[] = "thingnal.com";
 const uint16_t PORT = 8883;
-const char DEVICE_CODE[] = "test";
-const char DEVICE_KEY[] = "PVqrsYIcnY_hJNnW3E34XOWTIKuKLLBbrTwQ2IviSwE";
-const char CERTS[] = "root.crt";
+const char CERTS[] = "thingnal-webrtc.pem";
+const char DEVICE_CODE[] = "<Your device code>";
+const char DEVICE_KEY[] = "<Your device key>";
 
-const char VIDEO_SINK_PIPELINE[] = "v4l2src ! videorate ! video/x-raw,width=640,height=360,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! rtph264pay config-interval=-1 name=video-rtp ! appsink name=video-app-sink";
+const char VIDEO_SINK_PIPELINE[] = "v4l2src ! video/x-raw,width=1280,height=720,framerate=30/1 ! omxh264enc ! rtph264pay config-interval=-1 name=video-rtp ! appsink name=video-app-sink";
 
 const char AUDIO_SINK_PIPELINE[] = "alsasrc ! audioconvert ! audioresample ! alawenc ! rtppcmapay name=audio-rtp ! appsink name=audio-app-sink";
 
@@ -154,14 +152,6 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
       peer_connection_destroy(g_home_camera.pc);
 
     g_home_camera.pc = peer_connection_create();
-
-    MediaStream *media_stream = media_stream_new();
-    media_stream_add_track(media_stream, CODEC_H264);
-    media_stream_add_track(media_stream, CODEC_PCMA);
-    peer_connection_add_stream(g_home_camera.pc, media_stream);
-
-    Transceiver transceiver = {.video = SENDRECV, .audio = SENDRECV};
-    peer_connection_add_transceiver(g_home_camera.pc, transceiver);
 
     peer_connection_onicecandidate(g_home_camera.pc, on_icecandidate, NULL);
     peer_connection_ontrack(g_home_camera.pc, on_track, NULL);
