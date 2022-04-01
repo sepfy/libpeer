@@ -256,7 +256,7 @@ PeerConnection* peer_connection_create(void) {
 
   PeerConnection *pc = NULL;
   pc = (PeerConnection*)malloc(sizeof(PeerConnection));
-
+  memset(pc, 0, sizeof(*pc));
   if(pc == NULL)
     return pc;
 
