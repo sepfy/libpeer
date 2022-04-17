@@ -143,12 +143,11 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
       continue;
     }
 
-    session_description_append(sdp, "a=candidate:%s 1 udp %u %s %d typ %s",
+    session_description_append(sdp, "a=candidate:%s 1 udp %u %s %d typ host",
      nice_candidate->foundation,
      nice_candidate->priority,
      nice_candidate_addr,
-     nice_address_get_port(&nice_candidate->addr),
-     CANDIDATE_TYPE_NAME[nice_candidate->type]);
+     nice_address_get_port(&nice_candidate->addr));
 
     nice_candidate_free(nice_candidate);
   }

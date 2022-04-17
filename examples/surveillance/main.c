@@ -8,7 +8,7 @@
 #include "peer_connection.h"
 #include "signaling.h"
 
-const char PIPE_LINE[] = "v4l2src ! video/x-raw,width=1920,height=1072,framerate=30/1 ! omxh264enc ! rtph264pay name=rtp config-interval=-1 ! appsink name=peer-connection-sink";
+const char PIPE_LINE[] = "v4l2src ! video/x-raw,width=1920,height=1072,framerate=30/1 ! omxh264enc ! rtph264pay name=rtp config-interval=-1 ssrc=1 ! appsink name=peer-connection-sink";
 
 typedef struct Surveillance {
 
