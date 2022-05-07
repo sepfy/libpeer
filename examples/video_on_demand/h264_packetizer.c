@@ -37,7 +37,7 @@ H264Packetizer* h264_packetizer_create(PeerConnection *pc) {
   h264_packetizer->handler.alloc = h264_packetizer_alloc;
   h264_packetizer->handler.free = h264_packetizer_free;
   h264_packetizer->handler.packet = h264_packetizer_packet;
-  h264_packetizer->encoder = rtp_payload_encode_create(102, "H264", 0, 0, &h264_packetizer->handler, h264_packetizer);
+  h264_packetizer->encoder = rtp_payload_encode_create(102, "H264", 0, 1, &h264_packetizer->handler, h264_packetizer);
   h264_packetizer->pc = pc;
 
   return h264_packetizer;

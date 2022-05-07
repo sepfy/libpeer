@@ -41,12 +41,16 @@ static void on_icecandidate(char *sdp, void *data) {
   g_cond_signal(&g_surveillance.cond);
 }
 
-static void on_transport_ready(void *data) {
+void on_receiver_packet_loss(float fration_loss, uint32_t total_loss, void *data) {
+
+  LOG_INFO("Get receiver report. packet loss %f, %u", fration_loss, total_loss);
+}
+
+static void on_connected(void *data) {
 
   static int pt = -1;
   // Update payload type of rtph264pay
   int gst_pt = gst_pt = peer_connection_get_rtpmap(g_surveillance.pc, CODEC_H264);
-
   if(pt != gst_pt) {
     pt = gst_pt;
     g_object_set(g_surveillance.rtp, "pt", pt, NULL);
@@ -73,7 +77,8 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
 
     peer_connection_onicecandidate(g_surveillance.pc, on_icecandidate, NULL);
     peer_connection_oniceconnectionstatechange(g_surveillance.pc, &on_iceconnectionstatechange, NULL);
-    peer_connection_set_on_transport_ready(g_surveillance.pc, &on_transport_ready, NULL);
+    peer_connection_on_connected(g_surveillance.pc, on_connected, NULL);
+    peer_connection_on_receiver_packet_loss(g_surveillance.pc, on_receiver_packet_loss, NULL);
     peer_connection_create_answer(g_surveillance.pc);
 
     g_cond_wait(&g_surveillance.cond, &g_surveillance.mutex);
