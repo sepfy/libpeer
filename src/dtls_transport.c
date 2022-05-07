@@ -184,7 +184,7 @@ int dtls_transport_init(DtlsTransport *dtls_transport, BIO *agent_write_bio) {
 DtlsTransport* dtls_transport_create(BIO *agent_write_bio) {
 
   DtlsTransport *dtls_transport = NULL;
-  dtls_transport = (DtlsTransport*)malloc(sizeof(DtlsTransport));
+  dtls_transport = (DtlsTransport*)calloc(1, sizeof(DtlsTransport));
   if(dtls_transport == NULL)
     return dtls_transport;
 
@@ -228,6 +228,14 @@ int dtls_transport_validate(char *buf) {
   return ((*buf >= 19) && (*buf <= 64));
 }
 
+int dtls_transport_get_srtp_initialized(DtlsTransport *dtls_transport) {
+
+  if(dtls_transport) {
+    return dtls_transport->srtp_init_done;
+  }
+
+  return 0;
+}
 
 void dtls_transport_incomming_msg(DtlsTransport *dtls_transport, char *buf, int len) {
 
@@ -336,6 +344,10 @@ void dtls_transport_decrypt_rtp_packet(DtlsTransport *dtls_transport, uint8_t *p
   srtp_unprotect(dtls_transport->srtp_in, packet, bytes);
 }
 
+void dtls_transport_decrypt_rtcp_packet(DtlsTransport *dtls_transport, uint8_t *packet, int *bytes) {
+
+  srtp_unprotect_rtcp(dtls_transport->srtp_in, packet, bytes);
+}
 
 void dtls_transport_encrypt_rtp_packet(DtlsTransport *dtls_transport, uint8_t *packet, int *bytes) {
 

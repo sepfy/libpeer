@@ -110,7 +110,7 @@ void* srtp_transport_thread(void *data) {
   pthread_exit(NULL);
 }
 
-static void on_transport_ready(void *data) {
+static void on_connected(void *data) {
 
   gst_element_set_state(g_meeting.audio_element, GST_STATE_PLAYING);
   gst_element_set_state(g_meeting.video_element, GST_STATE_PLAYING);
@@ -165,7 +165,7 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
     peer_connection_onicecandidate(g_meeting.pc, on_icecandidate, NULL);
     peer_connection_ontrack(g_meeting.pc, on_track, NULL);
     peer_connection_oniceconnectionstatechange(g_meeting.pc, &on_iceconnectionstatechange, NULL);
-    peer_connection_set_on_transport_ready(g_meeting.pc, &on_transport_ready, NULL);
+    peer_connection_on_connected(g_meeting.pc, &on_connected, NULL);
     peer_connection_create_answer(g_meeting.pc);
 
     g_cond_wait(&g_meeting.cond, &g_meeting.mutex);

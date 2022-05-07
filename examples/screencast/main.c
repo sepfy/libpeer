@@ -39,7 +39,7 @@ static void on_icecandidate(char *sdp, void *data) {
   g_cond_signal(&g_screencast.cond);
 }
 
-static void on_transport_ready(void *data) {
+static void on_connected(void *data) {
 
   gst_element_set_state(g_screencast.video_src_pipeline, GST_STATE_PLAYING);
 }
@@ -90,7 +90,7 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
     peer_connection_ontrack(g_screencast.pc, on_track, NULL);
     peer_connection_onicecandidate(g_screencast.pc, on_icecandidate, NULL);
     peer_connection_oniceconnectionstatechange(g_screencast.pc, &on_iceconnectionstatechange, NULL);
-    peer_connection_set_on_transport_ready(g_screencast.pc, &on_transport_ready, NULL);
+    peer_connection_on_connected(g_screencast.pc, &on_connected, NULL);
     peer_connection_create_answer(g_screencast.pc);
 
     g_cond_wait(&g_screencast.cond, &g_screencast.mutex);

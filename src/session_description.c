@@ -103,23 +103,26 @@ void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
 
   switch(codec) {
     case CODEC_H264:
-      session_description_append(sdp, "m=video 9 UDP/TLS/RTP/SAVPF 102");
-      session_description_append(sdp, "a=rtpmap:102 H264/90000");
-      session_description_append(sdp, "a=fmtp:102 packetization-mode=1");
+      session_description_append(sdp, "m=video 9 UDP/TLS/RTP/SAVPF 96 102");
       session_description_append(sdp, "a=rtcp-fb:102 nack");
       session_description_append(sdp, "a=rtcp-fb:102 nack pli");
+      session_description_append(sdp, "a=fmtp:96 profile-level-id=42e01f;level-asymmetry-allowed=1");
+      session_description_append(sdp, "a=fmtp:102 profile-level-id=42e01f;packetization-mode=1;level-asymmetry-allowed=1");
       session_description_append(sdp, "a=fmtp:102 x-google-max-bitrate=6000;x-google-min-bitrate=2000;x-google-start-bitrate=4000");
+      session_description_append(sdp, "a=rtpmap:96 H264/90000");
+      session_description_append(sdp, "a=rtpmap:102 H264/90000");
+      session_description_append(sdp, "a=ssrc:1 cname:pear");
       break;
     case CODEC_OPUS:
       session_description_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 111");
       session_description_append(sdp, "a=rtcp-fb:111 nack");
       session_description_append(sdp, "a=rtpmap:111 opus/48000/2");
-      session_description_append(sdp, "a=ssrc:12 cname:YZcxBwerFFm6GH69");
+      session_description_append(sdp, "a=ssrc:2 cname:pear");
       break;
     case CODEC_PCMA:
       session_description_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 8");
       session_description_append(sdp, "a=rtpmap:8 PCMA/8000");
-      session_description_append(sdp, "a=ssrc:12 cname:YZcxBwerFFm6GH69");
+      session_description_append(sdp, "a=ssrc:2 cname:pear");
       break;
     default:
       return;

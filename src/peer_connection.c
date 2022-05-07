@@ -38,13 +38,15 @@ struct PeerConnection {
   void (*onicecandidate)(char *sdp, void *userdata);
   void (*oniceconnectionstatechange)(IceConnectionState state, void *userdata);
   void (*ontrack)(uint8_t *packet, size_t bytes, void *userdata);
+  void (*on_connected)(void *userdata);
+  void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *userdata);
 
   void *onicecandidate_userdata;
   void *oniceconnectionstatechange_userdata;
   void *ontrack_userdata;
+  void *on_connected_userdata;
+  void *on_receiver_packet_loss_userdata;
 
-  void (*on_transport_ready)(void *userdata);
-  void *on_transport_ready_userdata;
 };
 
 
@@ -143,12 +145,11 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
       continue;
     }
 
-    session_description_append(sdp, "a=candidate:%s 1 udp %u %s %d typ %s",
+    session_description_append(sdp, "a=candidate:%s 1 udp %u %s %d typ host",
      nice_candidate->foundation,
      nice_candidate->priority,
      nice_candidate_addr,
-     nice_address_get_port(&nice_candidate->addr),
-     CANDIDATE_TYPE_NAME[nice_candidate->type]);
+     nice_address_get_port(&nice_candidate->addr));
 
     nice_candidate_free(nice_candidate);
   }
@@ -178,6 +179,25 @@ int peer_connection_send_rtcp_pil(PeerConnection *pc, uint32_t ssrc) {
   return ret;
 }
 
+void peer_connection_incomming_rtcp(PeerConnection *pc, uint8_t *buf, size_t len) {
+
+  RtcpHeader rtcp_header = {0};
+  memcpy(&rtcp_header, buf, sizeof(rtcp_header));
+  switch(rtcp_header.type) {
+    case RTCP_RR:
+      if(rtcp_header.rc > 0) {
+        RtcpRr rtcp_rr = rtcp_packet_parse_rr(buf);
+        uint32_t fraction = ntohl(rtcp_rr.report_block[0].flcnpl) >> 24;
+        uint32_t total = ntohl(rtcp_rr.report_block[0].flcnpl) & 0x00FFFFFF;
+        if(pc->on_receiver_packet_loss && fraction > 0) {
+          pc->on_receiver_packet_loss((float)fraction/256.0, total, pc->on_receiver_packet_loss_userdata);
+        }
+      }
+      break;
+    default:
+      break;
+  }
+}
 
 static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint component_id,
  guint len, gchar *buf, gpointer data) {
@@ -186,14 +206,16 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
 
   if(rtcp_packet_validate(buf, len)) {
 
-     if(pc->on_transport_ready != NULL) {
-      pc->on_transport_ready((void*)pc->on_transport_ready_userdata);
-     }
+    dtls_transport_decrypt_rtcp_packet(pc->dtls_transport, buf, &len);
+    peer_connection_incomming_rtcp(pc, buf, len);
+
   }
   else if(dtls_transport_validate(buf)) {
 
     dtls_transport_incomming_msg(pc->dtls_transport, buf, len);
-
+    if(dtls_transport_get_srtp_initialized(pc->dtls_transport) && pc->on_connected) {
+      pc->on_connected(pc->on_connected_userdata);
+    }
   }
   else if(rtp_packet_validate(buf, len)) {
 
@@ -204,7 +226,6 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
     }
 
   }
-
 
 }
 
@@ -255,7 +276,7 @@ gboolean peer_connection_nice_agent_setup(PeerConnection *pc) {
 PeerConnection* peer_connection_create(void) {
 
   PeerConnection *pc = NULL;
-  pc = (PeerConnection*)malloc(sizeof(PeerConnection));
+  pc = (PeerConnection*)calloc(1, sizeof(PeerConnection));
   memset(pc, 0, sizeof(*pc));
   if(pc == NULL)
     return pc;
@@ -271,8 +292,6 @@ PeerConnection* peer_connection_create(void) {
   pc->oniceconnectionstatechange = NULL;
   pc->oniceconnectionstatechange_userdata = NULL;
 
-  pc->on_transport_ready = NULL;
-  pc->on_transport_ready_userdata = NULL;
   pc->transceiver.video = SENDONLY;
   pc->transceiver.audio = SENDONLY;
 
@@ -407,17 +426,22 @@ int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int byt
   dtls_transport_encrypt_rtp_packet(pc->dtls_transport, packet, &bytes);
   int sent = nice_agent_send(pc->nice_agent, pc->stream_id, pc->component_id, bytes, (gchar*)packet);
   if(sent < bytes) {
-    LOG_ERROR("only sent %d bytes? (was %d)\n", sent, bytes);
+    LOG_ERROR("only sent %d bytes? (was %d)", sent, bytes);
   }
   return sent;
 
 }
 
-void peer_connection_set_on_transport_ready(PeerConnection *pc, void (*on_transport_ready), void *data) {
+void peer_connection_on_connected(PeerConnection *pc, void (*on_connected), void *userdata) {
 
-  pc->on_transport_ready = on_transport_ready;
-  pc->on_transport_ready_userdata = data;
+  pc->on_connected = on_connected;
+  pc->on_connected_userdata = userdata;
+}
 
+void peer_connection_on_receiver_packet_loss(PeerConnection *pc, void (*on_receiver_packet_loss), void *userdata) {
+
+  pc->on_receiver_packet_loss = on_receiver_packet_loss;
+  pc->on_receiver_packet_loss_userdata = userdata;
 }
 
 void peer_connection_onicecandidate(PeerConnection *pc, void (*onicecandidate), void  *userdata) {

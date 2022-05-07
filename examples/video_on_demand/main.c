@@ -111,7 +111,7 @@ static void on_icecandidate(char *sdp, void *data) {
   g_cond_signal(&g_file_send.cond);
 }
 
-static void on_transport_ready(void *data) {
+static void on_connected(void *data) {
 
   if(g_file_send.sending_data == FALSE) {
     g_file_send.sending_data = TRUE;
@@ -138,7 +138,7 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
 
     peer_connection_onicecandidate(g_file_send.pc, on_icecandidate, NULL);
     peer_connection_oniceconnectionstatechange(g_file_send.pc, &on_iceconnectionstatechange, NULL);
-    peer_connection_set_on_transport_ready(g_file_send.pc, &on_transport_ready, NULL);
+    peer_connection_on_connected(g_file_send.pc, on_connected, NULL);
     peer_connection_create_answer(g_file_send.pc);
 
     g_cond_wait(&g_file_send.cond, &g_file_send.mutex);

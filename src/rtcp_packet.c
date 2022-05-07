@@ -52,3 +52,11 @@ int rtcp_packet_get_fir(char *packet, int len, int *seqnr) {
   return 20;
 }
 
+RtcpRr rtcp_packet_parse_rr(uint8_t *packet) {
+
+  RtcpRr rtcp_rr;
+  memcpy(&rtcp_rr.header, packet, sizeof(rtcp_rr.header));
+  memcpy(&rtcp_rr.report_block[0], packet + 8, 6*sizeof(uint32_t));
+
+  return rtcp_rr;
+}

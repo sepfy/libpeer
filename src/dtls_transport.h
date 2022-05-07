@@ -42,9 +42,15 @@ void dtls_transport_encrypt_rtp_packet(DtlsTransport *dtls_transport, uint8_t *p
 void dtls_transport_decrypt_rtp_packet(DtlsTransport *dtls_transport, uint8_t *packet, int *bytes);
 
 
+void dtls_transport_decrypt_rtcp_packet(DtlsTransport *dtls_transport, uint8_t *packet, int *bytes);
+
+
 void dtls_transport_encrypt_rctp_packet(DtlsTransport *dtls_transport, uint8_t *packet, int *bytes);
 
 
 const char* dtls_transport_get_fingerprint(DtlsTransport *dtls_transport);
+
+
+int dtls_transport_get_srtp_initialized(DtlsTransport *dtls_transport);
 
 #endif // DTLS_TRANSPORT_H_

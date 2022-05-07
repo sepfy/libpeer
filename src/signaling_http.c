@@ -130,7 +130,7 @@ SignalingHttp* signaling_http_create(const char *host, int port, const char *cal
   snprintf(signaling_http->call, sizeof(signaling_http->call), "/call/%s", call);
   signaling_http->index_html = index_html;
   signaling_http->answer = NULL;
-  signaling_http->server = http_server_init(8000, signaling_http_handle_request);
+  signaling_http->server = http_server_init(port, signaling_http_handle_request);
   http_server_set_userdata(signaling_http->server, signaling_http);
 
   signaling_http->signaling_observer = signaling_observer;

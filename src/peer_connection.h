@@ -120,10 +120,26 @@ int peer_connection_get_rtpmap(PeerConnection *pc, MediaCodec codec);
  */
 void peer_connection_enable_mdns(PeerConnection *pc, gboolean b_enabled);
 
+/**
+ * @brief register callback function to handle packet loss from RTCP receiver report
+ * @param[in] peer connection
+ * @param[in] callback function void (*cb)(float fraction_loss, uint32_t total_loss, void *userdata)
+ * @param[in] userdata for callback function
+ */
+void peer_connection_on_receiver_packet_loss(PeerConnection *pc, void (*cb), void *data);
+
+/**
+ * @brief register callback function to handle event when the connection is established
+ * @param[in] peer connection
+ * @param[in] callback function void (*cb)(void *userdata)
+ * @param[in] userdata for callback function
+ */
+void peer_connection_on_connected(PeerConnection *pc, void (*on_connected), void *data);
+
 // To confirm:
 int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);
 
-void peer_connection_set_on_transport_ready(PeerConnection *pc, void (*on_transport_ready), void *data);
+
 
 #ifdef __cplusplus
 }
