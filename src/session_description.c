@@ -198,6 +198,11 @@ RtpMap session_description_parse_rtpmap(const char *sdp) {
       continue;
 
     pt = atoi(pt_start + 1);
+
+    // limit payload type to 96-126 for gstreamer
+    if(pt < 96 && pt > 126)
+      continue;
+
     memset(codec, 0, sizeof(codec));
     strncpy(codec, codec_start, codec_end - codec_start);
 

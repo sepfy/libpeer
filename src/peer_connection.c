@@ -25,7 +25,7 @@ struct PeerConnection {
   GMainLoop *gloop;
   GThread *gthread;
 
-  gboolean mdns_enabled;
+  int mdns_enabled;
 
   uint32_t audio_ssrc, video_ssrc;
 
@@ -281,7 +281,7 @@ PeerConnection* peer_connection_create(void) {
   if(pc == NULL)
     return pc;
 
-  pc->mdns_enabled = FALSE;
+  pc->mdns_enabled = 0;
 
   pc->audio_ssrc = 0;
   pc->video_ssrc = 0;
@@ -307,7 +307,7 @@ PeerConnection* peer_connection_create(void) {
   return pc;
 }
 
-void peer_connection_enable_mdns(PeerConnection *pc, gboolean b_enabled) {
+void peer_connection_enable_mdns(PeerConnection *pc, int b_enabled) {
 
   pc->mdns_enabled = b_enabled;
 }

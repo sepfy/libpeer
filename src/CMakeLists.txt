@@ -10,7 +10,7 @@ if(NOT ENABLE_SIGNALING)
   list(REMOVE_ITEM SRCS ${SIGNALING_SRCS})
 endif()
 
-add_library(pear SHARED ${SRCS})
+add_library(pear ${SRCS})
 
 if(ENABLE_TEST)
   foreach(sourcefile ${TEST_SRCS})

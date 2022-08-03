@@ -1,5 +1,6 @@
 #include <glib.h>
 
+#include "srtp.h"
 #include "utils.h"
 #include "dtls_transport.h"
 
