@@ -80,58 +80,12 @@ static void* peer_connection_component_state_chanaged_cb(NiceAgent *agent,
 
 }
 
-static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint stream_id,
- gpointer data) {
+static void peer_connection_candidates_to_sdp(PeerConnection *pc, SessionDescription *sdp) {
 
-  PeerConnection *pc = (PeerConnection*)data;
-
-  gchar *local_ufrag = NULL;
-  gchar *local_password = NULL;
-  gchar ipaddr[INET6_ADDRSTRLEN];
   GSList *nice_candidates = NULL;
-
-  int i = 0;
   NiceCandidate *nice_candidate;
   char nice_candidate_addr[INET6_ADDRSTRLEN];
-
-  SessionDescription *sdp = pc->sdp;
-
-  if(!nice_agent_get_local_credentials(pc->nice_agent,
-   pc->stream_id, &local_ufrag, &local_password)) {
-    LOG_ERROR("get local credentials failed");
-    return NULL;
-  }
-
-  session_description_append(sdp, "v=0");
-  session_description_append(sdp, "o=- 1495799811084970 1495799811084970 IN IP4 0.0.0.0");
-  session_description_append(sdp, "s=-");
-  session_description_append(sdp, "t=0 0");
-  session_description_append(sdp, "a=msid-semantic: WMS");
-
-  if(pc->media_stream->tracks_num > 1) {
-    session_description_append(sdp, "a=group:BUNDLE 0 1");
-
-    session_description_add_codec(sdp, pc->media_stream->audio_codec, pc->transceiver.audio, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
-
-    session_description_add_codec(sdp, pc->media_stream->video_codec, pc->transceiver.video, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 1);
-
-  }
-  else {
-    session_description_append(sdp, "a=group:BUNDLE 0");
-
-    session_description_add_codec(sdp, pc->media_stream->audio_codec, pc->transceiver.audio, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
-
-    session_description_add_codec(sdp, pc->media_stream->video_codec, pc->transceiver.video, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
-
-
-  }
-
-  if(local_ufrag)
-    free(local_ufrag);
-
-  if(local_password)
-    free(local_password);
-
+  int i = 0;
 
   nice_candidates = nice_agent_get_local_candidates(pc->nice_agent,
    pc->stream_id, pc->component_id);
@@ -154,15 +108,66 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
     nice_candidate_free(nice_candidate);
   }
 
+  if(nice_candidates)
+    g_slist_free(nice_candidates);
+}
+
+static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint stream_id,
+ gpointer data) {
+
+  PeerConnection *pc = (PeerConnection*)data;
+
+  gchar *local_ufrag = NULL;
+  gchar *local_password = NULL;
+  gchar ipaddr[INET6_ADDRSTRLEN];
+
+  int i = 0;
+
+  SessionDescription *sdp = pc->sdp;
+
+  if(!nice_agent_get_local_credentials(pc->nice_agent,
+   pc->stream_id, &local_ufrag, &local_password)) {
+    LOG_ERROR("get local credentials failed");
+    return NULL;
+  }
+
+  session_description_append(sdp, "v=0");
+  session_description_append(sdp, "o=- 1495799811084970 1495799811084970 IN IP4 0.0.0.0");
+  session_description_append(sdp, "s=-");
+  session_description_append(sdp, "t=0 0");
+  session_description_append(sdp, "a=msid-semantic: WMS");
+
+  if(pc->media_stream->tracks_num > 1) {
+    session_description_append(sdp, "a=group:BUNDLE 0 1");
+
+    session_description_add_codec(sdp, pc->media_stream->audio_codec, pc->transceiver.audio, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
+    peer_connection_candidates_to_sdp(pc, sdp);
+
+    session_description_add_codec(sdp, pc->media_stream->video_codec, pc->transceiver.video, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 1);
+    peer_connection_candidates_to_sdp(pc, sdp);
+
+  }
+  else {
+    session_description_append(sdp, "a=group:BUNDLE 0");
+
+    session_description_add_codec(sdp, pc->media_stream->audio_codec, pc->transceiver.audio, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
+
+    session_description_add_codec(sdp, pc->media_stream->video_codec, pc->transceiver.video, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
+    peer_connection_candidates_to_sdp(pc, sdp);
+  }
+
+  if(local_ufrag)
+    free(local_ufrag);
+
+  if(local_password)
+    free(local_password);
+
   if(pc->onicecandidate != NULL) {
 
     char *sdp_content = session_description_get_content(pc->sdp);
     pc->onicecandidate(sdp_content, pc->onicecandidate_userdata);
 
   }
-
-  if(nice_candidates)
-    g_slist_free(nice_candidates);
 
 }
 
