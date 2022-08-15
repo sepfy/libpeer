@@ -2,12 +2,12 @@
 #include <stdlib.h>
 
 #define LEVEL_ERROR 0x00
-#define LEVEL_WARNING 0x01
+#define LEVEL_WARN 0x01
 #define LEVEL_INFO 0x02
 #define LEVEL_DEBUG 0x03
 
 #define ERROR_TAG "ERROR"
-#define WARNING_TAG "WARNING"
+#define WARN_TAG "WARN"
 #define INFO_TAG "INFO"
 
 #ifndef LOG_LEVEL
@@ -23,10 +23,10 @@
 #define LOG_INFO(fmt, arg...)
 #endif
 
-#if LOG_LEVEL >= LEVEL_WARNING
-#define LOG_WARNING(fmt, arg...) LOG_PRINT(WARNING_TAG, fmt, ##arg)
+#if LOG_LEVEL >= LEVEL_WARN
+#define LOG_WARN(fmt, arg...) LOG_PRINT(WARN_TAG, fmt, ##arg)
 #else
-#define LOG_WARNING(fmt, arg...)
+#define LOG_WARN(fmt, arg...)
 #endif
 
 #if LOG_LEVEL >= LEVEL_ERROR

@@ -53,4 +53,8 @@ const char* dtls_transport_get_fingerprint(DtlsTransport *dtls_transport);
 
 int dtls_transport_get_srtp_initialized(DtlsTransport *dtls_transport);
 
+int dtls_transport_sctp_to_dtls(DtlsTransport *dtls_transport, uint8_t *data, int bytes);
+
+int dtls_transport_decrypt_data(DtlsTransport *dtls_transport, char *encrypted_data, int encrypted_len, char *decrypted_data, int decrypted_len);
+
 #endif // DTLS_TRANSPORT_H_

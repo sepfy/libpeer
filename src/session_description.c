@@ -100,7 +100,7 @@ char* session_description_get_content(SessionDescription *sdp) {
 
 void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
  TransceiverDirection direction, const char *ufrag, const char *password, const char *fingerprint, int mid) {
-
+#if 0
   switch(codec) {
     case CODEC_H264:
       session_description_append(sdp, "m=video 9 UDP/TLS/RTP/SAVPF 96 102");
@@ -127,9 +127,7 @@ void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
     default:
       return;
   }
-
   session_description_append(sdp, "c=IN IP4 0.0.0.0");
-
   switch(direction) {
     case SENDRECV:
       session_description_append(sdp, "a=sendrecv");
@@ -143,9 +141,12 @@ void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
     default:
       break;
   }
-
+#endif
+  session_description_append(sdp, "m=application 50712 UDP/DTLS/SCTP webrtc-datachannel");
   session_description_append(sdp, "a=mid:%d", mid);
-  session_description_append(sdp, "a=rtcp-mux");
+  session_description_append(sdp, "a=sctp-port:5000");
+  session_description_append(sdp, "a=max-message-size:262144");
+//  session_description_append(sdp, "a=rtcp-mux");
   session_description_append(sdp, "a=ice-ufrag:%s", ufrag);
   session_description_append(sdp, "a=ice-pwd:%s", password);
   session_description_append(sdp, "a=ice-options:trickle");

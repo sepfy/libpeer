@@ -13,3 +13,6 @@
 [submodule "third_party/cJSON"]
 	path = third_party/cJSON
 	url = https://github.com/DaveGamble/cJSON.git
+[submodule "third_party/usrsctp"]
+	path = third_party/usrsctp
+	url = https://github.com/sctplab/usrsctp.git

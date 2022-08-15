@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <gio/gnetworking.h>
 
+#include "sctp.h"
 #include "dtls_transport.h"
 #include "nice_agent_bio.h"
 #include "rtp_packet.h"
@@ -29,6 +30,7 @@ struct PeerConnection {
 
   uint32_t audio_ssrc, video_ssrc;
 
+  Sctp *sctp;
   DtlsTransport *dtls_transport;
   SessionDescription *sdp;
   Transceiver transceiver;
@@ -108,6 +110,8 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
   session_description_append(sdp, "t=0 0");
   session_description_append(sdp, "a=msid-semantic: WMS");
 
+
+#if 0
   if(pc->media_stream->tracks_num > 1) {
     session_description_append(sdp, "a=group:BUNDLE 0 1");
 
@@ -119,13 +123,17 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
   else {
     session_description_append(sdp, "a=group:BUNDLE 0");
 
-    session_description_add_codec(sdp, pc->media_stream->audio_codec, pc->transceiver.audio, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
+//    session_description_add_codec(sdp, pc->media_stream->audio_codec, pc->transceiver.audio, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
 
     session_description_add_codec(sdp, pc->media_stream->video_codec, pc->transceiver.video, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
 
 
   }
+#endif
 
+    session_description_append(sdp, "a=group:BUNDLE 0");
+
+    session_description_add_codec(sdp, CODEC_H264, pc->transceiver.audio, local_ufrag, local_password, dtls_transport_get_fingerprint(pc->dtls_transport), 0);
   if(local_ufrag)
     free(local_ufrag);
 
@@ -153,7 +161,6 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
 
     nice_candidate_free(nice_candidate);
   }
-
   if(pc->onicecandidate != NULL) {
 
     char *sdp_content = session_description_get_content(pc->sdp);
@@ -203,19 +210,35 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
  guint len, gchar *buf, gpointer data) {
 
   PeerConnection *pc = (PeerConnection*)data;
+  int ret;
+  char decrypted_data[3000];
 
   if(rtcp_packet_validate(buf, len)) {
 
     dtls_transport_decrypt_rtcp_packet(pc->dtls_transport, buf, &len);
     peer_connection_incomming_rtcp(pc, buf, len);
-
   }
   else if(dtls_transport_validate(buf)) {
 
-    dtls_transport_incomming_msg(pc->dtls_transport, buf, len);
-    if(dtls_transport_get_srtp_initialized(pc->dtls_transport) && pc->on_connected) {
-      pc->on_connected(pc->on_connected_userdata);
+    if(!dtls_transport_get_srtp_initialized(pc->dtls_transport)) {
+
+      dtls_transport_incomming_msg(pc->dtls_transport, buf, len);
+
+      if(dtls_transport_get_srtp_initialized(pc->dtls_transport) && pc->on_connected) {
+        pc->on_connected(pc->on_connected_userdata);
+      }
     }
+    else {
+
+      ret = dtls_transport_decrypt_data(pc->dtls_transport, buf, len, decrypted_data, sizeof(decrypted_data));
+
+      if(!pc->sctp)
+        pc->sctp = sctp_create(pc->dtls_transport);
+
+      if(pc->sctp)
+        sctp_incoming_data(pc->sctp, decrypted_data, ret);
+    }
+
   }
   else if(rtp_packet_validate(buf, len)) {
 
@@ -363,7 +386,6 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
   int i;
 
   if(!remote_sdp) return;
-
   pc->audio_ssrc = session_description_find_ssrc("audio", remote_sdp);
   pc->video_ssrc = session_description_find_ssrc("video", remote_sdp);
 
@@ -405,11 +427,11 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *remote_sdp
     NiceCandidate* c = (NiceCandidate*)g_slist_nth(plist, 0)->data;
     if(!nice_agent_set_remote_credentials(pc->nice_agent, 1, ufrag, pwd))
     {
-      LOG_WARNING("failed to set remote credentials");
+      LOG_WARN("failed to set remote credentials");
     }
     if(nice_agent_set_remote_candidates(pc->nice_agent, pc->stream_id,
      pc->component_id, plist) < 1) {
-      LOG_WARNING("failed to set remote candidates");
+      LOG_WARN("failed to set remote candidates");
     }
     g_free(ufrag);
     g_free(pwd);

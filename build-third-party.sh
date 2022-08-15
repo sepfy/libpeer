@@ -21,3 +21,8 @@ make -j4
 # Build cJSON
 cd $BASE_DIR/third_party/cJSON
 make static
+
+cd $BASE_DIR/third_party/usrsctp
+mkdir -p build && cd build
+cmake ..
+make -j4
