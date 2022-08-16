@@ -9,8 +9,6 @@
 extern "C" {
 #endif
 
-#include <agent.h>
-
 #include "utils.h"
 #include "session_description.h"
 #include "dtls_transport.h"
@@ -118,7 +116,7 @@ int peer_connection_get_rtpmap(PeerConnection *pc, MediaCodec codec);
  * @param PeerConnection.
  * @param Boolean. Default is FALSE.
  */
-void peer_connection_enable_mdns(PeerConnection *pc, gboolean b_enabled);
+void peer_connection_enable_mdns(PeerConnection *pc, int b_enabled);
 
 /**
  * @brief register callback function to handle packet loss from RTCP receiver report

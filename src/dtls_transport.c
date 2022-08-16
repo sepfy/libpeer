@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include "sctp.h"
+#include "srtp.h"
 #include "utils.h"
 #include "dtls_transport.h"
 

@@ -11,7 +11,7 @@ make -j4
 
 # Build libnice
 cd $BASE_DIR/third_party/libnice
-meson builddir
+meson builddir -Ddefault_library=static
 ninja -C builddir
 
 # Build librtp

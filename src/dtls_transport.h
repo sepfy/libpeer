@@ -16,7 +16,6 @@
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
-#include <srtp.h> 
 
 typedef struct DtlsTransport DtlsTransport;
 

@@ -24,7 +24,7 @@ set(LIBRTP_LINK_DIRS ${CMAKE_SOURCE_DIR}/third_party/media-server/librtp/debug.l
 set(USRSCTP_LINK_DIRS ${CMAKE_SOURCE_DIR}/third_party/usrsctp/build/usrsctplib)
 link_directories(${LIBNICE_LINK_DIRS} ${LIBSRTP_LINK_DIRS} ${LIBRTP_LINK_DIRS} ${USRSCTP_LINK_DIRS})
 
-set(TARGET_LIBS "glib-2.0" "ssl" "crypto" "nice" "srtp2" "rtp" "pthread" "usrsctp")
+set(TARGET_LIBS "ssl" "crypto" "nice" "srtp2" "rtp" "usrsctp" "pthread" "glib-2.0" "gobject-2.0" "gio-2.0")
 
 if(ENABLE_SIGNALING)
   set(SIGNALING_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/third_party/httpserver.h ${CMAKE_SOURCE_DIR}/third_party/cJSON)

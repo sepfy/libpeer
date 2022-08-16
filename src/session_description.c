@@ -199,10 +199,14 @@ RtpMap session_description_parse_rtpmap(const char *sdp) {
       continue;
 
     pt = atoi(pt_start + 1);
+
     memset(codec, 0, sizeof(codec));
     strncpy(codec, codec_start, codec_end - codec_start);
 
     if(strcmp(codec, "H264") == 0) {
+      // limit payload type larger than 96 for H264
+      if(pt < 96)
+        continue;
       rtp_map.pt_h264 = pt;
     }
     else if(strcmp(codec, "PCMA") == 0) {
