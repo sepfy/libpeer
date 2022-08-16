@@ -4,4 +4,4 @@ file(GLOB SRCS "*.c")
 
 add_executable(datachannel ${SRCS})
 
-target_link_libraries(datachannel pear ${TARGET_LIBS} ${GST_LIBRARIES})
+target_link_libraries(datachannel pear ${TARGET_LIBS} pthread)

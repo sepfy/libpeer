@@ -10,20 +10,27 @@
 typedef struct Sctp {
 
   struct socket *sock;
+
   int local_port;
   int remote_port;
-  int stream_cursor;
-  void *user_data;
+  int connected;
 
   DtlsTransport *dtls_transport;
 
+  /* datachannel */
+  void (*onmessasge)(char *msg, size_t len, void *userdata);
+  void (*onopen)(void *userdata);
+  void (*onclose)(void *userdata);
+
+  void *userdata;
+
 } Sctp;
 
-static int sctp_data_ready_cb(void *reg_addr, void *data, size_t len, uint8_t tos, uint8_t set_df) {
+static int sctp_outgoing_data_cb(void *userdata, void *buf, size_t len, uint8_t tos, uint8_t set_df) {
 
-  Sctp *sctp = (Sctp*)reg_addr;
+  Sctp *sctp = (Sctp*)userdata;
 
-  dtls_transport_sctp_to_dtls(sctp->dtls_transport, data, len);
+  dtls_transport_sctp_to_dtls(sctp->dtls_transport, buf, len);
 
   return 0;
 }
@@ -35,10 +42,24 @@ void sctp_incoming_data(Sctp *sctp, char *buf, int len) {
 }
 
 
-static int sctp_incoming_data_cb(struct socket *sock, union sctp_sockstore addr, void *data, size_t len, struct sctp_rcvinfo recv_info, int flags, void *sctp) {
+static int sctp_incoming_data_cb(struct socket *sock, union sctp_sockstore addr,
+ void *data, size_t len, struct sctp_rcvinfo recv_info, int flags, void *userdata) {
 
-  char *info = (char*)data;
-  LOG_INFO("info (%ld) = %s", len, info);
+  char *msg = (char*)calloc(1, len + 1);
+
+  Sctp *sctp = (Sctp*)userdata;
+
+  if(!msg)
+    return -1;
+
+  strncpy(msg, data, len);
+  LOG_DEBUG("Got message %s (size = %ld)", msg, len);
+
+  if(sctp->onmessasge) {
+    sctp->onmessasge(msg, len, sctp->userdata);
+  }
+
+  free(msg);
 }
 
 void* sctp_connection_thread(void *data) {
@@ -52,6 +73,11 @@ void* sctp_connection_thread(void *data) {
   rconn.sconn_port = htons(sctp->remote_port);
   rconn.sconn_addr = (void*)sctp;
   ret = usrsctp_connect(sctp->sock, (struct sockaddr *)&rconn, sizeof(struct sockaddr_conn));
+  sctp->connected = 1;
+
+  if(sctp->onopen) {
+    sctp->onopen(sctp->userdata);
+  }
 
   pthread_exit(NULL);
 }
@@ -59,7 +85,6 @@ void* sctp_connection_thread(void *data) {
 
 Sctp* sctp_create(DtlsTransport *dtls_transport) {
 
-  int ret = -1;
   Sctp *sctp = (Sctp*)calloc(1, sizeof(Sctp));
 
   if(sctp == NULL)
@@ -68,10 +93,15 @@ Sctp* sctp_create(DtlsTransport *dtls_transport) {
   sctp->dtls_transport = dtls_transport;
   sctp->local_port = 5000;
   sctp->remote_port = 5000;
- 
-  usrsctp_init(0, sctp_data_ready_cb, NULL);
-  usrsctp_sysctl_set_sctp_ecn_enable(0);
 
+  return sctp;
+}
+
+int sctp_do_connect(Sctp *sctp) {
+
+  int ret = -1;
+  usrsctp_init(0, sctp_outgoing_data_cb, NULL);
+  usrsctp_sysctl_set_sctp_ecn_enable(0);
   usrsctp_register_address(sctp);
 
   struct socket *sock = usrsctp_socket(AF_CONN, SOCK_STREAM, IPPROTO_SCTP,
@@ -79,7 +109,7 @@ Sctp* sctp_create(DtlsTransport *dtls_transport) {
 
   if(!sock) {
     LOG_ERROR("usrsctp_socket failed");
-    return NULL;
+    return -1;
   }
 #if 0
   if(usrsctp_set_non_blocking(sock, 1) < 0) {
@@ -119,14 +149,19 @@ Sctp* sctp_create(DtlsTransport *dtls_transport) {
   sconn.sconn_port = htons(sctp->local_port);
   sconn.sconn_addr = (void *)sctp;
   ret = usrsctp_bind(sock, (struct sockaddr *)&sconn, sizeof(sconn));
-  LOG_INFO("%d\n", ret);
 
   sctp->sock = sock;
 
   pthread_t t;
   pthread_create(&t, NULL, sctp_connection_thread, sctp);
   pthread_detach(t);
-  return sctp;
+
+  return 0;
+}
+
+int sctp_is_connected(Sctp *sctp) {
+
+  return sctp->connected;
 }
 
 void sctp_destroy(Sctp *sctp) {
@@ -142,5 +177,20 @@ void sctp_destroy(Sctp *sctp) {
     free(sctp);
     sctp = NULL;
   }
+}
+
+void sctp_onmessage(Sctp *sctp, void (*onmessasge)(char *msg, size_t len, void *userdata)) {
+
+  sctp->onmessasge = onmessasge;
+}
+
+void sctp_onopen(Sctp *sctp, void (*onopen)(void *userdata)) {
+
+  sctp->onopen = onopen;
+}
+
+void sctp_onclose(Sctp *sctp, void (*onclose)(void *userdata)) {
+
+  sctp->onclose = onclose;
 }
 

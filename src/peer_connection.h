@@ -33,7 +33,7 @@ typedef struct PeerConnection PeerConnection;
  * @brief Create a struct PeerConnection and initialize it.
  * @return Pointer of PeerConnection.
  */
-PeerConnection* peer_connection_create();
+PeerConnection* peer_connection_create(void *userdata);
 
 /**
  * @brief Destory a struct PeerConnection.
@@ -136,9 +136,20 @@ void peer_connection_on_receiver_packet_loss(PeerConnection *pc, void (*cb), voi
  */
 void peer_connection_on_connected(PeerConnection *pc, void (*on_connected), void *data);
 
+/**
+ * @brief register callback function to handle event of datachannel
+ * @param[in] peer connection
+ * @param[in] callback function when message received
+ * @param[in] callback function when connection is opened
+ * @param[in] callback function when connection is closed
+ */
+void peer_connection_ondatachannel(PeerConnection *pc,
+ void (*onmessasge)(char *msg, size_t len, void *userdata),
+ void (*onopen)(void *userdata),
+ void (*onclose)(void *userdata));
+
 // To confirm:
 int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);
-
 
 
 #ifdef __cplusplus

@@ -49,6 +49,10 @@ struct PeerConnection {
   void *on_connected_userdata;
   void *on_receiver_packet_loss_userdata;
 
+  void *userdata;
+
+  GMutex mutex;
+  
 };
 
 
@@ -212,7 +216,6 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
   PeerConnection *pc = (PeerConnection*)data;
   int ret;
   char decrypted_data[3000];
-
   if(rtcp_packet_validate(buf, len)) {
 
     dtls_transport_decrypt_rtcp_packet(pc->dtls_transport, buf, &len);
@@ -232,10 +235,9 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
 
       ret = dtls_transport_decrypt_data(pc->dtls_transport, buf, len, decrypted_data, sizeof(decrypted_data));
 
-      if(!pc->sctp)
-        pc->sctp = sctp_create(pc->dtls_transport);
-
-      if(pc->sctp)
+      if(!sctp_is_connected(pc->sctp))
+        sctp_do_connect(pc->sctp);
+      else
         sctp_incoming_data(pc->sctp, decrypted_data, ret);
     }
 
@@ -296,7 +298,7 @@ gboolean peer_connection_nice_agent_setup(PeerConnection *pc) {
   return TRUE;
 }
 
-PeerConnection* peer_connection_create(void) {
+PeerConnection* peer_connection_create(void *userdata) {
 
   PeerConnection *pc = NULL;
   pc = (PeerConnection*)calloc(1, sizeof(PeerConnection));
@@ -324,6 +326,8 @@ PeerConnection* peer_connection_create(void) {
   }
 
   pc->dtls_transport = dtls_transport_create(nice_agent_bio_new(pc->nice_agent, pc->stream_id, pc->component_id));
+
+  pc->sctp = sctp_create(pc->dtls_transport);
 
   pc->sdp = session_description_create();
 
@@ -520,4 +524,20 @@ int peer_connection_get_rtpmap(PeerConnection *pc, MediaCodec codec) {
   }
 
    return -1;
+}
+
+
+void peer_connection_ondatachannel(PeerConnection *pc,
+ void (*onmessasge)(char *msg, size_t len, void *userdata),
+ void (*onopen)(void *userdata),
+ void (*onclose)(void *userdata)) {
+
+  if(pc) {
+
+    g_mutex_lock(&pc->mutex);
+    sctp_onopen(pc->sctp, onopen);
+    sctp_onclose(pc->sctp, onclose);
+    sctp_onmessage(pc->sctp, onmessasge);
+    g_mutex_unlock(&pc->mutex);
+  }
 }

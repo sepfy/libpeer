@@ -9,13 +9,20 @@
 #define ERROR_TAG "ERROR"
 #define WARN_TAG "WARN"
 #define INFO_TAG "INFO"
+#define DEBUG_TAG "DEBUG"
 
 #ifndef LOG_LEVEL
-#define LOG_LEVEL LEVEL_INFO
+#define LOG_LEVEL LEVEL_DEBUG
 #endif
 
 #define LOG_PRINT(level_tag, fmt, arg...) \
   fprintf(stdout, "[%s %s:%d] " fmt"\n", level_tag, __FILE__, __LINE__, ##arg)
+
+#if LOG_LEVEL >= LEVEL_DEBUG
+#define LOG_DEBUG(fmt, arg...) LOG_PRINT(INFO_TAG, fmt, ##arg)
+#else
+#define LOG_DEBUG(fmt, arg...)
+#endif
 
 #if LOG_LEVEL >= LEVEL_INFO
 #define LOG_INFO(fmt, arg...) LOG_PRINT(INFO_TAG, fmt, ##arg)

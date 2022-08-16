@@ -146,7 +146,7 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
     if(g_home_camera.pc)
       peer_connection_destroy(g_home_camera.pc);
 
-    g_home_camera.pc = peer_connection_create();
+    g_home_camera.pc = peer_connection_create(NULL);
 
     MediaStream *media_stream = media_stream_new();
     media_stream_add_track(media_stream, CODEC_H264);

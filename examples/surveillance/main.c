@@ -68,7 +68,7 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
 
     peer_connection_destroy(g_surveillance.pc);
 
-    g_surveillance.pc = peer_connection_create();
+    g_surveillance.pc = peer_connection_create(NULL);
 
     MediaStream *media_stream = media_stream_new();
     media_stream_add_track(media_stream, CODEC_H264);

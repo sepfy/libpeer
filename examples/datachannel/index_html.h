@@ -1,5 +1,5 @@
-#ifndef SURVEILLANCE_INDEX_HTML_H_
-#define SURVEILLANCE_INDEX_HTML_H_
+#ifndef DATACHANNEL_INDEX_HTML_H_
+#define DATACHANNEL_INDEX_HTML_H_
  
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,17 +8,18 @@ const char index_html[] = " \
 <!DOCTYPE html> \n \
 <html> \n \
   <head> \n \
-    <title>Surveillance</title> \n \
+    <title>Datachannel</title> \n \
   </head> \n \
   <body> \n \
-    <video width='100%' id='remoteCamera'></video> \n \
+    <label for='msg'>Message:</label><br> \n \
+    <input type='text' id='msg' name='msg'><br><br> \n \
+    <input type='submit' value='Send' onclick='sendMessage()'> \n \
     <script> \n \
       var pc = new RTCPeerConnection({ \n \
         iceServers: [{urls: 'stun:stun.l.google.com:19302'}] \n \
       }); \n \
       var log = msg => { console.log(msg); }; \n \
       function sendOfferToCall(sdp) { \n \
-console.log(sdp)\n \
         var xhttp = new XMLHttpRequest(); \n \
         xhttp.onreadystatechange = function() { \n \
           if (this.readyState == 4 && this.status == 200) { \n \
@@ -46,9 +47,9 @@ console.log(sdp)\n \
       }; \n \
       pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log); \n \
       setTimeout(function() { sendOfferToCall(pc.localDescription.sdp); }, 1000); \n \
-      setInterval(function() { console.log('send hello world'); sendChannel.send('hello world'); }, 3000); \n \
+      function sendMessage() { sendChannel.send(document.getElementById('msg').value); } \n \
     </script> \n \
   </body> \n \
 </html>";
 
-#endif // SURVEILLANCE_INDEX_HTML_H_
+#endif // DATACHANNEL_INDEX_HTML_H_
