@@ -160,10 +160,10 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
     peer_connection_ontrack(g_home_camera.pc, on_track, NULL);
     peer_connection_oniceconnectionstatechange(g_home_camera.pc, &on_iceconnectionstatechange, NULL);
     peer_connection_on_connected(g_home_camera.pc, &on_connected, NULL);
+    peer_connection_set_remote_description(g_home_camera.pc, msg);
     peer_connection_create_answer(g_home_camera.pc);
 
     g_cond_wait(&g_home_camera.cond, &g_home_camera.mutex);
-    peer_connection_set_remote_description(g_home_camera.pc, msg);
     g_mutex_unlock(&g_home_camera.mutex);
   }
 }

@@ -11,7 +11,17 @@
 #include "rtp_packet.h"
 #include "media_stream.h"
 
-#define SDP_MAX_SIZE 10240
+#define MEDIA_DESCRIPTION_MAX_NUM 10
+#define SDP_MAX_SIZE 20480
+
+typedef enum MediaDescription {
+
+  MEDIA_NONE,
+  MEDIA_VIDEO,
+  MEDIA_AUDIO,
+  MEDIA_DATACHANNEL,
+
+} MediaDescription;
 
 typedef struct SessionDescription SessionDescription;
 
@@ -19,7 +29,7 @@ typedef struct SessionDescription SessionDescription;
  * @brief Create a new SessionDescription.
  * @return Pointer of struct SessionDescription.
  */
-SessionDescription* session_description_create(void);
+SessionDescription* session_description_create(char *sdp_text);
 
 /**
  * @brief Destroy a SessionDescription.
@@ -77,5 +87,9 @@ uint32_t session_description_find_ssrc(const char *type, const char *sdp);
  * @param The content of session description protocol.
  */
 RtpMap session_description_parse_rtpmap(const char *sdp);
+
+void session_description_set_mdns_enabled(SessionDescription *sdp, int enabled);
+
+MediaDescription* session_description_get_media_descriptions(SessionDescription *sdp, int *num);
 
 #endif // SESSION_DESCRIPTION_H_

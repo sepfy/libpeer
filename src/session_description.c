@@ -11,18 +11,59 @@
 struct SessionDescription {
 
   size_t size;
-  char content[SDP_MAX_SIZE];
 
+  int mdns_enabled:1;
+
+  MediaDescription media_descriptions[MEDIA_DESCRIPTION_MAX_NUM];
+
+  int media_description_num;
+
+  char content[SDP_MAX_SIZE];
 };
 
-SessionDescription* session_description_create(void) {
+SessionDescription* session_description_create(char *sdp_text) {
+
+  char **splits;
+  int i;
 
   SessionDescription *sdp = NULL;
-  sdp = (SessionDescription*)malloc(sizeof(SessionDescription));
-  if(!sdp)
+  sdp = (SessionDescription*)calloc(1, sizeof(SessionDescription));
+  if(!sdp || !sdp_text)
     return sdp;
 
-  memset(sdp->content, 0, sizeof(sdp->content));
+  splits = g_strsplit(sdp_text, "\r\n", 512);
+  for(i = 0; splits[i] != NULL; i++) {
+
+    if(strstr(splits[i], "m=audio")) {
+
+      LOG_DEBUG("Find audio media description (mid = %d)", sdp->media_description_num);
+      sdp->media_descriptions[sdp->media_description_num++] = MEDIA_AUDIO;
+    }
+    else if(strstr(splits[i], "m=video")) {
+
+      LOG_DEBUG("Find video media description (mid = %d)", sdp->media_description_num);
+      sdp->media_descriptions[sdp->media_description_num++] = MEDIA_VIDEO;
+    }
+    else if(strstr(splits[i], "m=application")) {
+
+      LOG_DEBUG("Find datachannel media description (mid = %d)", sdp->media_description_num);
+      sdp->media_descriptions[sdp->media_description_num++] = MEDIA_DATACHANNEL;
+    }
+
+    if(strstr(splits[i], "candidate") != NULL && strstr(splits[i], "local") != NULL) {
+
+      if(sdp->mdns_enabled) {
+        char buf[256] = {0};
+        if(session_description_update_mdns_of_candidate(splits[i], buf, sizeof(buf)) != -1) {
+          session_description_append_newline(sdp, buf);
+        }
+      }
+    }
+    else {
+      session_description_append_newline(sdp, splits[i]);
+    }
+  }
+
   return sdp;
 }
 
@@ -32,6 +73,11 @@ void session_description_destroy(SessionDescription *sdp) {
     free(sdp);
     sdp = NULL;
   }
+}
+
+void session_description_set_mdns_enabled(SessionDescription *sdp, int enabled) {
+
+  sdp->mdns_enabled = enabled;
 }
 
 int session_description_update_mdns_of_candidate(char *candidate_src, char *candidate_dst, size_t size) {
@@ -59,7 +105,7 @@ int session_description_update_mdns_of_candidate(char *candidate_src, char *cand
 int session_description_append_newline(SessionDescription *sdp, const char *format, ...) {
 
   va_list argptr;
-  char attribute[128] = {0};
+  char attribute[256] = {0};
 
   if(strstr(format, "=") == NULL)
     return -1;
@@ -218,4 +264,10 @@ RtpMap session_description_parse_rtpmap(const char *sdp) {
   }
 
   return rtp_map;
+}
+
+MediaDescription* session_description_get_media_descriptions(SessionDescription *sdp, int *num) {
+
+  *num = sdp->media_description_num;
+  return sdp->media_descriptions;
 }

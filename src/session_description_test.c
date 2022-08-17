@@ -6,7 +6,7 @@ extern "C" {
 
 TEST(SessionDescription, session_description_create) {
 
-  SessionDescription *sdp = session_description_create();
+  SessionDescription *sdp = session_description_create(NULL);
   if(sdp)
     session_description_destroy(sdp);
 }
@@ -14,7 +14,7 @@ TEST(SessionDescription, session_description_create) {
 TEST(session_description, session_description_append) {
 
   char test_sdp[] = "a=12345\\r\\nm=12345\\r\\n";
-  SessionDescription *sdp = session_description_create();
+  SessionDescription *sdp = session_description_create(NULL);
   session_description_append(sdp, (char*)"a=12345");
   session_description_append(sdp, (char*)"m=12345");
 

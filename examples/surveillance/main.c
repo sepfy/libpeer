@@ -79,10 +79,10 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
     peer_connection_oniceconnectionstatechange(g_surveillance.pc, &on_iceconnectionstatechange, NULL);
     peer_connection_on_connected(g_surveillance.pc, on_connected, NULL);
     peer_connection_on_receiver_packet_loss(g_surveillance.pc, on_receiver_packet_loss, NULL);
+    peer_connection_set_remote_description(g_surveillance.pc, msg);
     peer_connection_create_answer(g_surveillance.pc);
 
     g_cond_wait(&g_surveillance.cond, &g_surveillance.mutex);
-    peer_connection_set_remote_description(g_surveillance.pc, msg);
     g_mutex_unlock(&g_surveillance.mutex);
   }
 }
