@@ -495,7 +495,7 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *sdp_text) 
 
   pc->remote_sdp = session_description_create(sdp_text);
 
-  pc->rtp_map = session_description_parse_rtpmap(sdp_text);
+  pc->rtp_map = session_description_get_rtpmap(pc->remote_sdp);
 
   sdp_text = session_description_get_content(pc->remote_sdp);
 

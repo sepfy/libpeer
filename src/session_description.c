@@ -16,10 +16,48 @@ struct SessionDescription {
 
   MediaDescription media_descriptions[MEDIA_DESCRIPTION_MAX_NUM];
 
+  RtpMap rtp_map;
+
   int media_description_num;
 
   char content[SDP_MAX_SIZE];
 };
+
+static void session_description_parse_rtpmap(SessionDescription *sdp, const char *attribute_text) {
+
+  //a=rtpmap:111 opus/48000/2
+  //a=rtpmap:8 PCMA/8000
+  //a=rtpmap:108 H264/90000
+  int pt = 0;
+  char codec[16];
+  char *pt_start, *codec_start, *codec_end;
+
+  pt_start = strstr(attribute_text, ":");
+  codec_start = strstr(attribute_text, " ") + 1;
+  codec_end = strstr(attribute_text, "/");
+
+  if(!pt_start && !codec_start && !codec_end)
+    return;
+
+  pt = atoi(pt_start + 1);
+
+  memset(codec, 0, sizeof(codec));
+  strncpy(codec, codec_start, codec_end - codec_start);
+
+  if(strcmp(codec, "H264") == 0) {
+    // limit payload type larger than 96 for H264
+    if(pt < 96)
+      return;
+    sdp->rtp_map.pt_h264 = pt;
+  }
+  else if(strcmp(codec, "PCMA") == 0) {
+    sdp->rtp_map.pt_pcma = pt;
+  }
+  else if(strcmp(codec, "opus") == 0) {
+    sdp->rtp_map.pt_opus = pt;
+  }
+
+}
 
 SessionDescription* session_description_create(char *sdp_text) {
 
@@ -48,6 +86,10 @@ SessionDescription* session_description_create(char *sdp_text) {
 
       LOG_DEBUG("Find datachannel media description (mid = %d)", sdp->media_description_num);
       sdp->media_descriptions[sdp->media_description_num++] = MEDIA_DATACHANNEL;
+    }
+
+    if(strstr(splits[i], "rtpmap") != NULL) {
+      session_description_parse_rtpmap(sdp, splits[i]);
     }
 
     if(strstr(splits[i], "candidate") != NULL && strstr(splits[i], "local") != NULL) {
@@ -218,56 +260,13 @@ uint32_t session_description_find_ssrc(const char *type, const char *sdp) {
   return ssrc;
 }
 
-RtpMap session_description_parse_rtpmap(const char *sdp) {
-
-  //a=rtpmap:111 opus/48000/2
-  //a=rtpmap:8 PCMA/8000
-  //a=rtpmap:108 H264/90000
-  RtpMap rtp_map;
-  int pt = 0;
-  int i;
-
-  char codec[16];
-
-  char *pt_start, *codec_start, *codec_end;
-
-  gchar **splits;
-  splits = g_strsplit(sdp, "\r\n", 256);
-  for(i = 0; splits[i] != NULL; i++) {
-    if(strstr(splits[i], "rtpmap") == NULL)
-      continue;
-
-    pt_start = strstr(splits[i], ":");
-    codec_start = strstr(splits[i], " ") + 1;
-    codec_end = strstr(splits[i], "/");
-
-    if(!pt_start && !codec_start && !codec_end)
-      continue;
-
-    pt = atoi(pt_start + 1);
-
-    memset(codec, 0, sizeof(codec));
-    strncpy(codec, codec_start, codec_end - codec_start);
-
-    if(strcmp(codec, "H264") == 0) {
-      // limit payload type larger than 96 for H264
-      if(pt < 96)
-        continue;
-      rtp_map.pt_h264 = pt;
-    }
-    else if(strcmp(codec, "PCMA") == 0) {
-      rtp_map.pt_pcma = pt;
-    }
-    else if(strcmp(codec, "opus") == 0) {
-      rtp_map.pt_opus = pt;
-    }
-  }
-
-  return rtp_map;
-}
-
 MediaDescription* session_description_get_media_descriptions(SessionDescription *sdp, int *num) {
 
   *num = sdp->media_description_num;
   return sdp->media_descriptions;
+}
+
+RtpMap session_description_get_rtpmap(SessionDescription *sdp) {
+
+  return sdp->rtp_map;
 }

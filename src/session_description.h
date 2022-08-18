@@ -82,11 +82,7 @@ void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
  */
 uint32_t session_description_find_ssrc(const char *type, const char *sdp);
 
-/**
- * @brief Parse RTP map of SDP.
- * @param The content of session description protocol.
- */
-RtpMap session_description_parse_rtpmap(const char *sdp);
+RtpMap session_description_get_rtpmap(SessionDescription *sdp);
 
 void session_description_set_mdns_enabled(SessionDescription *sdp, int enabled);
 
