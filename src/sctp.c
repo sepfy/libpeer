@@ -73,7 +73,6 @@ void* sctp_connection_thread(void *data) {
   rconn.sconn_port = htons(sctp->remote_port);
   rconn.sconn_addr = (void*)sctp;
   ret = usrsctp_connect(sctp->sock, (struct sockaddr *)&rconn, sizeof(struct sockaddr_conn));
-  sctp->connected = 1;
 
   if(sctp->onopen) {
     sctp->onopen(sctp->userdata);
@@ -152,6 +151,7 @@ int sctp_do_connect(Sctp *sctp) {
 
   sctp->sock = sock;
 
+  sctp->connected = 1;
   pthread_t t;
   pthread_create(&t, NULL, sctp_connection_thread, sctp);
   pthread_detach(t);

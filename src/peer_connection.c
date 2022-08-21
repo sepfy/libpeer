@@ -380,7 +380,7 @@ gboolean peer_connection_nice_agent_setup(PeerConnection *pc) {
   nice_agent_attach_recv(pc->nice_agent, pc->stream_id, pc->component_id,
    g_main_loop_get_context(pc->gloop), peer_connection_ice_recv_cb, pc);
 
-  pc->gthread = g_thread_new("ice gather thread", &peer_connection_gather_thread, pc);
+  pc->gthread = g_thread_new("ice gather thread", peer_connection_gather_thread, pc);
 
   return TRUE;
 }
