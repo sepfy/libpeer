@@ -12,34 +12,34 @@
 #define DEBUG_TAG "DEBUG"
 
 #ifndef LOG_LEVEL
-#define LOG_LEVEL LEVEL_DEBUG
+#define LOG_LEVEL LEVEL_INFO
 #endif
 
-#define LOG_PRINT(level_tag, fmt, arg...) \
-  fprintf(stdout, "[%s %s:%d] " fmt"\n", level_tag, __FILE__, __LINE__, ##arg)
+#define LOG_PRINT(level_tag, fmt, ...) \
+  fprintf(stdout, "[%s %s:%d] " fmt"\n", level_tag, __FILE__, __LINE__, ##__VA_ARGS__)
 
 #if LOG_LEVEL >= LEVEL_DEBUG
-#define LOG_DEBUG(fmt, arg...) LOG_PRINT(INFO_TAG, fmt, ##arg)
+#define LOG_DEBUG(fmt, ...) LOG_PRINT(INFO_TAG, fmt, ##__VA_ARGS__)
 #else
-#define LOG_DEBUG(fmt, arg...)
+#define LOG_DEBUG(fmt, ...)
 #endif
 
 #if LOG_LEVEL >= LEVEL_INFO
-#define LOG_INFO(fmt, arg...) LOG_PRINT(INFO_TAG, fmt, ##arg)
+#define LOG_INFO(fmt, ...) LOG_PRINT(INFO_TAG, fmt, ##__VA_ARGS__)
 #else
-#define LOG_INFO(fmt, arg...)
+#define LOG_INFO(fmt, ...)
 #endif
 
 #if LOG_LEVEL >= LEVEL_WARN
-#define LOG_WARN(fmt, arg...) LOG_PRINT(WARN_TAG, fmt, ##arg)
+#define LOG_WARN(fmt, ...) LOG_PRINT(WARN_TAG, fmt, ##__VA_ARGS__)
 #else
-#define LOG_WARN(fmt, arg...)
+#define LOG_WARN(fmt, ...)
 #endif
 
 #if LOG_LEVEL >= LEVEL_ERROR
-#define LOG_ERROR(fmt, arg...) LOG_PRINT(ERROR_TAG, fmt, ##arg)
+#define LOG_ERROR(fmt, ...) LOG_PRINT(ERROR_TAG, fmt, ##__VA_ARGS__)
 #else
-#define LOG_ERROR(fmt, arg...)
+#define LOG_ERROR(fmt, ...)
 #endif
 
 int utils_get_ipv4addr(char *hostname, char *ipv4addr, size_t size);

@@ -47,8 +47,8 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
 
     g_datachannel.pc = peer_connection_create(NULL);
 
-    peer_connection_onicecandidate(g_datachannel.pc, on_icecandidate, NULL);
-    peer_connection_oniceconnectionstatechange(g_datachannel.pc, &on_iceconnectionstatechange, NULL);
+    peer_connection_onicecandidate(g_datachannel.pc, on_icecandidate);
+    peer_connection_oniceconnectionstatechange(g_datachannel.pc, on_iceconnectionstatechange);
     peer_connection_ondatachannel(g_datachannel.pc, on_message, NULL, NULL);
 
     peer_connection_set_remote_description(g_datachannel.pc, msg);

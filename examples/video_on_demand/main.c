@@ -136,9 +136,9 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
 
     peer_connection_add_stream(g_file_send.pc, media_stream);
 
-    peer_connection_onicecandidate(g_file_send.pc, on_icecandidate, NULL);
-    peer_connection_oniceconnectionstatechange(g_file_send.pc, &on_iceconnectionstatechange, NULL);
-    peer_connection_on_connected(g_file_send.pc, on_connected, NULL);
+    peer_connection_onicecandidate(g_file_send.pc, on_icecandidate);
+    peer_connection_oniceconnectionstatechange(g_file_send.pc, on_iceconnectionstatechange);
+    peer_connection_on_connected(g_file_send.pc, on_connected);
     peer_connection_create_answer(g_file_send.pc);
 
     g_cond_wait(&g_file_send.cond, &g_file_send.mutex);

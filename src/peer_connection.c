@@ -56,12 +56,6 @@ struct PeerConnection {
   void (*on_connected)(void *userdata);
   void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *userdata);
 
-  void *onicecandidate_userdata;
-  void *oniceconnectionstatechange_userdata;
-  void *ontrack_userdata;
-  void *on_connected_userdata;
-  void *on_receiver_packet_loss_userdata;
-
   void *userdata;
 
   GMutex mutex;
@@ -94,7 +88,7 @@ static void* peer_connection_component_state_chanaged_cb(NiceAgent *agent,
   //LOG_INFO("SIGNAL: state changed %d %d %s[%d]",
   // stream_id, component_id, STATE_NAME[state], state);
   if(pc->oniceconnectionstatechange != NULL) {
-    pc->oniceconnectionstatechange(state, pc->oniceconnectionstatechange_userdata);
+    pc->oniceconnectionstatechange(state, pc->userdata);
   }
 
 }
@@ -259,7 +253,7 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
   if(pc->onicecandidate != NULL) {
 
     char *sdp_content = session_description_get_content(pc->local_sdp);
-    pc->onicecandidate(sdp_content, pc->onicecandidate_userdata);
+    pc->onicecandidate(sdp_content, pc->userdata);
   }
 
 }
@@ -288,7 +282,7 @@ void peer_connection_incomming_rtcp(PeerConnection *pc, uint8_t *buf, size_t len
         uint32_t fraction = ntohl(rtcp_rr.report_block[0].flcnpl) >> 24;
         uint32_t total = ntohl(rtcp_rr.report_block[0].flcnpl) & 0x00FFFFFF;
         if(pc->on_receiver_packet_loss && fraction > 0) {
-          pc->on_receiver_packet_loss((float)fraction/256.0, total, pc->on_receiver_packet_loss_userdata);
+          pc->on_receiver_packet_loss((float)fraction/256.0, total, pc->userdata);
         }
       }
       break;
@@ -315,7 +309,7 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
       dtls_transport_incomming_msg(pc->dtls_transport, buf, len);
 
       if(dtls_transport_get_srtp_initialized(pc->dtls_transport) && pc->on_connected) {
-        pc->on_connected(pc->on_connected_userdata);
+        pc->on_connected(pc->userdata);
       }
     }
     else {
@@ -334,7 +328,7 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
     dtls_transport_decrypt_rtp_packet(pc->dtls_transport, buf, &len);
 
     if(pc->ontrack != NULL) {
-      pc->ontrack(buf, len, pc->ontrack_userdata);
+      pc->ontrack(buf, len, pc->userdata);
     }
 
   }
@@ -398,12 +392,6 @@ PeerConnection* peer_connection_create(void *userdata) {
 
   pc->audio_ssrc = 0;
   pc->video_ssrc = 0;
-
-  pc->onicecandidate = NULL;
-  pc->onicecandidate_userdata = NULL;
-
-  pc->oniceconnectionstatechange = NULL;
-  pc->oniceconnectionstatechange_userdata = NULL;
 
   pc->transceiver.video = SENDONLY;
   pc->transceiver.audio = SENDONLY;
@@ -537,37 +525,32 @@ int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int byt
 
 }
 
-void peer_connection_on_connected(PeerConnection *pc, void (*on_connected), void *userdata) {
+void peer_connection_on_connected(PeerConnection *pc, void (*on_connected)(void *userdata)) {
 
   pc->on_connected = on_connected;
-  pc->on_connected_userdata = userdata;
 }
 
-void peer_connection_on_receiver_packet_loss(PeerConnection *pc, void (*on_receiver_packet_loss), void *userdata) {
+void peer_connection_on_receiver_packet_loss(PeerConnection *pc,
+ void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *userdata)) {
 
   pc->on_receiver_packet_loss = on_receiver_packet_loss;
-  pc->on_receiver_packet_loss_userdata = userdata;
 }
 
-void peer_connection_onicecandidate(PeerConnection *pc, void (*onicecandidate), void  *userdata) {
+void peer_connection_onicecandidate(PeerConnection *pc, void (*onicecandidate)(char *sdp_text, void *userdata)) {
 
   pc->onicecandidate = onicecandidate;
-  pc->onicecandidate_userdata = userdata;
-
 }
 
 void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
-  void (*oniceconnectionstatechange), void *userdata) {
+ void (*oniceconnectionstatechange)(IceConnectionState state, void *userdata)) {
 
   pc->oniceconnectionstatechange = oniceconnectionstatechange;
-  pc->oniceconnectionstatechange_userdata = userdata;
 
 }
 
-void peer_connection_ontrack(PeerConnection *pc, void (*ontrack), void *userdata) {
+void peer_connection_ontrack(PeerConnection *pc, void (*ontrack)(uint8_t *packet, size_t byte, void *userdata)) {
 
   pc->ontrack = ontrack;
-  pc->ontrack_userdata = userdata;
 
 }
 

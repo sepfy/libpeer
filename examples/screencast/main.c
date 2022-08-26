@@ -87,10 +87,10 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
     Transceiver transceiver = {.video = RECVONLY};
     peer_connection_add_transceiver(g_screencast.pc, transceiver);
 
-    peer_connection_ontrack(g_screencast.pc, on_track, NULL);
-    peer_connection_onicecandidate(g_screencast.pc, on_icecandidate, NULL);
-    peer_connection_oniceconnectionstatechange(g_screencast.pc, &on_iceconnectionstatechange, NULL);
-    peer_connection_on_connected(g_screencast.pc, &on_connected, NULL);
+    peer_connection_ontrack(g_screencast.pc, on_track);
+    peer_connection_onicecandidate(g_screencast.pc, on_icecandidate);
+    peer_connection_oniceconnectionstatechange(g_screencast.pc, on_iceconnectionstatechange);
+    peer_connection_on_connected(g_screencast.pc, on_connected);
     peer_connection_create_answer(g_screencast.pc);
 
     g_cond_wait(&g_screencast.cond, &g_screencast.mutex);

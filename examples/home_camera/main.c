@@ -156,10 +156,10 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
     Transceiver transceiver = {.video = SENDRECV, .audio = SENDRECV};
     peer_connection_add_transceiver(g_home_camera.pc, transceiver);
 
-    peer_connection_onicecandidate(g_home_camera.pc, on_icecandidate, NULL);
-    peer_connection_ontrack(g_home_camera.pc, on_track, NULL);
-    peer_connection_oniceconnectionstatechange(g_home_camera.pc, &on_iceconnectionstatechange, NULL);
-    peer_connection_on_connected(g_home_camera.pc, &on_connected, NULL);
+    peer_connection_onicecandidate(g_home_camera.pc, on_icecandidate);
+    peer_connection_ontrack(g_home_camera.pc, on_track);
+    peer_connection_oniceconnectionstatechange(g_home_camera.pc, on_iceconnectionstatechange);
+    peer_connection_on_connected(g_home_camera.pc, on_connected);
     peer_connection_set_remote_description(g_home_camera.pc, msg);
     peer_connection_create_answer(g_home_camera.pc);
 

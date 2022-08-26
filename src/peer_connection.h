@@ -58,7 +58,7 @@ void peer_connection_add_stream(PeerConnection *pc, MediaStream *media_stream);
  * @param A callback function to handle onicecandidate event.
  * @param A userdata which is pass to callback function. 
  */
-void peer_connection_onicecandidate(PeerConnection *pc, void (*onicecandidate), void  *userdata);
+void peer_connection_onicecandidate(PeerConnection *pc, void (*onicecandidate)(char *sdp_text, void *userdata));
 
 /**
  * @brief Set the callback function to handle oniceconnectionstatechange event.
@@ -67,7 +67,7 @@ void peer_connection_onicecandidate(PeerConnection *pc, void (*onicecandidate), 
  * @param A userdata which is pass to callback function. 
  */
 void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
- void (*oniceconnectionstatechange), void *userdata);
+ void (*oniceconnectionstatechange)(IceConnectionState state, void *userdata));
 
 /**
  * @brief Set the callback function to handle ontrack event.
@@ -75,7 +75,7 @@ void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
  * @param A callback function to handle ontrack event.
  * @param A userdata which is pass to callback function. 
  */
-void peer_connection_ontrack(PeerConnection *pc, void (*ontrack), void *userdata);
+void peer_connection_ontrack(PeerConnection *pc, void (*ontrack)(uint8_t *packet, size_t bytes, void *userdata));
 
 /**
  * @brief sets the specified session description as the remote peer's current offer or answer.
@@ -124,7 +124,8 @@ void peer_connection_enable_mdns(PeerConnection *pc, int b_enabled);
  * @param[in] callback function void (*cb)(float fraction_loss, uint32_t total_loss, void *userdata)
  * @param[in] userdata for callback function
  */
-void peer_connection_on_receiver_packet_loss(PeerConnection *pc, void (*cb), void *data);
+void peer_connection_on_receiver_packet_loss(PeerConnection *pc,
+ void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *userdata));
 
 /**
  * @brief register callback function to handle event when the connection is established
@@ -132,7 +133,7 @@ void peer_connection_on_receiver_packet_loss(PeerConnection *pc, void (*cb), voi
  * @param[in] callback function void (*cb)(void *userdata)
  * @param[in] userdata for callback function
  */
-void peer_connection_on_connected(PeerConnection *pc, void (*on_connected), void *data);
+void peer_connection_on_connected(PeerConnection *pc, void (*on_connected)(void *userdata));
 
 /**
  * @brief register callback function to handle event of datachannel

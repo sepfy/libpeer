@@ -162,10 +162,10 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
     Transceiver transceiver = {.video = SENDRECV, .audio = SENDRECV};
     peer_connection_add_transceiver(g_meeting.pc, transceiver);
 
-    peer_connection_onicecandidate(g_meeting.pc, on_icecandidate, NULL);
-    peer_connection_ontrack(g_meeting.pc, on_track, NULL);
-    peer_connection_oniceconnectionstatechange(g_meeting.pc, &on_iceconnectionstatechange, NULL);
-    peer_connection_on_connected(g_meeting.pc, &on_connected, NULL);
+    peer_connection_onicecandidate(g_meeting.pc, on_icecandidate);
+    peer_connection_ontrack(g_meeting.pc, on_track);
+    peer_connection_oniceconnectionstatechange(g_meeting.pc, on_iceconnectionstatechange);
+    peer_connection_on_connected(g_meeting.pc, on_connected);
     peer_connection_create_answer(g_meeting.pc);
 
     g_cond_wait(&g_meeting.cond, &g_meeting.mutex);
