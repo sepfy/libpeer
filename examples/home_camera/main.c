@@ -148,14 +148,6 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
 
     g_home_camera.pc = peer_connection_create(NULL);
 
-    MediaStream *media_stream = media_stream_new();
-    media_stream_add_track(media_stream, CODEC_H264);
-    media_stream_add_track(media_stream, CODEC_PCMA);
-    peer_connection_add_stream(g_home_camera.pc, media_stream);
-
-    Transceiver transceiver = {.video = SENDRECV, .audio = SENDRECV};
-    peer_connection_add_transceiver(g_home_camera.pc, transceiver);
-
     peer_connection_onicecandidate(g_home_camera.pc, on_icecandidate);
     peer_connection_ontrack(g_home_camera.pc, on_track);
     peer_connection_oniceconnectionstatechange(g_home_camera.pc, on_iceconnectionstatechange);

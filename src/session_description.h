@@ -63,19 +63,6 @@ int session_description_update_mdns_of_candidate(char *candidate_src, char *cand
 char* session_description_get_content(SessionDescription *sdp);
 
 /**
- * @brief Append media codec format to session description protocol content.
- * @param SessionDescription.
- * @param MediaCodec.
- * @param The direction of media stream.
- * @param ufrag of DTLS.
- * @param password of DTLS.
- * @param fingerprint of DTLS.
- * @param mid.
- */
-void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
- TransceiverDirection direction, const char *ufrag, const char *password, const char *fingerprint, int mid);
-
-/**
  * @brief Find RTP ssrc of audio or video in SDP.
  * @param Type is audio or video.
  * @param The content of session description protocol.

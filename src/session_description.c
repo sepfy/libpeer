@@ -185,64 +185,6 @@ char* session_description_get_content(SessionDescription *sdp) {
   return sdp->content; 
 }
 
-
-void session_description_add_codec(SessionDescription *sdp, MediaCodec codec,
- TransceiverDirection direction, const char *ufrag, const char *password, const char *fingerprint, int mid) {
-#if 0
-  switch(codec) {
-    case CODEC_H264:
-      session_description_append(sdp, "m=video 9 UDP/TLS/RTP/SAVPF 96 102");
-      session_description_append(sdp, "a=rtcp-fb:102 nack");
-      session_description_append(sdp, "a=rtcp-fb:102 nack pli");
-      session_description_append(sdp, "a=fmtp:96 profile-level-id=42e01f;level-asymmetry-allowed=1");
-      session_description_append(sdp, "a=fmtp:102 profile-level-id=42e01f;packetization-mode=1;level-asymmetry-allowed=1");
-      session_description_append(sdp, "a=fmtp:102 x-google-max-bitrate=6000;x-google-min-bitrate=2000;x-google-start-bitrate=4000");
-      session_description_append(sdp, "a=rtpmap:96 H264/90000");
-      session_description_append(sdp, "a=rtpmap:102 H264/90000");
-      session_description_append(sdp, "a=ssrc:1 cname:pear");
-      break;
-    case CODEC_OPUS:
-      session_description_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 111");
-      session_description_append(sdp, "a=rtcp-fb:111 nack");
-      session_description_append(sdp, "a=rtpmap:111 opus/48000/2");
-      session_description_append(sdp, "a=ssrc:2 cname:pear");
-      break;
-    case CODEC_PCMA:
-      session_description_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 8");
-      session_description_append(sdp, "a=rtpmap:8 PCMA/8000");
-      session_description_append(sdp, "a=ssrc:2 cname:pear");
-      break;
-    default:
-      return;
-  }
-  session_description_append(sdp, "c=IN IP4 0.0.0.0");
-  switch(direction) {
-    case SENDRECV:
-      session_description_append(sdp, "a=sendrecv");
-      break;
-    case RECVONLY:
-      session_description_append(sdp, "a=recvonly");
-      break;
-    case SENDONLY:
-      session_description_append(sdp, "a=sendonly");
-      break;
-    default:
-      break;
-  }
-#endif
-  session_description_append(sdp, "m=application 50712 UDP/DTLS/SCTP webrtc-datachannel");
-  session_description_append(sdp, "a=mid:%d", mid);
-  session_description_append(sdp, "a=sctp-port:5000");
-  session_description_append(sdp, "a=max-message-size:262144");
-//  session_description_append(sdp, "a=rtcp-mux");
-  session_description_append(sdp, "a=ice-ufrag:%s", ufrag);
-  session_description_append(sdp, "a=ice-pwd:%s", password);
-  session_description_append(sdp, "a=ice-options:trickle");
-  session_description_append(sdp, "a=fingerprint:sha-256 %s", fingerprint);
-  session_description_append(sdp, "a=setup:passive");
-
-}
-
 uint32_t session_description_find_ssrc(const char *type, const char *sdp) {
 
   char *media_line = strstr(sdp, type);

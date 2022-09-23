@@ -85,13 +85,6 @@ void peer_connection_ontrack(PeerConnection *pc, void (*ontrack)(uint8_t *packet
 void peer_connection_set_remote_description(PeerConnection *pc, char *sdp);
 
 /**
- * @brief Add a new RtpTransceiver to the set of transceivers associated with the PeerConnection.
- * @param PeerConnection.
- * @param RtpTransceiver.
- */
-int peer_connection_add_transceiver(PeerConnection *pc, Transceiver transceiver);
-
-/**
  * @brief PeerConnection creates an answer.
  * @param PeerConnection.
  */

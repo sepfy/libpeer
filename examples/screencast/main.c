@@ -80,21 +80,14 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
 
     g_screencast.pc = peer_connection_create(NULL);
 
-    MediaStream *media_stream = media_stream_new();
-    media_stream_add_track(media_stream, CODEC_H264);
-
-    peer_connection_add_stream(g_screencast.pc, media_stream);
-    Transceiver transceiver = {.video = RECVONLY};
-    peer_connection_add_transceiver(g_screencast.pc, transceiver);
-
     peer_connection_ontrack(g_screencast.pc, on_track);
     peer_connection_onicecandidate(g_screencast.pc, on_icecandidate);
     peer_connection_oniceconnectionstatechange(g_screencast.pc, on_iceconnectionstatechange);
     peer_connection_on_connected(g_screencast.pc, on_connected);
+    peer_connection_set_remote_description(g_screencast.pc, msg);
     peer_connection_create_answer(g_screencast.pc);
 
     g_cond_wait(&g_screencast.cond, &g_screencast.mutex);
-    peer_connection_set_remote_description(g_screencast.pc, msg);
     g_mutex_unlock(&g_screencast.mutex);
   }
 

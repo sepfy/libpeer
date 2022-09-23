@@ -46,7 +46,6 @@ struct PeerConnection {
 
   Sctp *sctp;
   DtlsTransport *dtls_transport;
-  Transceiver transceiver;
   MediaStream *media_stream;
   RtpMap rtp_map;
 
@@ -393,9 +392,6 @@ PeerConnection* peer_connection_create(void *userdata) {
   pc->audio_ssrc = 0;
   pc->video_ssrc = 0;
 
-  pc->transceiver.video = SENDONLY;
-  pc->transceiver.audio = SENDONLY;
-
   if(peer_connection_nice_agent_setup(pc) == FALSE) {
     peer_connection_destroy(pc);
     return NULL;
@@ -432,9 +428,6 @@ void peer_connection_destroy(PeerConnection *pc) {
   if(pc->dtls_transport)
     dtls_transport_destroy(pc->dtls_transport);
 
-  if(pc->media_stream)
-    media_stream_free(pc->media_stream);
-
   if(pc->local_sdp)
     session_description_destroy(pc->local_sdp);
 
@@ -448,7 +441,6 @@ void peer_connection_destroy(PeerConnection *pc) {
 void peer_connection_add_stream(PeerConnection *pc, MediaStream *media_stream) {
 
   pc->media_stream = media_stream;
-
 }
 
 int peer_connection_create_answer(PeerConnection *pc) {
@@ -551,12 +543,6 @@ void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
 void peer_connection_ontrack(PeerConnection *pc, void (*ontrack)(uint8_t *packet, size_t byte, void *userdata)) {
 
   pc->ontrack = ontrack;
-
-}
-
-int peer_connection_add_transceiver(PeerConnection *pc, Transceiver transceiver) {
-  pc->transceiver = transceiver;
-
 }
 
 uint32_t peer_connection_get_ssrc(PeerConnection *pc, const char *type) {

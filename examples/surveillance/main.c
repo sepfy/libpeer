@@ -8,7 +8,7 @@
 #include "peer_connection.h"
 #include "signaling.h"
 
-const char PIPE_LINE[] = "v4l2src ! video/x-raw,width=1920,height=1072,framerate=30/1 ! omxh264enc ! rtph264pay name=rtp config-interval=-1 ssrc=1 ! appsink name=peer-connection-sink";
+const char PIPE_LINE[] = "videotestsrc pattern=ball ! video/x-raw,width=1280,height=720,framerate=30/1 ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! rtph264pay name=rtp config-interval=-1 ssrc=1 ! appsink name=peer-connection-sink";
 
 typedef struct Surveillance {
 
@@ -69,11 +69,6 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
     peer_connection_destroy(g_surveillance.pc);
 
     g_surveillance.pc = peer_connection_create(NULL);
-
-    MediaStream *media_stream = media_stream_new();
-    media_stream_add_track(media_stream, CODEC_H264);
-
-    peer_connection_add_stream(g_surveillance.pc, media_stream);
 
     peer_connection_onicecandidate(g_surveillance.pc, on_icecandidate);
     peer_connection_oniceconnectionstatechange(g_surveillance.pc, on_iceconnectionstatechange);
