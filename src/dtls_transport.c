@@ -6,9 +6,21 @@
 #include "utils.h"
 #include "dtls_transport.h"
 
+#include "mbedtls/ssl_cookie.h"
+#include "mbedtls/x509_crt.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/rsa.h"
+#include "mbedtls/sha256.h"
+#include "mbedtls/ssl.h"
+#include "mbedtls/debug.h"
+#include "mbedtls/timing.h"
+
 #define SRTP_MASTER_KEY_LENGTH  16
 #define SRTP_MASTER_SALT_LENGTH 14
 #define SRTP_MASTER_LENGTH (SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_SALT_LENGTH)
+
+#define MBEDTLS_CHECK(mbedtls_function) if(mbedtls_function != 0) { printf("failed! errno: %d\n", mbedtls_function); }
 
 struct DtlsTransport {
 
@@ -27,6 +39,9 @@ struct DtlsTransport {
   Sctp *sctp;
 
   char fingerprint[160];
+
+  mbedtls_x509_crt x509_crt;
+  mbedtls_ssl_context ssl_mbedtls;
 
   gboolean handshake_done;
   gboolean srtp_init_done;
@@ -48,6 +63,16 @@ int cb_dtls_verify(int preverify_ok, X509_STORE_CTX *ctx) {
 
   return dtls_selfsigned_certs_ok ? 1 : (err == X509_V_OK);
 }
+static void my_debug( void *ctx, int level,
+                      const char *file, int line,
+                      const char *str )
+{
+    ((void) level);
+printf("[[[[%s][[[[%d]]]]\n", __func__, __LINE__);
+    fprintf( (FILE *) ctx, "%s:%04d: %s", file, line, str );
+    fflush(  (FILE *) ctx  );
+}
+
 
 void generate_self_certificate(DtlsTransport *dtls_transport) {
 
@@ -119,6 +144,136 @@ void generate_self_certificate(DtlsTransport *dtls_transport) {
 
 }
 
+void dtls_get_x509_digest_text(mbedtls_x509_crt *crt, char *digest_text, size_t size) {
+
+  unsigned char digest[32];
+  int i;
+
+  mbedtls_sha256_context sha256;
+  mbedtls_sha256_init(&sha256);
+  mbedtls_sha256_starts(&sha256, 0);
+  mbedtls_sha256_update(&sha256, crt->raw.p, crt->raw.len);
+  mbedtls_sha256_finish(&sha256, digest);
+
+  memset(digest_text, 0, size);
+
+  for(i = 0; i < 32; i++) {
+    snprintf(digest_text, 4, "%.2X:", digest[i]);
+    digest_text += 3;
+  }
+
+  *(digest_text - 1) = '\0';
+}
+
+int dtls_mbedtls_ice_recv_timeout( void *ctx,
+                                        unsigned char *buf,
+                                        size_t len,
+                                        uint32_t timeout ){
+printf("recv timeout...\n");
+  LOG_INFO("");
+}
+
+int dtls_mbedtls_ice_send(void *ctx, const unsigned char *buf, size_t len) {
+LOG_INFO("");
+}
+
+int dtls_mbedtls_ice_recv(void *ctx, unsigned char *buf, size_t len) {
+LOG_INFO("");
+}
+
+void dtls_get_x509_selfsign_crt(DtlsTransport *dtls) {
+
+  static const int key_length = 2048;
+  static int exponential = 65537;
+  static const char subject_name[] = "C=UK,O=ARM,CN=mbed TLS CA";
+  static const char serial_text[] = "1";
+  unsigned char output_buf[4096];
+
+  static mbedtls_entropy_context entropy;
+  static mbedtls_ctr_drbg_context ctr_drbg;
+  static mbedtls_mpi serial;
+
+  static mbedtls_ssl_config conf;
+  static mbedtls_pk_context pk;
+  static mbedtls_rsa_context *rsa;
+
+  static mbedtls_x509write_cert crt;
+  static mbedtls_sha256_context sha256;
+
+  //mbedtls_ssl_conf_dbg( &conf, my_debug, stdout );
+  //mbedtls_debug_set_threshold(3);
+  mbedtls_ctr_drbg_init(&ctr_drbg);
+  mbedtls_entropy_init(&entropy);
+  mbedtls_mpi_init(&serial);
+  mbedtls_pk_init(&pk);
+  mbedtls_pk_setup(&pk, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
+  mbedtls_x509write_crt_init(&crt);
+  mbedtls_x509_crt_init(&dtls->x509_crt);
+  mbedtls_ssl_init(&dtls->ssl_mbedtls);
+
+  mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
+
+  rsa = mbedtls_pk_rsa(pk);
+
+  mbedtls_rsa_gen_key(rsa, mbedtls_ctr_drbg_random, &ctr_drbg, key_length, exponential);
+
+  mbedtls_x509write_crt_set_subject_key(&crt, &pk);
+  mbedtls_x509write_crt_set_issuer_key(&crt, &pk);
+
+  mbedtls_x509write_crt_set_subject_name(&crt, subject_name);
+  mbedtls_x509write_crt_set_issuer_name(&crt, subject_name);
+
+  mbedtls_x509write_crt_set_version(&crt, MBEDTLS_X509_CRT_VERSION_3);
+  mbedtls_x509write_crt_set_md_alg(&crt, MBEDTLS_MD_SHA256);
+
+  mbedtls_mpi_read_string(&serial, 10, serial_text);
+  mbedtls_x509write_crt_set_serial(&crt, &serial);
+  mbedtls_x509write_crt_set_validity(&crt, "20131231235959", "20301231235959");
+  mbedtls_x509write_crt_set_subject_key_identifier(&crt);
+  mbedtls_x509write_crt_set_authority_key_identifier(&crt);
+
+  mbedtls_x509write_crt_set_basic_constraints(&crt, 1, -1);
+
+  memset(output_buf, 0, sizeof(output_buf));
+  mbedtls_x509write_crt_pem(&crt, output_buf, sizeof(output_buf), mbedtls_ctr_drbg_random, &ctr_drbg);
+
+  mbedtls_x509_crt_parse(&dtls->x509_crt, output_buf, 4096);
+
+  dtls_get_x509_digest_text(&dtls->x509_crt, dtls->fingerprint, sizeof(dtls->fingerprint));
+  printf("%s\n", dtls->fingerprint);
+
+
+  // Setup DTLS
+  MBEDTLS_CHECK(mbedtls_ssl_config_defaults(&conf,
+   MBEDTLS_SSL_IS_SERVER,
+   MBEDTLS_SSL_TRANSPORT_DATAGRAM,
+   MBEDTLS_SSL_PRESET_DEFAULT));
+
+  mbedtls_ssl_conf_rng(&conf, mbedtls_ctr_drbg_random, &ctr_drbg);
+  mbedtls_ssl_conf_read_timeout(&conf, 1000);
+
+  mbedtls_ssl_conf_ca_chain(&conf, &dtls->x509_crt, NULL );
+  MBEDTLS_CHECK(mbedtls_ssl_conf_own_cert(&conf, &dtls->x509_crt, &pk));
+
+    mbedtls_ssl_cookie_ctx cookie_ctx;
+    mbedtls_ssl_cookie_init( &cookie_ctx );
+  mbedtls_ssl_cookie_setup( &cookie_ctx, mbedtls_ctr_drbg_random, &ctr_drbg );
+
+    mbedtls_ssl_conf_dtls_cookies( &conf, mbedtls_ssl_cookie_write, mbedtls_ssl_cookie_check,
+                               &cookie_ctx );
+mbedtls_timing_delay_context timer;
+    mbedtls_ssl_set_timer_cb(&dtls->ssl_mbedtls, &timer, mbedtls_timing_set_delay,
+                                            mbedtls_timing_get_delay );
+
+  MBEDTLS_CHECK(mbedtls_ssl_setup(&dtls->ssl_mbedtls, &conf));
+
+  mbedtls_ssl_set_bio(&dtls->ssl_mbedtls, NULL, dtls_mbedtls_ice_send, dtls_mbedtls_ice_recv, dtls_mbedtls_ice_recv_timeout);
+  printf("set bio...\n");
+
+
+}
+
+
 int dtls_transport_init(DtlsTransport *dtls_transport, BIO *agent_write_bio) {
 
   dtls_transport->ssl_ctx = SSL_CTX_new(DTLS_method());
@@ -183,6 +338,9 @@ int dtls_transport_init(DtlsTransport *dtls_transport, BIO *agent_write_bio) {
     LOG_ERROR("libsrtp init failed");
   }
 
+  dtls_get_x509_selfsign_crt(dtls_transport);
+printf("p = %p\n", &dtls_transport->ssl_mbedtls);
+
   return 0;
 }
 
@@ -194,6 +352,8 @@ DtlsTransport* dtls_transport_create(BIO *agent_write_bio) {
     return dtls_transport;
 
   dtls_transport_init(dtls_transport, agent_write_bio);
+
+
   return dtls_transport;
 }
 
@@ -217,10 +377,20 @@ void dtls_transport_destroy(DtlsTransport *dtls_transport) {
   free(dtls_transport);
 }
 
+
+void* mythread(void *ctx) {
+  DtlsTransport *dtls_transport = (DtlsTransport*)ctx;
+
+  pthread_exit(NULL);
+}
+
 void dtls_transport_do_handshake(DtlsTransport *dtls_transport) {
 
-  SSL_set_accept_state(dtls_transport->ssl);
-  SSL_do_handshake(dtls_transport->ssl);
+//  SSL_set_accept_state(dtls_transport->ssl);
+//  SSL_do_handshake(dtls_transport->ssl);
+  printf("do handshaking\n");
+  pthread_t t;
+  pthread_create(&t, NULL, mythread, dtls_transport);
   dtls_transport->handshake_done = TRUE;
 
 }
@@ -281,6 +451,12 @@ int dtls_transport_decrypt_data(DtlsTransport *dtls_transport, char *encrypted_d
 
 void dtls_transport_incomming_msg(DtlsTransport *dtls_transport, char *buf, int len) {
 
+  static int handshake = 0;
+  printf("incoming...\n");
+  int ret;
+
+
+#if 0
   int written = BIO_write(dtls_transport->read_bio, buf, len);
   if(written != len) {
     LOG_ERROR();
@@ -391,6 +567,7 @@ void dtls_transport_incomming_msg(DtlsTransport *dtls_transport, char *buf, int 
 
 //  dtls_transport->sctp = sctp_create(dtls_transport);
 
+#endif
 }
 
 void dtls_transport_decrypt_rtp_packet(DtlsTransport *dtls_transport, uint8_t *packet, int *bytes) {
