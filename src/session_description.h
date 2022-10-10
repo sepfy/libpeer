@@ -25,6 +25,24 @@ typedef enum MediaDescription {
 
 typedef struct SessionDescription SessionDescription;
 
+struct SessionDescription {
+
+  size_t size;
+
+  int mdns_enabled:1;
+
+  int datachannel_enabled:1;
+
+  MediaDescription media_descriptions[MEDIA_DESCRIPTION_MAX_NUM];
+
+  RtpMap rtp_map;
+
+  int media_description_num;
+
+  char content[SDP_MAX_SIZE];
+
+};
+
 /**
  * @brief Create a new SessionDescription.
  * @return Pointer of struct SessionDescription.

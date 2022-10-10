@@ -34,7 +34,7 @@ const char index_html[] = " \
         xhttp.setRequestHeader('Content-Type', 'plain/text'); \n \
         xhttp.send(btoa(JSON.stringify({'type': 'offer', 'sdp': sdp}))); \n \
       } \n \
-      const sendChannel = pc.createDataChannel('foo') \n \
+      const sendChannel = pc.createDataChannel('pear') \n \
       pc.ondatachannel = () => { \n \
         console.log('ondatachannel');\n \
       } \n \

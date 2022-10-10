@@ -8,21 +8,6 @@
 #include "media_stream.h"
 #include "session_description.h"
 
-struct SessionDescription {
-
-  size_t size;
-
-  int mdns_enabled:1;
-
-  MediaDescription media_descriptions[MEDIA_DESCRIPTION_MAX_NUM];
-
-  RtpMap rtp_map;
-
-  int media_description_num;
-
-  char content[SDP_MAX_SIZE];
-};
-
 static void session_description_parse_rtpmap(SessionDescription *sdp, const char *attribute_text) {
 
   //a=rtpmap:111 opus/48000/2
@@ -86,6 +71,7 @@ SessionDescription* session_description_create(char *sdp_text) {
 
       LOG_DEBUG("Find datachannel media description (mid = %d)", sdp->media_description_num);
       sdp->media_descriptions[sdp->media_description_num++] = MEDIA_DATACHANNEL;
+      sdp->datachannel_enabled = 1;
     }
 
     if(strstr(splits[i], "rtpmap") != NULL) {

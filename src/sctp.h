@@ -9,11 +9,13 @@ Sctp* sctp_create(DtlsTransport *dtls_transport);
 
 void sctp_destroy(Sctp *sctp);
 
-int sctp_do_connect(Sctp *sctp);
+int sctp_create_socket(Sctp *sctp);
 
 int sctp_is_connected(Sctp *sctp);
 
-void sctp_incoming_data(Sctp *sctp, char *buf, int len);
+void sctp_incoming_data(Sctp *sctp, char *buf, size_t len);
+
+int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len);
 
 void sctp_onmessage(Sctp *sctp, void (*onmessasge)(char *msg, size_t len, void *userdata));
 

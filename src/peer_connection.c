@@ -310,15 +310,16 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
       if(dtls_transport_get_srtp_initialized(pc->dtls_transport) && pc->on_connected) {
         pc->on_connected(pc->userdata);
       }
+
+      if(pc->remote_sdp->datachannel_enabled) {
+        sctp_create_socket(pc->sctp);
+      }
+
     }
     else {
 
       ret = dtls_transport_decrypt_data(pc->dtls_transport, buf, len, decrypted_data, sizeof(decrypted_data));
-
-      if(!sctp_is_connected(pc->sctp))
-        sctp_do_connect(pc->sctp);
-      else
-        sctp_incoming_data(pc->sctp, decrypted_data, ret);
+      sctp_incoming_data(pc->sctp, decrypted_data, ret);
     }
 
   }
@@ -505,6 +506,13 @@ void peer_connection_set_remote_description(PeerConnection *pc, char *sdp_text) 
 
 }
 
+int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len) {
+
+  if(sctp_is_connected(pc->sctp))
+    return sctp_outgoing_data(pc->sctp, message, len);
+
+  return -1;
+}
 
 int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes) {
 

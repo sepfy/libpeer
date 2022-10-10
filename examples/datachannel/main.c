@@ -31,9 +31,15 @@ static void on_icecandidate(char *sdp, void *data) {
   g_cond_signal(&g_datachannel.cond);
 }
 
-static void on_message(char *buf, size_t len, void *userdata) {
+static void on_open(void *userdata) {
 
+  char msg[] = "open";
+  peer_connection_datachannel_send(g_datachannel.pc, msg, strlen(msg));
+}
+
+static void on_message(char *buf, size_t len, void *userdata) {
   LOG_INFO("Got message %s", buf);
+  peer_connection_datachannel_send(g_datachannel.pc, buf, len);
 }
 
 void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
@@ -49,7 +55,7 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
 
     peer_connection_onicecandidate(g_datachannel.pc, on_icecandidate);
     peer_connection_oniceconnectionstatechange(g_datachannel.pc, on_iceconnectionstatechange);
-    peer_connection_ondatachannel(g_datachannel.pc, on_message, NULL, NULL);
+    peer_connection_ondatachannel(g_datachannel.pc, on_message, on_open, NULL);
 
     peer_connection_set_remote_description(g_datachannel.pc, msg);
     peer_connection_create_answer(g_datachannel.pc);
