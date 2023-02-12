@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <gio/gnetworking.h>
 
+#include <gst/gst.h>
 #include "sctp.h"
 #include "dtls_transport.h"
 #include "nice_agent_bio.h"
@@ -46,7 +47,6 @@ struct PeerConnection {
 
   Sctp *sctp;
   DtlsTransport *dtls_transport;
-  MediaStream *media_stream;
   RtpMap rtp_map;
 
   void (*onicecandidate)(char *sdp, void *userdata);
@@ -58,7 +58,9 @@ struct PeerConnection {
   void *userdata;
 
   GMutex mutex;
-  
+
+  MediaStream *audio_media_stream;
+  MediaStream *video_media_stream;
 };
 
 
@@ -290,6 +292,38 @@ void peer_connection_incomming_rtcp(PeerConnection *pc, uint8_t *buf, size_t len
   }
 }
 
+static void peer_connection_media_stream_playback(PeerConnection *pc) {
+
+  LOG_INFO("Playback");
+  int pt;
+
+  MediaCodec codec;
+  MediaStream *media_stream;
+
+  media_stream = pc->audio_media_stream;
+
+  if(media_stream) {
+
+    codec = media_stream_get_codec(media_stream);
+    pt = peer_connection_get_rtpmap(pc, codec);
+    media_stream_set_payloadtype(media_stream, pt);
+    media_stream_play(media_stream);
+  }
+
+  media_stream = pc->video_media_stream;
+
+  if(media_stream) {
+
+    codec = media_stream_get_codec(media_stream);
+    pt = peer_connection_get_rtpmap(pc, codec);
+    media_stream_set_payloadtype(media_stream, pt);
+    media_stream_play(media_stream);
+  }
+
+
+
+}
+
 static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint component_id,
  guint len, gchar *buf, gpointer data) {
 
@@ -309,6 +343,7 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
 
       if(dtls_transport_get_srtp_initialized(pc->dtls_transport) && pc->on_connected) {
         pc->on_connected(pc->userdata);
+        peer_connection_media_stream_playback(pc);
       }
 
       if(pc->remote_sdp->datachannel_enabled) {
@@ -387,6 +422,8 @@ PeerConnection* peer_connection_create(void *userdata) {
   if(pc == NULL)
     return pc;
 
+  gst_init(NULL, NULL);
+
   pc->codec_capability.h264 = 1;
   pc->codec_capability.opus = 1;
 
@@ -414,6 +451,8 @@ void peer_connection_enable_mdns(PeerConnection *pc, int enabled) {
 
 void peer_connection_destroy(PeerConnection *pc) {
 
+  int i, n;
+
   if(pc == NULL)
     return;
 
@@ -435,13 +474,44 @@ void peer_connection_destroy(PeerConnection *pc) {
   if(pc->remote_sdp)
     session_description_destroy(pc->remote_sdp);
 
+  if(pc->audio_media_stream) {
+
+    media_stream_destroy(pc->audio_media_stream);
+  }
+
+  if(pc->video_media_stream) {
+    media_stream_destroy(pc->video_media_stream);
+  }
+
   free(pc);
   pc = NULL;
 }
 
-void peer_connection_add_stream(PeerConnection *pc, MediaStream *media_stream) {
+static void peer_connection_on_rtp_data(uint8_t *rtp_packet, size_t bytes, void *userdata) {
 
-  pc->media_stream = media_stream;
+  PeerConnection *pc = (PeerConnection*)userdata;
+  peer_connection_send_rtp_packet(pc, rtp_packet, bytes);
+}
+
+void peer_connection_add_stream(PeerConnection *pc, MediaCodec codec, const char *pipeline) {
+
+  MediaStream *media_stream = media_stream_create(codec, pipeline, peer_connection_on_rtp_data, pc);
+  if(!media_stream)
+    return;
+
+  switch(codec) {
+
+    case CODEC_H264:
+      pc->video_media_stream = media_stream;
+      break;
+    case CODEC_OPUS:
+    case CODEC_PCMA:
+    case CODEC_PCMU:
+      pc->audio_media_stream = media_stream;
+      break;
+    default:
+      break;
+  }
 }
 
 int peer_connection_create_answer(PeerConnection *pc) {

@@ -24,6 +24,10 @@ endif(ENABLE_TEST)
 
 file(GLOB HEADERS "*.h")
 
+pkg_check_modules(GST REQUIRED gstreamer-1.0>=1.4 gstreamer-base-1.0>=1.4)
+
+include_directories(${CMAKE_SOURCE_DIR}/src ${GST_INCLUDE_DIRS})
+
 set_target_properties(pear PROPERTIES PUBLIC_HEADER "${HEADERS}")
 
 install(TARGETS pear

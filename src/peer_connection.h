@@ -50,7 +50,7 @@ int peer_connection_send_rtcp_pil(PeerConnection *pc, uint32_t ssrc);
  * @param A PeerConnection.
  * @param A MediaStream.
  */
-void peer_connection_add_stream(PeerConnection *pc, MediaStream *media_stream);
+void peer_connection_add_stream(PeerConnection *pc, MediaCodec codec, const char *pipeline);
 
 /**
  * @brief Set the callback function to handle onicecandidate event.
