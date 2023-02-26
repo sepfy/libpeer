@@ -222,9 +222,13 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
     switch(media_descriptions[i]) {
       case MEDIA_VIDEO:
         peer_connection_video_to_sdp(pc, sdp, (i+1));
+ 
+        media_stream_set_ssrc(pc->video_media_stream, i+1);
         break;
       case MEDIA_AUDIO:
         peer_connection_audio_to_sdp(pc, sdp, (i+1));
+
+        media_stream_set_ssrc(pc->audio_media_stream, i+1);
         break;
       case MEDIA_DATACHANNEL:
         peer_connection_datachannel_to_sdp(pc, sdp);
@@ -341,8 +345,11 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
 
       dtls_transport_incomming_msg(pc->dtls_transport, buf, len);
 
-      if(dtls_transport_get_srtp_initialized(pc->dtls_transport) && pc->on_connected) {
-        pc->on_connected(pc->userdata);
+      if(dtls_transport_get_srtp_initialized(pc->dtls_transport)) {
+
+        if(pc->on_connected)
+          pc->on_connected(pc->userdata);
+
         peer_connection_media_stream_playback(pc);
       }
 
@@ -364,6 +371,16 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
 
     if(pc->ontrack != NULL) {
       pc->ontrack(buf, len, pc->userdata);
+    }
+
+    if(pc->audio_media_stream) {
+
+      media_stream_ontrack(pc->audio_media_stream, buf, len);
+    }
+
+    if(pc->video_media_stream) {
+
+      media_stream_ontrack(pc->video_media_stream, buf, len);
     }
 
   }
@@ -493,9 +510,10 @@ static void peer_connection_on_rtp_data(uint8_t *rtp_packet, size_t bytes, void 
   peer_connection_send_rtp_packet(pc, rtp_packet, bytes);
 }
 
-void peer_connection_add_stream(PeerConnection *pc, MediaCodec codec, const char *pipeline) {
+void peer_connection_add_stream(PeerConnection *pc, MediaCodec codec,
+ const char *outgoing_pipeline, const char *incoming_pipeline) {
 
-  MediaStream *media_stream = media_stream_create(codec, pipeline, peer_connection_on_rtp_data, pc);
+  MediaStream *media_stream = media_stream_create(codec, outgoing_pipeline, incoming_pipeline, peer_connection_on_rtp_data, pc);
   if(!media_stream)
     return;
 

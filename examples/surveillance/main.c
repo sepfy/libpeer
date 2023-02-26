@@ -54,7 +54,7 @@ void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
 
     g_surveillance.pc = peer_connection_create(NULL);
 
-    peer_connection_add_stream(g_surveillance.pc, CODEC_H264, PIPE_LINE);
+    peer_connection_add_stream(g_surveillance.pc, CODEC_H264, PIPE_LINE, NULL);
 
     peer_connection_onicecandidate(g_surveillance.pc, on_icecandidate);
 
