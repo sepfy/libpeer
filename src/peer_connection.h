@@ -84,7 +84,7 @@ void peer_connection_ontrack(PeerConnection *pc, void (*ontrack)(uint8_t *packet
  * @param PeerConnection.
  * @param SDP string.
  */
-void peer_connection_set_remote_description(PeerConnection *pc, char *sdp);
+void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp);
 
 /**
  * @brief PeerConnection creates an answer.
@@ -152,7 +152,7 @@ int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t l
 
 // To confirm:
 int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);
-
+void peer_connection_media_stream_playback(PeerConnection *pc);
 #ifdef __cplusplus
 }
 #endif

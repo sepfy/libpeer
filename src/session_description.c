@@ -161,7 +161,7 @@ int session_description_append(SessionDescription *sdp, const char *format, ...)
   va_end(argptr);
 
   strcat(sdp->content, attribute);
-  strcat(sdp->content, "\\r\\n");
+  strcat(sdp->content, "\r\n");
 
   return 0;
 }

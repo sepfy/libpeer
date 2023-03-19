@@ -1,85 +1,57 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "index_html.h"
-#include "peer_connection.h"
 #include "signaling.h"
+#include "peer_connection.h"
 
 const char PIPE_LINE[] = "libcamerasrc ! video/x-raw, format=NV12, width=800, height=600, framerate=20/1, interlace-mode=progressive, colorimetry=bt709 ! v4l2h264enc capture-io-mode=4 output-io-mode=4";
 
-typedef struct Surveillance {
+void on_iceconnectionstatechange(IceConnectionState state, void *data) {
 
-  GCond cond;
+  printf("state is changed: %d\n", state);
+}
 
-  GMutex mutex;
+void on_icecandidate(char *answer_sdp, void *data) {
 
-  PeerConnection *pc;
+  signaling_set_answer(answer_sdp);
+}
 
-  Signaling *signaling;
+void on_connected(void *data) {
 
-} Surveillance;
+  printf("on connected\n");
+}
 
-Surveillance g_surveillance = {0};
+void signaling_on_offersdp_get(const char *offersdp, size_t len) {
 
-static void on_iceconnectionstatechange(IceConnectionState state, void *data) {
+  static PeerConnection *pc = NULL;
 
-  if(state == FAILED) {
+  if(pc) {
 
-    LOG_INFO("disconnect with browser...");
+    printf("destroy\n");
+    peer_connection_destroy(pc);
   }
-}
 
-static void on_icecandidate(char *sdp, void *data) {
+  pc = peer_connection_create(NULL);
 
-  signaling_send_answer_to_call(g_surveillance.signaling, sdp);
+  peer_connection_add_stream(pc, CODEC_H264, PIPE_LINE, NULL);
 
-  g_cond_signal(&g_surveillance.cond);
-}
+  peer_connection_onicecandidate(pc, on_icecandidate);
 
-static void on_connected(void *data) {
+  peer_connection_oniceconnectionstatechange(pc, on_iceconnectionstatechange);
 
-  LOG_INFO("on connected");
-}
+  peer_connection_on_connected(pc, on_connected);
 
-void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
+  peer_connection_set_remote_description(pc, offersdp);
 
-  if(signaling_event == SIGNALING_EVENT_GET_OFFER) {
-
-    printf("get offer from singaling\n");
-
-    g_mutex_lock(&g_surveillance.mutex);
-
-    peer_connection_destroy(g_surveillance.pc);
-
-    g_surveillance.pc = peer_connection_create(NULL);
-
-    peer_connection_add_stream(g_surveillance.pc, CODEC_H264, PIPE_LINE, NULL);
-
-    peer_connection_onicecandidate(g_surveillance.pc, on_icecandidate);
-
-    peer_connection_oniceconnectionstatechange(g_surveillance.pc, on_iceconnectionstatechange);
-
-    peer_connection_on_connected(g_surveillance.pc, on_connected);
-
-    peer_connection_set_remote_description(g_surveillance.pc, msg);
-
-    peer_connection_create_answer(g_surveillance.pc);
-
-    g_cond_wait(&g_surveillance.cond, &g_surveillance.mutex);
-
-    g_mutex_unlock(&g_surveillance.mutex);
-  }
+  peer_connection_create_answer(pc);
 }
 
 void signal_handler(int signal) {
 
-  if(g_surveillance.signaling)
-    signaling_destroy(g_surveillance.signaling);
-
-  if(g_surveillance.pc)
-    peer_connection_destroy(g_surveillance.pc);
-
+  printf("catch interrupt. exit app\n");
   exit(0);
 }
 
@@ -87,19 +59,7 @@ int main(int argc, char *argv[]) {
 
   signal(SIGINT, signal_handler);
 
-  SignalingOption signaling_option = {SIGNALING_PROTOCOL_HTTP, "0.0.0.0", "demo", 8000, index_html};
-
-  g_surveillance.signaling = signaling_create(signaling_option);
-
-  if(!g_surveillance.signaling) {
-
-    printf("create signaling service failed\n");
-    return 0;
-  }
-
-  signaling_on_call_event(g_surveillance.signaling, &on_call_event, NULL);
-
-  signaling_dispatch(g_surveillance.signaling);
+  signaling_dispatch(8000, index_html, signaling_on_offersdp_get);
 
   return 0;
 }

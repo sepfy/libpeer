@@ -3,6 +3,9 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <gst/gst.h>
+
+#include "utils.h"
 
 typedef enum MediaCodec {
 
@@ -17,12 +20,32 @@ typedef enum MediaCodec {
 
 } MediaCodec;
 
+struct MediaStream {
+
+  MediaCodec codec;
+  char outgoing_pipeline_text[1024];
+  char incoming_pipeline_text[1024];
+
+  uint8_t rtp_packet[1400];
+
+  GstElement *outgoing_pipeline;
+  GstElement *incoming_pipeline;
+  GstElement *sink;
+  GstElement *src;
+  GstElement *rtp;
+
+  void *userdata;
+  void (*on_rtp_data)(const char *rtp_packet, size_t bytes, void *userdata);
+
+  Buffer *outgoing_rb;
+  Buffer *incoming_rb;
+};
+
 typedef struct MediaStream MediaStream;
 
 MediaStream* media_stream_create(MediaCodec codec,
  const char *outgoing_pipeline_text,
- const char *incoming_pipeline_text,
- void (*on_rtp_data)(const char *rtp_packet, size_t bytes, void *userdata), void *userdata);
+ const char *incoming_pipeline_text);
 
 int media_stream_set_payloadtype(MediaStream *media_stream, int pt);
 

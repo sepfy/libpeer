@@ -59,14 +59,46 @@ struct PeerConnection {
 
   GMutex mutex;
 
+  Buffer *outgoing_rb;
+
   MediaStream *audio_media_stream;
   MediaStream *video_media_stream;
+
+  int destroyed;
 };
 
+void* peer_connection_send_thread(void *userdata) {
 
-void* peer_connection_gather_thread(void *data) {
+  size_t size;
+  uint8_t data[1500];
 
-  PeerConnection *pc = (PeerConnection*)data;
+  PeerConnection *pc = (PeerConnection*)userdata;
+
+  while (!pc->destroyed) {
+
+    if (pc->video_media_stream && (utils_buffer_pop(pc->video_media_stream->outgoing_rb, (uint8_t*)&size, sizeof(size_t)) == sizeof(size_t))) {
+
+      if (size > 0 && utils_buffer_pop(pc->video_media_stream->outgoing_rb, data, size) == size) {
+     
+        peer_connection_send_rtp_packet(pc, data, size);
+      }
+    } else if (pc->audio_media_stream && (utils_buffer_pop(pc->audio_media_stream->outgoing_rb, (uint8_t*)&size, sizeof(size_t)) == sizeof(size_t))) {
+
+      if (size > 0 && utils_buffer_pop(pc->audio_media_stream->outgoing_rb, data, size) == size) {
+     
+        peer_connection_send_rtp_packet(pc, data, size);
+      }
+
+    } else {
+      usleep(10000);
+    }
+    
+  }
+}
+
+void* peer_connection_gather_thread(void *userdata) {
+
+  PeerConnection *pc = (PeerConnection*)userdata;
 
   g_main_loop_run(pc->gloop);
 
@@ -296,7 +328,7 @@ void peer_connection_incomming_rtcp(PeerConnection *pc, uint8_t *buf, size_t len
   }
 }
 
-static void peer_connection_media_stream_playback(PeerConnection *pc) {
+void peer_connection_media_stream_playback(PeerConnection *pc) {
 
   LOG_INFO("Playback");
   int pt;
@@ -324,8 +356,10 @@ static void peer_connection_media_stream_playback(PeerConnection *pc) {
     media_stream_play(media_stream);
   }
 
-
-
+#if 1
+  pthread_t tid;
+  pthread_create(&tid, NULL, peer_connection_send_thread, pc);
+#endif
 }
 
 static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint component_id,
@@ -456,6 +490,8 @@ PeerConnection* peer_connection_create(void *userdata) {
 
   pc->sctp = sctp_create(pc->dtls_transport);
 
+  pc->destroyed = 0;
+
   return pc;
 }
 
@@ -472,6 +508,8 @@ void peer_connection_destroy(PeerConnection *pc) {
 
   if(pc == NULL)
     return;
+
+  pc->destroyed = 1;
 
   g_main_loop_quit(pc->gloop);
 
@@ -504,16 +542,10 @@ void peer_connection_destroy(PeerConnection *pc) {
   pc = NULL;
 }
 
-static void peer_connection_on_rtp_data(uint8_t *rtp_packet, size_t bytes, void *userdata) {
-
-  PeerConnection *pc = (PeerConnection*)userdata;
-  peer_connection_send_rtp_packet(pc, rtp_packet, bytes);
-}
-
 void peer_connection_add_stream(PeerConnection *pc, MediaCodec codec,
  const char *outgoing_pipeline, const char *incoming_pipeline) {
 
-  MediaStream *media_stream = media_stream_create(codec, outgoing_pipeline, incoming_pipeline, peer_connection_on_rtp_data, pc);
+  MediaStream *media_stream = media_stream_create(codec, outgoing_pipeline, incoming_pipeline);
   if(!media_stream)
     return;
 
@@ -541,7 +573,7 @@ int peer_connection_create_answer(PeerConnection *pc) {
   return 0;
 }
 
-void peer_connection_set_remote_description(PeerConnection *pc, char *sdp_text) {
+void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp_text) {
 
   gsize len;
   gchar* ufrag = NULL;

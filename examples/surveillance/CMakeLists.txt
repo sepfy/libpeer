@@ -2,6 +2,6 @@ project(surveillance)
 
 file(GLOB SRCS "*.c")
 
-add_executable(surveillance ${SRCS})
+add_executable(surveillance ${SRCS} ../signaling/signaling.c)
 
 target_link_libraries(surveillance pear ${TARGET_LIBS} ${GST_LIBRARIES})
