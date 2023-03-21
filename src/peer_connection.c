@@ -180,15 +180,15 @@ static void peer_connection_video_to_sdp(PeerConnection *pc, SessionDescription 
 
 static void peer_connection_audio_to_sdp(PeerConnection *pc, SessionDescription *sdp, uint32_t ssrc) {
 
-  session_description_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 111");
-
   if(pc->codec_capability.opus) {
 
+    session_description_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 111");
     session_description_append(sdp, "a=rtcp-fb:111 nack");
     session_description_append(sdp, "a=rtpmap:111 opus/48000/2");
   }
   else if(pc->codec_capability.pcma) {
 
+    session_description_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 8");
     session_description_append(sdp, "a=rtpmap:8 PCMA/8000");
   }
 
@@ -387,33 +387,29 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
         peer_connection_media_stream_playback(pc);
       }
 
-      if(pc->remote_sdp->datachannel_enabled) {
+      if (pc->remote_sdp->datachannel_enabled) {
         sctp_create_socket(pc->sctp);
       }
 
-    }
-    else {
+    } else {
 
       ret = dtls_transport_decrypt_data(pc->dtls_transport, buf, len, decrypted_data, sizeof(decrypted_data));
       sctp_incoming_data(pc->sctp, decrypted_data, ret);
     }
 
-  }
-  else if(rtp_packet_validate(buf, len)) {
+  } else if (rtp_packet_validate(buf, len)) {
 
     dtls_transport_decrypt_rtp_packet(pc->dtls_transport, buf, &len);
 
-    if(pc->ontrack != NULL) {
+    if (pc->ontrack != NULL) {
       pc->ontrack(buf, len, pc->userdata);
     }
 
-    if(pc->audio_media_stream) {
-
+    if (pc->audio_media_stream) {
       media_stream_ontrack(pc->audio_media_stream, buf, len);
     }
 
-    if(pc->video_media_stream) {
-
+    if (pc->video_media_stream) {
       media_stream_ontrack(pc->video_media_stream, buf, len);
     }
 
@@ -476,7 +472,7 @@ PeerConnection* peer_connection_create(void *userdata) {
   gst_init(NULL, NULL);
 
   pc->codec_capability.h264 = 1;
-  pc->codec_capability.opus = 1;
+  pc->codec_capability.pcma = 1;
 
   pc->audio_ssrc = 0;
   pc->video_ssrc = 0;

@@ -104,7 +104,7 @@ MediaStream* media_stream_create(MediaCodec codec,
         break;
       case CODEC_PCMA:
         snprintf(media_stream->incoming_pipeline_text, sizeof(media_stream->incoming_pipeline_text),
-         "appsrc name=src format=time ! application/x-rtp,clock-rate=8000,encoding-name=PCMA,medi ! rtppcmadepay ! %s",
+         "appsrc name=src format=time ! application/x-rtp,clock-rate=8000,encoding-name=PCMA ! rtppcmadepay ! %s",
          incoming_pipeline_text);
         break;
       case CODEC_PCMU:

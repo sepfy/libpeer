@@ -7,12 +7,9 @@
 
 const char VIDEO_SINK_PIPELINE[] = "libcamerasrc ! video/x-raw, format=NV12, width=1280, height=960, framerate=30/1, interlace-mode=progressive, colorimetry=bt709 ! v4l2h264enc capture-io-mode=4 output-io-mode=4";
 
-//const char AUDIO_SINK_PIPELINE[] = "audiotestsrc ! alawenc";
+const char AUDIO_SINK_PIPELINE[] = "alsasrc ! audioconvert ! audioresample ! alawenc";
 
-const char AUDIO_SINK_PIPELINE[] = "audiotestsrc ! opusenc"; 
-//const char AUDIO_SRC_PIPELINE[] = "alawdec ! audioresample ! audioconvert ! alsasink device=plughw:wm8960soundcard,0";
-
-const char AUDIO_SRC_PIPELINE[] = "opusparse ! opusdec ! audioconvert ! audioresample ! queue ! alsasink device=hdmi:vc4hdmi,0";
+const char AUDIO_SRC_PIPELINE[] = "alawdec ! audioresample ! audioconvert ! audio/x-raw,format=S16LE,channel=2,rate=48000 ! alsasink device=hdmi:vc4hdmi,0";
 
 void on_iceconnectionstatechange(IceConnectionState state, void *data) {
 
@@ -46,7 +43,7 @@ void signaling_on_offersdp_get(const char *offersdp, size_t len) {
 
   peer_connection_add_stream(pc, CODEC_H264, VIDEO_SINK_PIPELINE, NULL);
 
-  peer_connection_add_stream(pc, CODEC_OPUS, AUDIO_SINK_PIPELINE, AUDIO_SRC_PIPELINE);
+  peer_connection_add_stream(pc, CODEC_PCMA, AUDIO_SINK_PIPELINE, AUDIO_SRC_PIPELINE);
 
   peer_connection_onicecandidate(pc, on_icecandidate);
 
@@ -59,7 +56,6 @@ void signaling_on_offersdp_get(const char *offersdp, size_t len) {
   peer_connection_create_answer(pc);
 
 }
-
 
 void signal_handler(int signal) {
 
