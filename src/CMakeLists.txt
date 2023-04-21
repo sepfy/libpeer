@@ -58,6 +58,10 @@ add_library(pear SHARED ${SRCS})
 
 target_link_libraries(pear ssl crypto nice srtp2 rtp usrsctp pthread glib-2.0 gobject-2.0 gio-2.0 ${GST_LIBRARIES})
 
+if(ENABLE_AEC)
+  target_link_libraries(pear speexdsp)
+endif()
+
 set_target_properties(pear PROPERTIES PUBLIC_HEADER "${HEADERS}")
 
 install(TARGETS pear

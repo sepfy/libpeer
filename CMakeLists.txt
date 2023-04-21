@@ -4,6 +4,7 @@ project(pear)
 option(ENABLE_TEST "Enable unit test" OFF)
 option(ENABLE_EXAMPLES "Build examples" OFF)
 option(ENABLE_SIGNALING "Enable signaling service" OFF)
+option(ENABLE_AEC "Enable acoustic echo cancellation" OFF)
 
 if(ENABLE_EXAMPLES)
   set(ENABLE_SIGNALING ON)

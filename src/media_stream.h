@@ -7,6 +7,11 @@
 
 #include "utils.h"
 
+#ifdef SPEEX_AEC
+#include <speex/speex_echo.h>
+#include <speex/speex_preprocess.h>
+#endif
+
 typedef enum MediaCodec {
 
   /* Video */
@@ -26,19 +31,23 @@ struct MediaStream {
   char outgoing_pipeline_text[1024];
   char incoming_pipeline_text[1024];
 
-  uint8_t rtp_packet[1400];
-
   GstElement *outgoing_pipeline;
   GstElement *incoming_pipeline;
   GstElement *sink;
   GstElement *src;
   GstElement *rtp;
 
-  void *userdata;
-  void (*on_rtp_data)(const char *rtp_packet, size_t bytes, void *userdata);
-
   Buffer *outgoing_rb;
   Buffer *incoming_rb;
+
+#ifdef SPEEX_AEC
+  GstElement *aec_far;
+  GstElement *aec_cap;
+
+  SpeexEchoState *echo_state;
+  SpeexPreprocessState *preprocess_state;
+#endif
+
 };
 
 typedef struct MediaStream MediaStream;
@@ -47,7 +56,7 @@ MediaStream* media_stream_create(MediaCodec codec,
  const char *outgoing_pipeline_text,
  const char *incoming_pipeline_text);
 
-int media_stream_set_payloadtype(MediaStream *media_stream, int pt);
+void media_stream_set_payloadtype(MediaStream *media_stream, int pt);
 
 void media_stream_set_ssrc(MediaStream *media_stream, uint64_t ssrc);
 

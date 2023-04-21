@@ -64,22 +64,23 @@ struct PeerConnection {
   MediaStream *audio_media_stream;
   MediaStream *video_media_stream;
 
-  int destroyed;
+  GTask *task; 
 };
 
-void* peer_connection_send_thread(void *userdata) {
+static void peer_connection_task(GTask *task,
+ gpointer source_object, gpointer userdata, GCancellable *cancellable) {
 
   size_t size;
   uint8_t data[1500];
 
   PeerConnection *pc = (PeerConnection*)userdata;
 
-  while (!pc->destroyed) {
+  while (1) {
 
     if (pc->video_media_stream && (utils_buffer_pop(pc->video_media_stream->outgoing_rb, (uint8_t*)&size, sizeof(size_t)) == sizeof(size_t))) {
 
       if (size > 0 && utils_buffer_pop(pc->video_media_stream->outgoing_rb, data, size) == size) {
-     
+
         peer_connection_send_rtp_packet(pc, data, size);
       }
     } else if (pc->audio_media_stream && (utils_buffer_pop(pc->audio_media_stream->outgoing_rb, (uint8_t*)&size, sizeof(size_t)) == sizeof(size_t))) {
@@ -90,10 +91,24 @@ void* peer_connection_send_thread(void *userdata) {
       }
 
     } else {
+
       usleep(10000);
     }
-    
   }
+
+}
+
+static void peer_connection_start_task(PeerConnection *pc) {
+LOG_INFO("start task..");
+  pc->task = g_task_new(NULL, NULL, NULL, NULL);
+  g_task_set_task_data(pc->task, pc, NULL);
+  g_task_run_in_thread(pc->task, peer_connection_task);
+}
+
+static void peer_connection_stop_task(PeerConnection *pc) {
+
+  g_task_return_new_error(pc->task, G_IO_ERROR, G_IO_ERROR_CANCELLED, "");
+  g_object_unref(pc->task);
 }
 
 void* peer_connection_gather_thread(void *userdata) {
@@ -356,10 +371,6 @@ void peer_connection_media_stream_playback(PeerConnection *pc) {
     media_stream_play(media_stream);
   }
 
-#if 1
-  pthread_t tid;
-  pthread_create(&tid, NULL, peer_connection_send_thread, pc);
-#endif
 }
 
 static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint component_id,
@@ -385,6 +396,7 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
           pc->on_connected(pc->userdata);
 
         peer_connection_media_stream_playback(pc);
+        peer_connection_start_task(pc);
       }
 
       if (pc->remote_sdp->datachannel_enabled) {
@@ -417,9 +429,17 @@ static void peer_connection_ice_recv_cb(NiceAgent *agent, guint stream_id, guint
 
 }
 
+gboolean callback(gpointer arg) {
+
+  printf("test...\n");
+
+}
+
 gboolean peer_connection_nice_agent_setup(PeerConnection *pc) {
 
   pc->gloop = g_main_loop_new(NULL, FALSE);
+
+//  g_idle_add(callback, NULL);
 
   pc->nice_agent = nice_agent_new(g_main_loop_get_context(pc->gloop),
    NICE_COMPATIBILITY_RFC5245);
@@ -471,9 +491,6 @@ PeerConnection* peer_connection_create(void *userdata) {
 
   gst_init(NULL, NULL);
 
-  pc->codec_capability.h264 = 1;
-  pc->codec_capability.pcma = 1;
-
   pc->audio_ssrc = 0;
   pc->video_ssrc = 0;
 
@@ -485,8 +502,6 @@ PeerConnection* peer_connection_create(void *userdata) {
   pc->dtls_transport = dtls_transport_create(nice_agent_bio_new(pc->nice_agent, pc->stream_id, pc->component_id));
 
   pc->sctp = sctp_create(pc->dtls_transport);
-
-  pc->destroyed = 0;
 
   return pc;
 }
@@ -505,7 +520,7 @@ void peer_connection_destroy(PeerConnection *pc) {
   if(pc == NULL)
     return;
 
-  pc->destroyed = 1;
+  peer_connection_stop_task(pc);
 
   g_main_loop_quit(pc->gloop);
 
@@ -541,23 +556,40 @@ void peer_connection_destroy(PeerConnection *pc) {
 void peer_connection_add_stream(PeerConnection *pc, MediaCodec codec,
  const char *outgoing_pipeline, const char *incoming_pipeline) {
 
-  MediaStream *media_stream = media_stream_create(codec, outgoing_pipeline, incoming_pipeline);
-  if(!media_stream)
-    return;
+  MediaStream **media_stream = NULL;
 
   switch(codec) {
 
     case CODEC_H264:
-      pc->video_media_stream = media_stream;
+      pc->codec_capability.h264 = 1;
+      media_stream = &pc->video_media_stream;
+      break;
+    case CODEC_VP8:
+      pc->codec_capability.vp8 = 1;
+      media_stream = &pc->video_media_stream;
       break;
     case CODEC_OPUS:
+      pc->codec_capability.opus = 1;
+      media_stream = &pc->audio_media_stream;
+      break;
     case CODEC_PCMA:
+      pc->codec_capability.pcma = 1;
+      media_stream = &pc->audio_media_stream;
+      break;
     case CODEC_PCMU:
-      pc->audio_media_stream = media_stream;
+      pc->codec_capability.pcmu = 1;
+      media_stream = &pc->audio_media_stream;
       break;
     default:
       break;
   }
+
+  if (*media_stream != NULL) {
+
+    media_stream_destroy(*media_stream);
+  }
+
+  *media_stream = media_stream_create(codec, outgoing_pipeline, incoming_pipeline);
 }
 
 int peer_connection_create_answer(PeerConnection *pc) {
