@@ -23,9 +23,9 @@
   fprintf(stdout, "[%s %s:%d] " fmt"\n", level_tag, __FILE__, __LINE__, ##__VA_ARGS__)
 
 #if LOG_LEVEL >= LEVEL_DEBUG
-#define LOG_DEBUG(fmt, ...) LOG_PRINT(INFO_TAG, fmt, ##__VA_ARGS__)
+#define LOGD(fmt, ...) LOG_PRINT(INFO_TAG, fmt, ##__VA_ARGS__)
 #else
-#define LOG_DEBUG(fmt, ...)
+#define LOGD(fmt, ...)
 #endif
 
 #if LOG_LEVEL >= LEVEL_INFO

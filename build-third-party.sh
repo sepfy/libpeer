@@ -6,7 +6,7 @@ BASE_DIR=$(dirname $BASE_PATH)
 # Build libsrtp
 cd $BASE_DIR/third_party/libsrtp
 mkdir -p build && cd build
-cmake ..
+cmake -DCMAKE_C_FLAGS="-fPIC" ..
 make -j4
 
 # Build libnice
@@ -24,5 +24,5 @@ make static
 
 cd $BASE_DIR/third_party/usrsctp
 mkdir -p build && cd build
-cmake ..
+cmake -DCMAKE_C_FLAGS="-fPIC" ..
 make -j4

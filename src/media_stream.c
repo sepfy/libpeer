@@ -224,7 +224,7 @@ MediaStream* media_stream_create(MediaCodec codec,
 
     media_stream->outgoing_rb = utils_buffer_new(1404*64);
 
-    LOG_DEBUG("outgoing pipeline: %s", media_stream->outgoing_pipeline_text);
+    LOGD("outgoing pipeline: %s", media_stream->outgoing_pipeline_text);
     media_stream->outgoing_pipeline = gst_parse_launch(media_stream->outgoing_pipeline_text, NULL);
     media_stream->sink = gst_bin_get_by_name(GST_BIN(media_stream->outgoing_pipeline), "sink");
     media_stream->rtp = gst_bin_get_by_name(GST_BIN(media_stream->outgoing_pipeline), "rtp");
@@ -278,7 +278,7 @@ MediaStream* media_stream_create(MediaCodec codec,
         break;
     }
 
-    LOG_DEBUG("incoming pipeline: %s", media_stream->incoming_pipeline_text);
+    LOGD("incoming pipeline: %s", media_stream->incoming_pipeline_text);
 
     media_stream->incoming_rb = utils_buffer_new(64*1404); 
 

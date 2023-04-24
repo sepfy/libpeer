@@ -44,7 +44,7 @@ static void session_description_parse_rtpmap(SessionDescription *sdp, const char
 
 }
 
-SessionDescription* session_description_create(char *sdp_text) {
+SessionDescription* session_description_create(const char *sdp_text) {
 
   char **splits;
   int i;
@@ -59,17 +59,17 @@ SessionDescription* session_description_create(char *sdp_text) {
 
     if(strstr(splits[i], "m=audio")) {
 
-      LOG_DEBUG("Find audio media description (mid = %d)", sdp->media_description_num);
+      LOGD("Find audio media description (mid = %d)", sdp->media_description_num);
       sdp->media_descriptions[sdp->media_description_num++] = MEDIA_AUDIO;
     }
     else if(strstr(splits[i], "m=video")) {
 
-      LOG_DEBUG("Find video media description (mid = %d)", sdp->media_description_num);
+      LOGD("Find video media description (mid = %d)", sdp->media_description_num);
       sdp->media_descriptions[sdp->media_description_num++] = MEDIA_VIDEO;
     }
     else if(strstr(splits[i], "m=application")) {
 
-      LOG_DEBUG("Find datachannel media description (mid = %d)", sdp->media_description_num);
+      LOGD("Find datachannel media description (mid = %d)", sdp->media_description_num);
       sdp->media_descriptions[sdp->media_description_num++] = MEDIA_DATACHANNEL;
       sdp->datachannel_enabled = 1;
     }
