@@ -64,6 +64,7 @@ struct PeerConnection {
   MediaStream *audio_media_stream;
   MediaStream *video_media_stream;
 
+  GCancellable *cancellable;
   GTask *task; 
 };
 
@@ -75,7 +76,7 @@ static void peer_connection_task(GTask *task,
 
   PeerConnection *pc = (PeerConnection*)userdata;
 
-  while (1) {
+  while (!g_cancellable_is_cancelled(cancellable)) {
 
     if (pc->video_media_stream && (utils_buffer_pop(pc->video_media_stream->outgoing_rb, (uint8_t*)&size, sizeof(size_t)) == sizeof(size_t))) {
 
@@ -96,19 +97,35 @@ static void peer_connection_task(GTask *task,
     }
   }
 
+  LOGD("peer_connection_task exit");
 }
 
 static void peer_connection_start_task(PeerConnection *pc) {
-LOG_INFO("start task..");
-  pc->task = g_task_new(NULL, NULL, NULL, NULL);
+
+  LOGD("peer_connection_start_task");
+
+  pc->cancellable = g_cancellable_new();
+
+  pc->task = g_task_new(NULL, pc->cancellable, NULL, NULL);
+
   g_task_set_task_data(pc->task, pc, NULL);
+
   g_task_run_in_thread(pc->task, peer_connection_task);
+
 }
 
 static void peer_connection_stop_task(PeerConnection *pc) {
 
-  g_task_return_new_error(pc->task, G_IO_ERROR, G_IO_ERROR_CANCELLED, "");
+  LOGD("peer_connection_stop_task");
+
+  g_cancellable_cancel(pc->cancellable);
+
+  g_task_propagate_boolean(pc->task, NULL);
+
+  g_object_unref(pc->cancellable);
+
   g_object_unref(pc->task);
+
 }
 
 void* peer_connection_gather_thread(void *userdata) {
@@ -345,7 +362,8 @@ void peer_connection_incomming_rtcp(PeerConnection *pc, uint8_t *buf, size_t len
 
 void peer_connection_media_stream_playback(PeerConnection *pc) {
 
-  LOG_INFO("Playback");
+  LOGD("peer_connection_media_stream_playback");
+
   int pt;
 
   MediaCodec codec;

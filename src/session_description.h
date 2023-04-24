@@ -47,7 +47,7 @@ struct SessionDescription {
  * @brief Create a new SessionDescription.
  * @return Pointer of struct SessionDescription.
  */
-SessionDescription* session_description_create(char *sdp_text);
+SessionDescription* session_description_create(const char *sdp_text);
 
 /**
  * @brief Destroy a SessionDescription.

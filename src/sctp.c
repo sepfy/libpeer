@@ -81,7 +81,7 @@ static int sctp_handle_incoming_data(Sctp *sctp, char *data, size_t len, uint32_
       break;
     case DATA_CHANNEL_PPID_DOMSTRING:
 
-      LOG_DEBUG("Got message %s (size = %ld)", msg, len);
+      LOGD("Got message %s (size = %ld)", msg, len);
       msg = strndup(data, len);
       if(msg && sctp->onmessasge) {
         sctp->onmessasge(msg, len, sctp->userdata);
@@ -105,7 +105,7 @@ static int sctp_incoming_data_cb(struct socket *sock, union sctp_sockstore addr,
  void *data, size_t len, struct sctp_rcvinfo recv_info, int flags, void *userdata) {
 
   Sctp *sctp = (Sctp*)userdata;
-  LOG_DEBUG("Data of length %u received on stream %u with SSN %u, TSN %u, PPID %u\n",
+  LOGD("Data of length %u received on stream %u with SSN %u, TSN %u, PPID %u\n",
     (uint32_t)len,
     recv_info.rcv_sid,
     recv_info.rcv_ssn,
