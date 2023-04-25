@@ -691,34 +691,6 @@ int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int byt
 
 }
 
-void peer_connection_on_connected(PeerConnection *pc, void (*on_connected)(void *userdata)) {
-
-  pc->on_connected = on_connected;
-}
-
-void peer_connection_on_receiver_packet_loss(PeerConnection *pc,
- void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *userdata)) {
-
-  pc->on_receiver_packet_loss = on_receiver_packet_loss;
-}
-
-void peer_connection_onicecandidate(PeerConnection *pc, void (*onicecandidate)(char *sdp_text, void *userdata)) {
-
-  pc->onicecandidate = onicecandidate;
-}
-
-void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
- void (*oniceconnectionstatechange)(IceConnectionState state, void *userdata)) {
-
-  pc->oniceconnectionstatechange = oniceconnectionstatechange;
-
-}
-
-void peer_connection_ontrack(PeerConnection *pc, void (*ontrack)(uint8_t *packet, size_t byte, void *userdata)) {
-
-  pc->ontrack = ontrack;
-}
-
 uint32_t peer_connection_get_ssrc(PeerConnection *pc, const char *type) {
 
   if(strcmp(type, "audio") == 0) {
@@ -748,6 +720,34 @@ int peer_connection_get_rtpmap(PeerConnection *pc, MediaCodec codec) {
    return -1;
 }
 
+// callbacks
+void peer_connection_on_connected(PeerConnection *pc, void (*on_connected)(void *userdata)) {
+
+  pc->on_connected = on_connected;
+}
+
+void peer_connection_on_receiver_packet_loss(PeerConnection *pc,
+ void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *userdata)) {
+
+  pc->on_receiver_packet_loss = on_receiver_packet_loss;
+}
+
+void peer_connection_onicecandidate(PeerConnection *pc, void (*onicecandidate)(char *sdp_text, void *userdata)) {
+
+  pc->onicecandidate = onicecandidate;
+}
+
+void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
+ void (*oniceconnectionstatechange)(IceConnectionState state, void *userdata)) {
+
+  pc->oniceconnectionstatechange = oniceconnectionstatechange;
+
+}
+
+void peer_connection_ontrack(PeerConnection *pc, void (*ontrack)(uint8_t *packet, size_t byte, void *userdata)) {
+
+  pc->ontrack = ontrack;
+}
 
 void peer_connection_ondatachannel(PeerConnection *pc,
  void (*onmessasge)(char *msg, size_t len, void *userdata),
@@ -761,3 +761,4 @@ void peer_connection_ondatachannel(PeerConnection *pc,
     sctp_onmessage(pc->sctp, onmessasge);
   }
 }
+
