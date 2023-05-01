@@ -17,23 +17,16 @@ const char index_html[] = " \
         iceServers: [{urls: 'stun:stun.l.google.com:19302'}] \n \
       }); \n \
       var log = msg => { console.log(msg); }; \n \
-      function httpPost(url, payload, callback) { \n \
+      function sdpExchange(sdp) { \n \
         var xhttp = new XMLHttpRequest(); \n \
         xhttp.onreadystatechange = function() { \n \
           if (this.readyState == 4 && this.status == 200) { \n \
-            callback(this.responseText); \n \
+            pc.setRemoteDescription(new RTCSessionDescription({'type': 'answer', 'sdp': this.responseText})); \n \
           } \n \
         }; \n \
-        xhttp.open('POST', url); \n \
-        xhttp.send(payload); \n \
-      } \n \
-      function pollAnswer() { \n \
-        httpPost('/answer', '', function(sdp) { \n \
-          if(sdp == '') \n \
-            setTimeout(pollAnswer, 2000); \n \
-          else \n \
-            pc.setRemoteDescription(new RTCSessionDescription({'type': 'answer', 'sdp': sdp})); \n \
-        }); \n \
+        xhttp.open('POST', '/sdpexchange'); \n \
+        xhttp.setRequestHeader('Content-Type', 'plain/text'); \n \
+        xhttp.send(sdp); \n \
       } \n \
       pc.ontrack = function (event) { \n \
         var el = document.getElementById('remoteCamera'); \n \
@@ -44,7 +37,7 @@ const char index_html[] = " \
       }; \n \
       pc.oniceconnectionstatechange = e => log(pc.iceConnectionState); \n \
       pc.onicecandidate = event => { \n \
-        if(event.candidate === null) httpPost('/offer', pc.localDescription.sdp, pollAnswer) \n \
+        if(event.candidate === null) sdpExchange(pc.localDescription.sdp) \n \
       }; \n \
       pc.addTransceiver('video', {'direction': 'sendrecv'}) \n \
       pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log); \n \
