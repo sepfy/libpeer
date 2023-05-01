@@ -3,25 +3,53 @@
 #ifdef _POSIX_C_SOURCE
 #undef _POSIX_C_SOURCE
 #endif
+#include <glib.h>
 #include <httpserver.h>
 
-#define OFFER_URL "/offer"
-#define ANSWER_URL "/answer"
+#define SDP_EXCHANGE_URL "/sdpexchange"
 
-void (*g_signaling_on_offersdp_get)(const char *offersdp, size_t len) = NULL;
-const char *g_index_html = NULL;
-char *g_answer = NULL;
+#include "signaling.h"
+
+typedef struct Signaling {
+
+  struct http_server_s *server; 
+
+  char *answer;
+
+  const char *index_html;
+
+  GCond cond;
+
+  GMutex mutex;
+
+  void (*on_offersdp_get)(char *offersdp, void *data);
+
+} Signaling;
+
+
+Signaling g_signaling;
+
 
 void signaling_set_answer(const char *sdp) {
 
-  // clear old data
-  if(g_answer != NULL) {
+  if(g_signaling.answer) {
 
-    free(g_answer);
-    g_answer = NULL;
+    free(g_signaling.answer);
   }
 
-  g_answer = strdup(sdp);
+  g_signaling.answer = strdup(sdp);
+  g_cond_signal(&g_signaling.cond);
+}
+
+void signaling_sdpexchange_request(const char *body, size_t len) {
+
+  char *offersdp = strndup(body, len);
+
+  if (offersdp) {
+
+   g_signaling.on_offersdp_get(offersdp, NULL);
+   free(offersdp);
+  }
 }
 
 void signaling_handle_request(struct http_request_s* request) {
@@ -32,32 +60,29 @@ void signaling_handle_request(struct http_request_s* request) {
 
   http_string_t url = http_request_target(request);
 
-  if(url.len == strlen(OFFER_URL) && memcmp(url.buf, OFFER_URL, url.len) == 0) {
+  if(url.len == strlen(SDP_EXCHANGE_URL) && memcmp(url.buf, SDP_EXCHANGE_URL, url.len) == 0) {
+
+    http_response_header(response, "Content-Type", "text/plain");
 
     http_string_t body = http_request_body(request);
-    if(g_signaling_on_offersdp_get != NULL)
-      g_signaling_on_offersdp_get(body.buf, body.len);
 
-    http_response_header(response, "Content-Type", "text/plain");
-    http_response_body(response, "", 0);
-  }
-  else if(url.len == strlen(ANSWER_URL) && memcmp(url.buf, ANSWER_URL, url.len) == 0) {
+    signaling_sdpexchange_request(body.buf, body.len);
 
-    http_response_header(response, "Content-Type", "text/plain");
+    // Block until answer is set
+    g_mutex_lock(&g_signaling.mutex);
+    g_cond_wait(&g_signaling.cond, &g_signaling.mutex);
+    g_mutex_unlock(&g_signaling.mutex);
 
-    if(g_answer != NULL) {
+    http_response_body(response, g_signaling.answer, strlen(g_signaling.answer));
 
-      http_response_body(response, g_answer, strlen(g_answer));
-    }
-    else {
-      http_response_body(response, "", 0);
-    }
   }
   else {
 
+    // index
     http_response_header(response, "Content-Type", "text/html");
-    if(g_index_html != NULL)
-      http_response_body(response, g_index_html, strlen(g_index_html));
+
+    if(g_signaling.index_html != NULL)
+      http_response_body(response, g_signaling.index_html, strlen(g_signaling.index_html));
     else
       http_response_body(response, "", 0);
   }
@@ -65,17 +90,14 @@ void signaling_handle_request(struct http_request_s* request) {
   http_respond(request, response);
 }
 
-void signaling_dispatch(int port, const char *index_html,
- void (*signaling_on_offersdp_get)(const char* offersdp, size_t len)) {
+void signaling_dispatch(int port, const char *index_html, void (*on_offersdp_get)(char *msg, void *data)) {
 
-  struct http_server_s *http_server; 
+  g_signaling.index_html = index_html;
 
-  g_index_html = index_html;
+  g_signaling.server = http_server_init(port, signaling_handle_request);
 
-  g_signaling_on_offersdp_get = signaling_on_offersdp_get;
+  g_signaling.on_offersdp_get = on_offersdp_get;
 
-  http_server = http_server_init(port, signaling_handle_request);
-
-  http_server_listen(http_server);
+  http_server_listen(g_signaling.server);
 }
 
