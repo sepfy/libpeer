@@ -325,6 +325,11 @@ void dtls_transport_incomming_msg(DtlsTransport *dtls_transport, char *buf, int 
   if(!rcert) {
     LOG_ERROR("%s", ERR_reason_error_string(ERR_get_error()));
   }
+  else if(SSL_get_verify_result(dtls_transport->ssl) != X509_V_OK) {
+    LOG_ERROR("Certificate verification failed");
+    X509_free(rcert);
+    rcert = NULL;
+  }
   else {
     unsigned int rsize;
     unsigned char rfingerprint[EVP_MAX_MD_SIZE];
