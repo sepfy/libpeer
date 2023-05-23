@@ -47,6 +47,11 @@ BIO* nice_agent_bio_new(NiceAgent *nice_agent, guint stream_id, guint component_
   }
 
   NiceAgentBio *nice_agent_bio = (NiceAgentBio*)malloc(sizeof(NiceAgentBio));
+  if(nice_agent_bio == NULL) {
+    BIO_free(bio);
+    return NULL;
+  }
+
   nice_agent_bio->nice_agent = nice_agent;
   nice_agent_bio->stream_id = stream_id;
   nice_agent_bio->component_id = component_id;
