@@ -248,7 +248,7 @@ int dtls_transport_sctp_to_dtls(DtlsTransport *dtls_transport, uint8_t *data, in
   if(SSL_write(dtls_transport->ssl, data, bytes) != bytes) {
     //LOG_WARN("");
   }
-
+  return bytes;
 }
 
 int dtls_transport_decrypt_data(DtlsTransport *dtls_transport, char *encrypted_data, int encrypted_len,

@@ -89,7 +89,7 @@ static void* peer_connection_component_state_chanaged_cb(NiceAgent *agent,
   if(pc->oniceconnectionstatechange != NULL) {
     pc->oniceconnectionstatechange(state, pc->userdata);
   }
-
+  return NULL;
 }
 
 static void peer_connection_candidates_to_sdp(PeerConnection *pc, SessionDescription *sdp) {
@@ -255,6 +255,7 @@ static void* peer_connection_candidate_gathering_done_cb(NiceAgent *agent, guint
     pc->onicecandidate(sdp_content, pc->userdata);
   }
 
+  return NULL;
 }
 
 int peer_connection_send_rtcp_pil(PeerConnection *pc, uint32_t ssrc) {
