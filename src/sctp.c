@@ -3,7 +3,7 @@
 #include <usrsctp.h>
 #include <pthread.h>
 
-#include "dtls_transport.h"
+#include "dtls_srtp.h"
 #include "sctp.h"
 #include "utils.h"
 
@@ -12,25 +12,6 @@
 #define DATA_CHANNEL_PPID_BINARY_PARTIAL    52
 #define DATA_CHANNEL_PPID_BINARY            53
 #define DATA_CHANNEL_PPID_DOMSTRING_PARTIAL 54
-
-typedef struct Sctp {
-
-  struct socket *sock;
-
-  int local_port;
-  int remote_port;
-  int connected;
-
-  DtlsTransport *dtls_transport;
-
-  /* datachannel */
-  void (*onmessasge)(char *msg, size_t len, void *userdata);
-  void (*onopen)(void *userdata);
-  void (*onclose)(void *userdata);
-
-  void *userdata;
-
-} Sctp;
 
 int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len) {
 
@@ -43,7 +24,7 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len) {
   spa.sendv_sndinfo.snd_ppid = htonl(51);
 
   if(usrsctp_sendv(sctp->sock, buf, len, NULL, 0, &spa, sizeof(spa), SCTP_SENDV_SPA, 0) < 0) {
-    LOG_ERROR("sctp sendv error");
+    LOGE("sctp sendv error");
     return -1;
   }
 
@@ -53,7 +34,7 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len) {
 static int sctp_outgoing_data_cb(void *userdata, void *buf, size_t len, uint8_t tos, uint8_t set_df) {
 
   Sctp *sctp = (Sctp*)userdata;
-  dtls_transport_sctp_to_dtls(sctp->dtls_transport, buf, len);
+  //dtls_srtp_sctp_to_dtls(sctp->dtls_srtp, buf, len);
 
   return 0;
 }
@@ -113,7 +94,7 @@ static int sctp_incoming_data_cb(struct socket *sock, union sctp_sockstore addr,
     ntohl(recv_info.rcv_ppid));
 
   if(flags & MSG_NOTIFICATION) {
-    LOG_INFO("MSG_NOTIFICATION");
+    LOGI("MSG_NOTIFICATION");
   }
   else {
     sctp_handle_incoming_data(sctp, data, len, ntohl(recv_info.rcv_ppid), recv_info.rcv_sid, flags);
@@ -121,14 +102,14 @@ static int sctp_incoming_data_cb(struct socket *sock, union sctp_sockstore addr,
 
 }
 
-Sctp* sctp_create(DtlsTransport *dtls_transport) {
+Sctp* sctp_create(DtlsSrtp *dtls_srtp) {
 
   Sctp *sctp = (Sctp*)calloc(1, sizeof(Sctp));
 
   if(sctp == NULL)
     return NULL;
 
-  sctp->dtls_transport = dtls_transport;
+  sctp->dtls_srtp = dtls_srtp;
   sctp->local_port = 5000;
   sctp->remote_port = 5000;
 
@@ -146,14 +127,14 @@ int sctp_create_socket(Sctp *sctp) {
    sctp_incoming_data_cb, NULL, 0, sctp);
 
   if(!sock) {
-    LOG_ERROR("usrsctp_socket failed");
+    LOGE("usrsctp_socket failed");
     return -1;
   }
 
   do {
 
     if(usrsctp_set_non_blocking(sock, 1) < 0) {
-      LOG_ERROR("usrsctp_set_non_blocking failed");
+      LOGE("usrsctp_set_non_blocking failed");
       break;
     }
 
@@ -200,7 +181,7 @@ int sctp_create_socket(Sctp *sctp) {
     ret = usrsctp_connect(sock, (struct sockaddr *)&rconn, sizeof(struct sockaddr_conn));
 
     if(ret < 0 && errno != EINPROGRESS) {
-      LOG_ERROR("connect error");
+      LOGE("connect error");
       break;
     }
 
