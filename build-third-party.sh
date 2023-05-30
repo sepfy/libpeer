@@ -22,6 +22,11 @@ make -j4
 cd $BASE_DIR/third_party/cJSON
 make static
 
+# Build mbedTLS
+cd $BASE_DIR/third_party/mbedtls
+sed -i 's/\/\/#define MBEDTLS_SSL_DTLS_SRTP/#define MBEDTLS_SSL_DTLS_SRTP/g' include/mbedtls/mbedtls_config.h
+make -j4
+
 cd $BASE_DIR/third_party/usrsctp
 mkdir -p build && cd build
 cmake -DCMAKE_C_FLAGS="-fPIC" ..
