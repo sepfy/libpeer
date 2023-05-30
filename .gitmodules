@@ -16,3 +16,6 @@
 [submodule "third_party/usrsctp"]
 	path = third_party/usrsctp
 	url = https://github.com/sctplab/usrsctp.git
+[submodule "third_party/mbedtls"]
+	path = third_party/mbedtls
+	url = https://github.com/Mbed-TLS/mbedtls.git
