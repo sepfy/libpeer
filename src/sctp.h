@@ -1,11 +1,30 @@
 #ifndef SCTP_H_
 #define SCTP_H_
 
-#include "dtls_transport.h"
+#include "dtls_srtp.h"
 
 typedef struct Sctp Sctp;
 
-Sctp* sctp_create(DtlsTransport *dtls_transport);
+typedef struct Sctp {
+
+  struct socket *sock;
+
+  int local_port;
+  int remote_port;
+  int connected;
+
+  DtlsSrtp *dtls_srtp;
+
+  /* datachannel */
+  void (*onmessasge)(char *msg, size_t len, void *userdata);
+  void (*onopen)(void *userdata);
+  void (*onclose)(void *userdata);
+
+  void *userdata;
+
+} Sctp;
+
+Sctp* sctp_create(DtlsSrtp *dtls_srtp);
 
 void sctp_destroy(Sctp *sctp);
 

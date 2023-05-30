@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-#include <glib.h>
+//#include <glib.h>
 
 #include "utils.h"
 #include "media_stream.h"
@@ -53,7 +53,7 @@ SessionDescription* session_description_create(const char *sdp_text) {
   sdp = (SessionDescription*)calloc(1, sizeof(SessionDescription));
   if(!sdp || !sdp_text)
     return sdp;
-
+#if 0
   splits = g_strsplit(sdp_text, "\r\n", 512);
   for(i = 0; splits[i] != NULL; i++) {
 
@@ -91,7 +91,7 @@ SessionDescription* session_description_create(const char *sdp_text) {
       session_description_append_newline(sdp, splits[i]);
     }
   }
-
+#endif
   return sdp;
 }
 

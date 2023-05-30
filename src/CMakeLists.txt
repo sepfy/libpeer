@@ -32,20 +32,6 @@ find_package(PkgConfig)
 pkg_check_modules(GLIB REQUIRED glib-2.0)
 pkg_check_modules(GST REQUIRED gstreamer-1.0>=1.4 gstreamer-base-1.0>=1.4)
 
-set(LIBNICE_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/third_party/libnice/agent)
-set(LIBSRTP_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/third_party/libsrtp/include)
-set(LIBRTP_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/third_party/media-server/librtp/include)
-set(USRSCTP_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/third_party/usrsctp/usrsctplib)
-include_directories(${GLIB_INCLUDE_DIRS} ${LIBNICE_INCLUDE_DIRS} ${LIBSRTP_INCLUDE_DIRS} ${LIBRTP_INCLUDE_DIRS} ${USRSCTP_INCLUDE_DIRS})
-
-include_directories(${CMAKE_SOURCE_DIR}/src ${GST_INCLUDE_DIRS})
-
-set(LIBNICE_LINK_DIRS ${CMAKE_SOURCE_DIR}/third_party/libnice/builddir/nice/)
-set(LIBSRTP_LINK_DIRS ${CMAKE_SOURCE_DIR}/third_party/libsrtp/build/)
-set(LIBRTP_LINK_DIRS ${CMAKE_SOURCE_DIR}/third_party/media-server/librtp/debug.linux)
-set(USRSCTP_LINK_DIRS ${CMAKE_SOURCE_DIR}/third_party/usrsctp/build/usrsctplib)
-link_directories(${LIBNICE_LINK_DIRS} ${LIBSRTP_LINK_DIRS} ${LIBRTP_LINK_DIRS} ${USRSCTP_LINK_DIRS})
-
 if(ENABLE_SIGNALING)
   set(SIGNALING_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/third_party/httpserver.h ${CMAKE_SOURCE_DIR}/third_party/cJSON)
   include_directories(${SIGNALING_INCLUDE_DIRS})
@@ -56,7 +42,7 @@ endif()
 
 add_library(pear SHARED ${SRCS})
 
-target_link_libraries(pear ssl crypto nice srtp2 rtp usrsctp pthread glib-2.0 gobject-2.0 gio-2.0 ${GST_LIBRARIES})
+target_link_libraries(pear ${TARGET_LIBS})
 
 if(ENABLE_AEC)
   target_link_libraries(pear speexdsp)

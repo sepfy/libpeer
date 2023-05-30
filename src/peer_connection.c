@@ -1,9 +1,110 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <gio/gnetworking.h>
 
-#include <gst/gst.h>
+#include "peer_connection.h"
+
+static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t len) {
+  
+  DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx; 
+  PeerConnection *pc = (PeerConnection *) dtls_srtp->user_data;
+  LOGD("peer_connection_dtls_srtp_recv %p\n", &pc->agent);
+  int ret;
+  
+  while (1) {
+    ret = agent_recv(&pc->agent, buf, len);
+    if (ret > 0) {
+      break;
+    }
+  }
+  
+  return ret;
+}
+
+static int peer_connection_dtls_srtp_send(void *ctx, const unsigned char *buf, size_t len) {
+  
+  DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx; 
+  PeerConnection *pc = (PeerConnection *) dtls_srtp->user_data;
+  
+  agent_send(&pc->agent, (char*)buf, len);
+  
+  return 0;
+}
+
+void peer_connection_init(PeerConnection *pc) {
+
+  dtls_srtp_init(&pc->dtls_srtp, DTLS_SRTP_ROLE_SERVER, pc);
+
+  pc->dtls_srtp.udp_recv = peer_connection_dtls_srtp_recv;
+  pc->dtls_srtp.udp_send = peer_connection_dtls_srtp_send;
+}
+
+void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp_text) {
+
+  agent_set_remote_description(&pc->agent, (char*)sdp_text);
+
+  for(int i = 0; i < pc->agent.remote_candidates_count; i++) {
+
+    printf("Remote candidate: %d ip = %d.%d.%d.%d port = %d\n", i, pc->agent.remote_candidates[i].addr.ipv4[0], pc->agent.remote_candidates[i].addr.ipv4[1], pc->agent.remote_candidates[i].addr.ipv4[2], pc->agent.remote_candidates[i].addr.ipv4[3], pc->agent.remote_candidates[i].addr.port);
+  }
+
+  while(1) {
+
+    if (pc->dtls_srtp.state == DTLS_SRTP_STATE_CONNECTED) {
+
+      agent_select_candidate_pair(&pc->agent);
+
+    } else if (pc->agent.state == AGENT_STATE_CONNECTED) {
+
+      printf("Agent connected\n");
+
+      if (dtls_srtp_handshake(&pc->dtls_srtp, NULL) == 0) {
+
+
+        printf("HANDSHAKE DONE\n");
+      }
+
+
+    } else {
+
+
+      agent_select_candidate_pair(&pc->agent);
+//    agent_send(&agent, buf, sizeof(buf));
+    }
+    usleep(1000 * 100);
+
+
+  }
+
+}
+
+const char* peer_connection_create_offer(PeerConnection *pc) {
+
+  char description[512];
+
+  memset(description, 0, sizeof(description));
+
+  memset(&pc->agent, 0, sizeof(pc->agent));
+
+  agent_gather_candidates(&pc->agent);
+
+  agent_get_local_description(&pc->agent, description, sizeof(description));
+
+  sdp_create(&pc->local_sdp);
+
+  sdp_append_h264(&pc->local_sdp);
+
+  sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
+  sdp_append(&pc->local_sdp, "a=setup:actpass");
+
+  strcat(pc->local_sdp.content, description);
+
+  return pc->local_sdp.content;
+}
+
+
+
+#if 0
 #include "sctp.h"
 #include "dtls_transport.h"
 #include "nice_agent_bio.h"
@@ -719,6 +820,7 @@ int peer_connection_get_rtpmap(PeerConnection *pc, MediaCodec codec) {
 
    return -1;
 }
+#endif
 
 // callbacks
 void peer_connection_on_connected(PeerConnection *pc, void (*on_connected)(void *userdata)) {
@@ -738,10 +840,9 @@ void peer_connection_onicecandidate(PeerConnection *pc, void (*onicecandidate)(c
 }
 
 void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
- void (*oniceconnectionstatechange)(IceConnectionState state, void *userdata)) {
+ void (*oniceconnectionstatechange)(IceCandidateState state, void *userdata)) {
 
   pc->oniceconnectionstatechange = oniceconnectionstatechange;
-
 }
 
 void peer_connection_ontrack(PeerConnection *pc, void (*ontrack)(uint8_t *packet, size_t byte, void *userdata)) {
@@ -756,9 +857,9 @@ void peer_connection_ondatachannel(PeerConnection *pc,
 
   if(pc) {
 
-    sctp_onopen(pc->sctp, onopen);
-    sctp_onclose(pc->sctp, onclose);
-    sctp_onmessage(pc->sctp, onmessasge);
+    sctp_onopen(&pc->sctp, onopen);
+    sctp_onclose(&pc->sctp, onclose);
+    sctp_onmessage(&pc->sctp, onmessasge);
   }
 }
 

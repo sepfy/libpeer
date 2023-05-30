@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <string.h>
 #include "utils.h"
+#include "mbedtls/md.h"
+
 
 // http://haoyuanliu.github.io/2017/01/16/%E5%9C%B0%E5%9D%80%E6%9F%A5%E8%AF%A2%E5%87%BD%E6%95%B0gethostbyname-%E5%92%8Cgetaddrinfo/
 int utils_get_ipv4addr(char *hostname, char *ipv4addr, size_t size) {
@@ -104,5 +106,35 @@ int utils_buffer_pop(Buffer *rb, uint8_t *data, int size) {
   return size;
 }
 
+void utils_random_string(char *s, const int len) {
+
+  int i;
+
+  static const char alphanum[] =
+   "0123456789"
+   "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+   "abcdefghijklmnopqrstuvwxyz";
+
+  srand(time(NULL));
+
+  for (i = 0; i < len; ++i) {
+    s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
+  }
+
+  s[len] = '\0';
+}
+
+void utils_get_sha1(const char *input, size_t input_len, const char *key, unsigned char *output) {
+
+  mbedtls_md_context_t ctx;
+  mbedtls_md_type_t md_type = MBEDTLS_MD_SHA1;
+  mbedtls_md_init(&ctx);
+  mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(md_type), 1);
+  mbedtls_md_hmac_starts(&ctx, (const unsigned char *) key, strlen(key));
+  mbedtls_md_hmac_update(&ctx, (const unsigned char *) input, input_len);
+  mbedtls_md_hmac_finish(&ctx, output);
+  mbedtls_md_free(&ctx);
+
+}
 
 

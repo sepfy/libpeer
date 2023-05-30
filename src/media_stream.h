@@ -3,7 +3,10 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+
+#ifdef GST
 #include <gst/gst.h>
+#endif
 
 #include "utils.h"
 
@@ -31,11 +34,13 @@ struct MediaStream {
   char outgoing_pipeline_text[1024];
   char incoming_pipeline_text[1024];
 
+#ifdef GST
   GstElement *outgoing_pipeline;
   GstElement *incoming_pipeline;
   GstElement *sink;
   GstElement *src;
   GstElement *rtp;
+#endif
 
   Buffer *outgoing_rb;
   Buffer *incoming_rb;

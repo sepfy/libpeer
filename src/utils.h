@@ -20,31 +20,35 @@
 #endif
 
 #define LOG_PRINT(level_tag, fmt, ...) \
-  fprintf(stdout, "[%s %s:%d] " fmt"\n", level_tag, __FILE__, __LINE__, ##__VA_ARGS__)
+  fprintf(stdout, "%s\t%s\t%d\t" fmt"\n", level_tag, __FILE__, __LINE__, ##__VA_ARGS__)
 
 #if LOG_LEVEL >= LEVEL_DEBUG
-#define LOGD(fmt, ...) LOG_PRINT(INFO_TAG, fmt, ##__VA_ARGS__)
+#define LOGD(fmt, ...) LOG_PRINT(DEBUG_TAG, fmt, ##__VA_ARGS__)
 #else
 #define LOGD(fmt, ...)
 #endif
 
 #if LOG_LEVEL >= LEVEL_INFO
-#define LOG_INFO(fmt, ...) LOG_PRINT(INFO_TAG, fmt, ##__VA_ARGS__)
+#define LOGI(fmt, ...) LOG_PRINT(INFO_TAG, fmt, ##__VA_ARGS__)
 #else
-#define LOG_INFO(fmt, ...)
+#define LOGI(fmt, ...)
 #endif
 
 #if LOG_LEVEL >= LEVEL_WARN
-#define LOG_WARN(fmt, ...) LOG_PRINT(WARN_TAG, fmt, ##__VA_ARGS__)
+#define LOGW(fmt, ...) LOG_PRINT(WARN_TAG, fmt, ##__VA_ARGS__)
 #else
-#define LOG_WARN(fmt, ...)
+#define LOGW(fmt, ...)
 #endif
 
 #if LOG_LEVEL >= LEVEL_ERROR
-#define LOG_ERROR(fmt, ...) LOG_PRINT(ERROR_TAG, fmt, ##__VA_ARGS__)
+#define LOGE(fmt, ...) LOG_PRINT(ERROR_TAG, fmt, ##__VA_ARGS__)
 #else
-#define LOG_ERROR(fmt, ...)
+#define LOGE(fmt, ...)
 #endif
+
+void utils_random_string(char *s, const int len);
+void utils_get_sha1(const char *input, size_t input_len, const char *key, unsigned char *output);
+
 
 typedef struct Buffer {
 
