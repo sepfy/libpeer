@@ -3,44 +3,30 @@
 
 #include <stdlib.h>
 #include <stdint.h>
-
-#ifdef GST
 #include <gst/gst.h>
-#endif
-
-#include "utils.h"
 
 #ifdef SPEEX_AEC
 #include <speex/speex_echo.h>
 #include <speex/speex_preprocess.h>
 #endif
 
-typedef enum MediaCodec {
+#include "utils.h"
+#include "codec.h"
 
-  /* Video */
-  CODEC_H264,
-  CODEC_VP8,
-  /* Audio */
-  CODEC_OPUS,
-  CODEC_PCMA,
-  CODEC_PCMU,
-  CODEC_NONE,
+#define PIPELINE_TEXT_MAX_LENGTH 1024
 
-} MediaCodec;
-
-struct MediaStream {
+typedef struct MediaStream {
 
   MediaCodec codec;
+
   char outgoing_pipeline_text[1024];
   char incoming_pipeline_text[1024];
 
-#ifdef GST
   GstElement *outgoing_pipeline;
   GstElement *incoming_pipeline;
   GstElement *sink;
   GstElement *src;
   GstElement *rtp;
-#endif
 
   Buffer *outgoing_rb;
   Buffer *incoming_rb;
@@ -53,9 +39,7 @@ struct MediaStream {
   SpeexPreprocessState *preprocess_state;
 #endif
 
-};
-
-typedef struct MediaStream MediaStream;
+} MediaStream;
 
 MediaStream* media_stream_create(MediaCodec codec,
  const char *outgoing_pipeline_text,

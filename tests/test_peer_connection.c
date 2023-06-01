@@ -61,5 +61,8 @@ int main(int argc, char *argv[]) {
   peer_connection_set_remote_description(&pc, answer_sdp);
   cJSON_Delete(answer);
 
+  while (1) {
+    usleep(100*1000);
+  }
 }
 

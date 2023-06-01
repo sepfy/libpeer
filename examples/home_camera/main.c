@@ -5,9 +5,9 @@
 #include "peer_connection.h"
 #include "signaling.h"
 
-const char VIDEO_SINK_PIPELINE[] = "libcamerasrc ! video/x-raw, format=NV12, width=1280, height=960, framerate=30/1, interlace-mode=progressive, colorimetry=bt709 ! v4l2h264enc capture-io-mode=4 output-io-mode=4";
+const char VIDEO_SINK_PIPELINE[] = "v4l2src ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15";
 
-const char AUDIO_SINK_PIPELINE[] = "alsasrc latency-time=20000 device=plughw:wm8960soundcard,0 ! audio/x-raw,format=S16LE,channel=2,rate=48000 ! audioresample ! audioconvert ! audio/x-raw,channels=1,rate=8000 ! identity name=aec-cap ! alawenc";
+const char AUDIO_SINK_PIPELINE[] = "alsasrc latency-time=20000 device=plughw:U0x46d0x81b,0 ! audio/x-raw,channels=1,rate=8000 ! identity name=aec-cap ! alawenc";
 
 const char AUDIO_SRC_PIPELINE[] = "alawdec ! audio/x-raw,channels=1,rate=8000 ! queue ! identity name=aec-far ! audioresample ! audioconvert ! audio/x-raw,format=S16LE,channels=2,rate=48000 ! alsasink device=hdmi:vc4hdmi,0";
 
@@ -29,7 +29,7 @@ void on_connected(void *data) {
   printf("on connected\n");
 }
 
-void signaling_on_offersdp_get(const char *offersdp, size_t len) {
+void signaling_on_offersdp_get(char *offersdp, size_t len) {
 
   static PeerConnection *pc = NULL;
 

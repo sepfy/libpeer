@@ -31,48 +31,72 @@ static int peer_connection_dtls_srtp_send(void *ctx, const unsigned char *buf, s
   return 0;
 }
 
+void peer_connection_configure(PeerConnection *pc, PeerOptions *options) {
+
+  memcpy(&pc->options, options, sizeof(PeerOptions));
+
+}
+
 void peer_connection_init(PeerConnection *pc) {
+
+  pc->agent.mode = AGENT_MODE_CONTROLLED;
 
   dtls_srtp_init(&pc->dtls_srtp, DTLS_SRTP_ROLE_SERVER, pc);
 
   pc->dtls_srtp.udp_recv = peer_connection_dtls_srtp_recv;
   pc->dtls_srtp.udp_send = peer_connection_dtls_srtp_send;
+
+
+#ifdef HAVE_GST
+  gst_init(NULL, NULL);
+  pc->audio_stream = media_stream_create(pc->options.audio_codec, pc->options.audio_outgoing_pipeline, pc->options.audio_incoming_pipeline);
+  pc->video_stream = media_stream_create(pc->options.video_codec, pc->options.video_outgoing_pipeline, pc->options.video_incoming_pipeline);
+#endif
 }
 
 void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp_text) {
 
   agent_set_remote_description(&pc->agent, (char*)sdp_text);
 
-  for(int i = 0; i < pc->agent.remote_candidates_count; i++) {
-
-    printf("Remote candidate: %d ip = %d.%d.%d.%d port = %d\n", i, pc->agent.remote_candidates[i].addr.ipv4[0], pc->agent.remote_candidates[i].addr.ipv4[1], pc->agent.remote_candidates[i].addr.ipv4[2], pc->agent.remote_candidates[i].addr.ipv4[3], pc->agent.remote_candidates[i].addr.port);
-  }
-
   while(1) {
 
-    if (pc->dtls_srtp.state == DTLS_SRTP_STATE_CONNECTED) {
 
-      agent_select_candidate_pair(&pc->agent);
+    if (pc->agent.state == AGENT_STATE_CONNECTED && pc->dtls_srtp.state == DTLS_SRTP_STATE_INIT) {
 
-    } else if (pc->agent.state == AGENT_STATE_CONNECTED) {
-
-      printf("Agent connected\n");
-
+      printf("handshake\n");
       if (dtls_srtp_handshake(&pc->dtls_srtp, NULL) == 0) {
 
 
         printf("HANDSHAKE DONE\n");
+
+#ifdef HAVE_GST
+  if (pc->audio_stream) media_stream_play(pc->audio_stream);
+  if (pc->video_stream) media_stream_play(pc->video_stream);
+
+  uint8_t data[1500];
+  size_t size = sizeof(data);
+
+  while (1) {
+
+    if (pc->video_stream && (utils_buffer_pop(pc->video_stream->outgoing_rb, data, size) == size)) {
+
+      size_t packet_size;
+      memcpy(&packet_size, data, sizeof(size_t));
+          
+      //LOGD("buf size = %ld, %d\n", size, packet_size);
+      peer_connection_send_rtp_packet(pc, data + sizeof(size_t), packet_size);
+    }
+  }
+
+#endif
+        break;
       }
 
 
     } else {
 
-
-      agent_select_candidate_pair(&pc->agent);
-//    agent_send(&agent, buf, sizeof(buf));
+      agent_loop(&pc->agent);
     }
-    usleep(1000 * 100);
-
 
   }
 
@@ -100,6 +124,13 @@ const char* peer_connection_create_offer(PeerConnection *pc) {
   strcat(pc->local_sdp.content, description);
 
   return pc->local_sdp.content;
+}
+
+int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes) {
+
+  dtls_srtp_encrypt_rtp_packet(&pc->dtls_srtp, packet, &bytes);
+
+  return agent_send(&pc->agent, packet, bytes);
 }
 
 
@@ -779,17 +810,6 @@ int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t l
     return sctp_outgoing_data(pc->sctp, message, len);
 
   return -1;
-}
-
-int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes) {
-
-  dtls_transport_encrypt_rtp_packet(pc->dtls_transport, packet, &bytes);
-  int sent = nice_agent_send(pc->nice_agent, pc->stream_id, pc->component_id, bytes, (gchar*)packet);
-  if(sent < bytes) {
-    LOG_ERROR("only sent %d bytes? (was %d)", sent, bytes);
-  }
-  return sent;
-
 }
 
 uint32_t peer_connection_get_ssrc(PeerConnection *pc, const char *type) {

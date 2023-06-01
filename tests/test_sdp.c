@@ -4,6 +4,11 @@
 
 #include "agent.h"
 
+void on_agent_state_changed(AgentState state, void *user_data) {
+
+  printf("Agent state changed: %d\n", state);
+} 
+
 int main(int argc, char *argv[]) {
 
   Agent agent;
@@ -47,23 +52,14 @@ int main(int argc, char *argv[]) {
 
   printf("Remote description: \n%s", remote_description);
 
+  agent.mode = AGENT_MODE_CONTROLLING;
+  //agent.mode = AGENT_MODE_CONTROLLED;
+  agent.state_changed_cb = on_agent_state_changed;
   agent_set_remote_description(&agent, remote_description);
 
-  pthread_t thread;
+  while (1) {
 
-  pthread_create(&thread, NULL, agent_thread, &agent);
-
-  char buf[64];
-
-  memset(buf, 0, sizeof(buf));
-
-  snprintf(buf, sizeof(buf), "hello from %s", argv[1]);
-
-  while(1) {
-
-    agent_select_candidate_pair(&agent);
-//    agent_send(&agent, buf, sizeof(buf));
-    usleep(1000 * 1000);
+    agent_loop(&agent);
   }
 
   return 0;

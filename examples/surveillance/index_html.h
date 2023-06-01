@@ -14,7 +14,7 @@ const char index_html[] = " \
     <video width='100%' id='remoteCamera'></video> \n \
     <script> \n \
       var pc = new RTCPeerConnection({ \n \
-        iceServers: [{urls: 'stun:stun.l.google.com:19302'}] \n \
+        iceServers: [{urls: 'stun:142.250.21.127:19302'}] \n \
       }); \n \
       var log = msg => { console.log(msg); }; \n \
       function sdpExchange(sdp) { \n \

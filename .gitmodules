@@ -19,3 +19,6 @@
 [submodule "third_party/mbedtls"]
 	path = third_party/mbedtls
 	url = https://github.com/Mbed-TLS/mbedtls.git
+[submodule "third_party/mosquitto"]
+	path = third_party/mosquitto
+	url = https://github.com/eclipse/mosquitto

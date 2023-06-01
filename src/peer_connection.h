@@ -13,11 +13,33 @@ extern "C" {
 #include "agent.h"
 #include "dtls_srtp.h"
 #include "sdp.h"
+#include "codec.h"
+
+#ifdef HAVE_GST
+#include "gst/media_stream.h"
+#endif
+
+
+typedef struct PeerOptions {
+
+  MediaCodec audio_codec;
+  MediaCodec video_codec;
+  int b_datachannel;
+
+#ifdef HAVE_GST
+  const char *audio_outgoing_pipeline;
+  const char *audio_incoming_pipeline;
+  const char *video_outgoing_pipeline;
+  const char *video_incoming_pipeline;
+#endif
+
+} PeerOptions;
 
 typedef struct PeerConnection PeerConnection;
 
 struct PeerConnection {
 
+  PeerOptions options;
   Agent agent;
   DtlsSrtp dtls_srtp;
   Sctp sctp;
@@ -33,8 +55,14 @@ struct PeerConnection {
 
   void *user_data;
 
+#ifdef HAVE_GST
+  MediaStream *audio_stream;
+  MediaStream *video_stream;
+#endif
 
 };
+
+void peer_connection_configure(PeerConnection *pc, PeerOptions *options);
 
 void peer_connection_init(PeerConnection *pc);
 
@@ -96,6 +124,7 @@ void peer_connection_ondatachannel(PeerConnection *pc,
  void (*onopen)(void *userdata),
  void (*onclose)(void *userdata));
 
+int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);
 
 
 #if 0
@@ -187,7 +216,6 @@ void peer_connection_enable_mdns(PeerConnection *pc, int b_enabled);
 int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len);
 
 // To confirm:
-int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);
 void peer_connection_media_stream_playback(PeerConnection *pc);
 #endif
 
