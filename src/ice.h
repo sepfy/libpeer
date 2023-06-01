@@ -7,7 +7,7 @@
 #include "stun.h"
 
 #define ICE_UFRAG_LENGTH 4
-#define ICE_UPWD_LENGTH 22
+#define ICE_UPWD_LENGTH 24
 
 typedef enum IceCandidateState {
 
@@ -52,10 +52,13 @@ typedef struct IceCandidatePair IceCandidatePair;
 
 struct IceCandidatePair {
 
+  IceCandidateState state;
+
   IceCandidate *local;
 
   IceCandidate *remote;
 
+  uint64_t priority;
 };
 
 void ice_candidate_create(IceCandidate *ice_candidate, IceCandidateType type, Address *addr);

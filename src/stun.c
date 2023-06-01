@@ -89,9 +89,9 @@ void stun_set_mapped_address(char *value, uint8_t *mask, Address *addr) {
     ipv4[i] = addr->ipv4[i];
   }
 
-  LOGD("XOR Mapped Address Family: 0x%02x", *family);
-  LOGD("XOR Mapped Address Port: %d", *port);
-  LOGD("XOR Mapped Address Address: %d.%d.%d.%d", ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
+  //LOGD("XOR Mapped Address Family: 0x%02x", *family);
+  //LOGD("XOR Mapped Address Port: %d", *port);
+  //LOGD("XOR Mapped Address Address: %d.%d.%d.%d", ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
 }
 
 void stun_get_mapped_address(char *value, uint8_t *mask, Address *addr) {
@@ -134,8 +134,8 @@ void stun_parse_msg_buf(StunMessage *msg) {
 
     StunAttribute *attr = (StunAttribute *)(msg->buf + pos);
 
-    LOGD("Attribute Type: 0x%04x", ntohs(attr->type));
-    LOGD("Attribute Length: %d", ntohs(attr->length));
+    //LOGD("Attribute Type: 0x%04x", ntohs(attr->type));
+    //LOGD("Attribute Length: %d", ntohs(attr->length));
 
     switch (ntohs(attr->type)) {
       case STUN_ATTR_TYPE_MAPPED_ADDRESS:
@@ -198,8 +198,8 @@ void stun_parse_binding_response(char *buf, size_t len, Address *addr) {
 
     StunAttribute *attr = (StunAttribute *)(buf + pos);
 
-    LOGD("Attribute Type: 0x%04x", ntohs(attr->type));
-    LOGD("Attribute Length: %d", ntohs(attr->length));
+    //LOGD("Attribute Type: 0x%04x", ntohs(attr->type));
+    //LOGD("Attribute Length: %d", ntohs(attr->length));
 
     if (ntohs(attr->type) == STUN_ATTRIBUTE_MAPPED_ADDRESS) {
 
@@ -425,6 +425,9 @@ StunMsgType stun_is_stun_msg(char *buf, size_t size) {
 
     return STUN_MSG_TYPE_BINDING_RESPONSE;
 
+  } else if (ntohs(header->type) == STUN_BINDING_ERROR_RESPONSE) {
+
+    return STUN_MSG_TYPE_BINDING_ERROR_RESPONSE;
   } else {
 
     return STUN_MSG_TYPE_INVLID;

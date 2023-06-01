@@ -22,6 +22,10 @@ make -j4
 cd $BASE_DIR/third_party/cJSON
 make static
 
+# Buld mosquitto
+cd $BASE_DIR/third_party/mosquitto/lib
+make WITH_STATIC_LIBRARIES=yes
+
 # Build mbedTLS
 cd $BASE_DIR/third_party/mbedtls
 sed -i 's/\/\/#define MBEDTLS_SSL_DTLS_SRTP/#define MBEDTLS_SSL_DTLS_SRTP/g' include/mbedtls/mbedtls_config.h

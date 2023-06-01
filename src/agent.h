@@ -21,7 +21,7 @@
 
 #define AGENT_MAX_DESCRIPTION 40960
 #define AGENT_MAX_CANDIDATES 10
-
+#define AGENT_MAX_CANDIDATE_PAIRS 100
 
 typedef enum AgentState {
 
@@ -34,6 +34,12 @@ typedef enum AgentState {
 
 } AgentState;
 
+typedef enum AgentMode {
+
+  AGENT_MODE_CONTROLLED = 0,
+  AGENT_MODE_CONTROLLING
+
+} AgentMode;
 
 typedef struct Agent Agent;
 
@@ -59,20 +65,29 @@ struct Agent {
 
   AgentState state;
 
-  IceCandidatePair selected_pair;
+  AgentMode mode;
+
+  IceCandidatePair candidate_pairs[AGENT_MAX_CANDIDATE_PAIRS];
+  IceCandidatePair *selected_pair;
+  IceCandidatePair *nominated_pair;
+
+  int candidate_pairs_num;
 
   int use_candidate;
 
   uint32_t transaction_id[3];
 
-  void (*on_recv_cb)(Agent *agent, char *buf, int len, void *user_data);
+  void (*state_changed_cb)(AgentState state, void *user_data);
+  void (*data_recv_cb)(char *buf, int len, void *user_data);
 };
 
 void agent_gather_candidates(Agent *agent);
 
 void agent_get_local_description(Agent *agent, char *description, int length);
 
-void agent_send(Agent *agent, char *buf, int len);
+int agent_loop(Agent *agent);
+
+int agent_send(Agent *agent, char *buf, int len);
 
 int agent_recv(Agent *agent, char *buf, int len);
 
@@ -82,7 +97,7 @@ void *agent_thread(void *arg);
 
 void agent_select_candidate_pair(Agent *agent);
 
-void agent_attach_recv_cb(Agent *agent, void (*on_recv_cb)(Agent *agent, char *buf, int len, void *user_data));
+void agent_attach_recv_cb(Agent *agent, void (*data_recv_cb)(char *buf, int len, void *user_data));
 
 #endif // AGENT_H_
 

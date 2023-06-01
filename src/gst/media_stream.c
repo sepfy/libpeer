@@ -31,6 +31,8 @@ int media_stream_new_sample(GstElement *sink, void *userdata) {
   GstMapInfo info;
   MediaStream *ms = (MediaStream*)userdata;
 
+  char rtp_chunk[1500];
+
   g_signal_emit_by_name(sink, "pull-sample", &sample);
 
   if (sample) {
@@ -38,8 +40,13 @@ int media_stream_new_sample(GstElement *sink, void *userdata) {
     buffer = gst_sample_get_buffer(sample);
     gst_buffer_map(buffer, &info, GST_MAP_READ);
 
-    utils_buffer_push(ms->outgoing_rb, (uint8_t*)&info.size, sizeof(size_t));
-    utils_buffer_push(ms->outgoing_rb, info.data, info.size);
+    memset(rtp_chunk, 0, sizeof(rtp_chunk));
+    memcpy(rtp_chunk, &info.size, sizeof(size_t));
+    memcpy(rtp_chunk + sizeof(size_t), info.data, info.size);
+
+    utils_buffer_push(ms->outgoing_rb, (uint8_t*)rtp_chunk, sizeof(rtp_chunk));
+    //utils_buffer_push(ms->outgoing_rb, (uint8_t*)&info.size, sizeof(size_t));
+    //utils_buffer_push(ms->outgoing_rb, info.data, info.size);
 
     gst_buffer_unmap(buffer, &info);
     gst_sample_unref(sample);
@@ -60,7 +67,7 @@ void media_stream_on_aec_far(GstElement *identity, GstBuffer *buf, gpointer udat
 
 #ifdef SPEEX_AEC
 
-  LOG_INFO("%lld: aec_far: %d", getms(), info.size);
+  LOGI("%lld: aec_far: %d", getms(), info.size);
 
   FarData *far_data = (FarData*)calloc(1, sizeof(FarData));
 
@@ -107,7 +114,7 @@ void media_stream_on_aec_cap(GstElement *identity, GstBuffer *buf, gpointer udat
 
   memset(output_frame, 0, sizeof(output_frame));
 
-  LOG_INFO("%lld: aec_cap: %d", getms(), info.size);
+  LOGI("%lld: aec_cap: %d", getms(), info.size);
 
   FarData *far_data = NULL;
 
@@ -117,18 +124,18 @@ void media_stream_on_aec_cap(GstElement *identity, GstBuffer *buf, gpointer udat
 
     if ((curr_ts - far_data->ts) < 300) {
       // pass
-      LOG_INFO("pass");
+      LOGI("pass");
       break;
  
     } else if ((curr_ts - far_data->ts) > 330) {
       // drop
-      LOG_INFO("drop");
+      LOGI("drop");
       g_queue_pop_head(queue);
     }
     else {
 
 
-      LOG_INFO("echo-> playback time: %lld, current time: %lld, timediff: %lld", far_data->ts, curr_ts, curr_ts - far_data->ts);
+      LOGI("echo-> playback time: %lld, current time: %lld, timediff: %lld", far_data->ts, curr_ts, curr_ts - far_data->ts);
 
       speex_echo_cancellation(ms->echo_state, (spx_int16_t*)info.data, (spx_int16_t*)far_data->buf, (spx_int16_t*)output_frame);
 
@@ -189,7 +196,7 @@ MediaStream* media_stream_create(MediaCodec codec,
 
   if (outgoing_pipeline_text != NULL) {
 
-    LOG_INFO("outgoing pipeline source: %s", outgoing_pipeline_text);
+    LOGI("outgoing pipeline source: %s", outgoing_pipeline_text);
 
     switch(codec) {
 
@@ -245,7 +252,7 @@ MediaStream* media_stream_create(MediaCodec codec,
 
   if (incoming_pipeline_text != NULL) {
 
-    LOG_INFO("incoming pipeline source: %s", incoming_pipeline_text);
+    LOGI("incoming pipeline source: %s", incoming_pipeline_text);
 
     switch(codec) {
 

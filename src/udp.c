@@ -96,7 +96,7 @@ int udp_socket_sendto(UdpSocket *udp_socket, Address *addr, const char *buf, int
 
   sin.sin_port = htons(addr->port);
 
-  LOGD("sendto addr %d.%d.%d.%d (%d)", addr->ipv4[0], addr->ipv4[1], addr->ipv4[2], addr->ipv4[3], addr->port);
+  //LOGD("sendto addr %d.%d.%d.%d (%d)", addr->ipv4[0], addr->ipv4[1], addr->ipv4[2], addr->ipv4[3], addr->port);
   int ret = sendto(udp_socket->fd, buf, len, 0, (struct sockaddr *)&sin, sizeof(sin));
 
   if (ret < 0) {

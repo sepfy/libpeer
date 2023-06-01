@@ -1,103 +1,144 @@
 #include <string.h>
-#define HTTPSERVER_IMPL
-#ifdef _POSIX_C_SOURCE
-#undef _POSIX_C_SOURCE
-#endif
-#include <glib.h>
-#include <httpserver.h>
-
-#define SDP_EXCHANGE_URL "/sdpexchange"
-
+#include <unistd.h>
+#include <cjson/cJSON.h>
 #include "signaling.h"
+#include "base64.h"
+#include "utils.h"
 
-typedef struct Signaling {
+#define MQTT_HOST "test.mosquitto.org"
+#define MQTT_PORT 1883
+#define KEEPALIVE 60
 
-  struct http_server_s *server; 
-
-  char *answer;
-
-  const char *index_html;
-
-  GCond cond;
-
-  GMutex mutex;
-
-  void (*on_offersdp_get)(char *offersdp, void *data);
-
-} Signaling;
-
+#define JSONRPC_METHOD_REQUEST_OFFER "request_offer"
+#define JSONRPC_METHOD_RESPONSE_ANSWER "response_answer"
 
 Signaling g_signaling;
 
+void signaling_set_local_description(const char *description) {
 
-void signaling_set_answer(const char *sdp) {
+  int rc;
 
-  if(g_signaling.answer) {
+  char topic[128];
 
-    free(g_signaling.answer);
-  }
+  char description_base64[2048];
 
-  g_signaling.answer = strdup(sdp);
-  g_cond_signal(&g_signaling.cond);
+  memset(description_base64, 0, sizeof(description_base64));
+
+  memset(topic, 0, sizeof(topic));
+
+  base64_encode(description, strlen(description), description_base64, sizeof(description_base64));
+
+  snprintf(topic, sizeof(topic), "webrtc/%s/jsonrpc-reply", g_signaling.client_id);
+
+  cJSON *json = cJSON_CreateObject();
+
+  cJSON_AddStringToObject(json, "jsonrpc", "2.0");
+
+  cJSON_AddStringToObject(json, "result", description_base64);
+
+  cJSON_AddStringToObject(json, "id", "1");
+
+  char *payload = cJSON_PrintUnformatted(json);
+
+  rc = mosquitto_publish(g_signaling.mosq, NULL, topic, strlen(payload), payload, 0, false);
+
+  cJSON_Delete(json);
+
+  free(payload);
+
 }
 
-void signaling_sdpexchange_request(const char *body, size_t len) {
+void signaling_connect_callback(struct mosquitto *mosq, void *obj, int result) {
 
-  char *offersdp = strndup(body, len);
-
-  if (offersdp) {
-
-   g_signaling.on_offersdp_get(offersdp, NULL);
-   free(offersdp);
-  }
+  printf("connect callback, rc=%d\n", result);
 }
 
-void signaling_handle_request(struct http_request_s* request) {
+void signaling_message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *message) {
 
-  struct http_response_s* response = http_response_init();
+  printf("topic: %s\n", message->topic);
+  printf("payload: %s\n", (char *)message->payload);
 
-  http_response_status(response, 200);
+  char *payload = (char *)message->payload;
 
-  http_string_t url = http_request_target(request);
+  cJSON *json = cJSON_Parse(payload);
 
-  if(url.len == strlen(SDP_EXCHANGE_URL) && memcmp(url.buf, SDP_EXCHANGE_URL, url.len) == 0) {
+  if (json) {
 
-    http_response_header(response, "Content-Type", "text/plain");
+    cJSON *method = cJSON_GetObjectItem(json, "method");
 
-    http_string_t body = http_request_body(request);
+    if (method) {
 
-    signaling_sdpexchange_request(body.buf, body.len);
+      if (strcmp(method->valuestring, JSONRPC_METHOD_REQUEST_OFFER) == 0) {
 
-    // Block until answer is set
-    g_mutex_lock(&g_signaling.mutex);
-    g_cond_wait(&g_signaling.cond, &g_signaling.mutex);
-    g_mutex_unlock(&g_signaling.mutex);
+        g_signaling.on_event(SIGNALING_EVENT_REQUEST_OFFER, NULL, 0, g_signaling.user_data);
 
-    http_response_body(response, g_signaling.answer, strlen(g_signaling.answer));
+      } else if (strcmp(method->valuestring, JSONRPC_METHOD_RESPONSE_ANSWER) == 0) {
 
+        cJSON *params = cJSON_GetObjectItem(json, "params");
+
+        if (params && cJSON_IsString(params)) {
+
+          char description[4096];
+          memset(description, 0, sizeof(description));
+          base64_decode(params->valuestring, strlen(params->valuestring), description, sizeof(description));
+          g_signaling.on_event(SIGNALING_EVENT_RESPONSE_ANSWER, description, strlen(description), g_signaling.user_data);
+        }
+      }
+
+
+    }
   }
-  else {
 
-    // index
-    http_response_header(response, "Content-Type", "text/html");
+  cJSON_Delete(json);
 
-    if(g_signaling.index_html != NULL)
-      http_response_body(response, g_signaling.index_html, strlen(g_signaling.index_html));
-    else
-      http_response_body(response, "", 0);
-  }
-
-  http_respond(request, response);
 }
 
-void signaling_dispatch(int port, const char *index_html, void (*on_offersdp_get)(char *msg, void *data)) {
+void signaling_dispatch(const char *client_id, void (*on_event)(SignalingEvent event, const char *data, size_t len, void *user_data), void *user_data) {
 
-  g_signaling.index_html = index_html;
+  int rc;
 
-  g_signaling.server = http_server_init(port, signaling_handle_request);
+  char topic[128];
 
-  g_signaling.on_offersdp_get = on_offersdp_get;
+  g_signaling.user_data = user_data;
 
-  http_server_listen(g_signaling.server);
+  g_signaling.on_event = on_event;
+
+  g_signaling.run = 1;
+
+  strncpy(g_signaling.client_id, client_id, sizeof(g_signaling.client_id));
+
+  memset(topic, 0, sizeof(topic));
+
+  snprintf(topic, sizeof(topic), "webrtc/%s/jsonrpc", client_id);
+
+  mosquitto_lib_init();
+
+  g_signaling.mosq = mosquitto_new(client_id, true, 0);
+
+  if (g_signaling.mosq) {
+
+    mosquitto_connect_callback_set(g_signaling.mosq, signaling_connect_callback);
+    mosquitto_message_callback_set(g_signaling.mosq, signaling_message_callback);
+
+    rc = mosquitto_connect(g_signaling.mosq, MQTT_HOST, MQTT_PORT, KEEPALIVE);
+printf("topic: %s\n", topic);
+    mosquitto_subscribe(g_signaling.mosq, NULL, topic, 0);
+
+    while (g_signaling.run) {
+
+      rc = mosquitto_loop(g_signaling.mosq, -1, 1);
+
+      if (g_signaling.run && rc) {
+
+        printf("connection error!\n");
+        sleep(1);
+        mosquitto_reconnect(g_signaling.mosq);
+      }
+    }
+
+    mosquitto_destroy(g_signaling.mosq);
+  }
+
+  mosquitto_lib_cleanup();
 }
 

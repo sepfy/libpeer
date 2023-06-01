@@ -437,3 +437,8 @@ int dtls_srtp_read(DtlsSrtp *dtls_srtp, unsigned char *buf, size_t len) {
   return ret;
 }
 
+
+void dtls_srtp_encrypt_rtp_packet(DtlsSrtp *dtls_srtp, uint8_t *packet, int *bytes) {
+
+  srtp_protect(dtls_srtp->srtp_out, packet, bytes);
+}
