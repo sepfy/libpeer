@@ -23,5 +23,7 @@ int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, char *buf, int len
 
 int udp_socket_get_host_address(UdpSocket *udp_socket, Address *addr);
 
+void udp_resolve_mdns_host(UdpSocket *udp_socket, const char *host, Address *addr);
+
 #endif // UDP_SOCKET_H_
 

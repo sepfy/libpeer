@@ -2,12 +2,13 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <string.h>
-
 #include <sys/types.h>
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
+#include <errno.h>
 
 #include "utils.h"
 #include "udp.h"
@@ -16,6 +17,9 @@ int udp_socket_open(UdpSocket *udp_socket) {
 
   udp_socket->fd = socket(AF_INET, SOCK_DGRAM, 0);
 
+  int flags = fcntl(udp_socket->fd, F_GETFL, 0);
+
+  fcntl(udp_socket->fd, F_SETFL, flags | O_NONBLOCK);
 }
 
 int udp_socket_bind(UdpSocket *udp_socket, Address *addr) {
@@ -109,13 +113,15 @@ int udp_socket_sendto(UdpSocket *udp_socket, Address *addr, const char *buf, int
 
 int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, char *buf, int len) {
 
+  struct sockaddr_in sin;
+
+  int ret;
+
   if (udp_socket->fd < 0) {
 
     LOGE("recvfrom before socket init");
     return -1; 
   }
-
-  struct sockaddr_in sin;
 
   socklen_t sin_len = sizeof(sin);
 
@@ -125,12 +131,36 @@ int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, char *buf, int len
 
   sin.sin_port = htons(addr->port);
   sin.sin_addr.s_addr = htonl(INADDR_ANY);
+#if 0
+  fd_set read_set;
+  FD_ZERO(&read_set);
+  FD_SET(udp_socket->fd, &read_set);
 
-  LOGD("recvfrom addr %d.%d.%d.%d (%d)", addr->ipv4[0], addr->ipv4[1], addr->ipv4[2], addr->ipv4[3], addr->port);
-  int ret = recvfrom(udp_socket->fd, buf, len, 0, (struct sockaddr *)&sin, &sin_len);
+  struct timeval tv;
+  tv.tv_sec = 10;
+  tv.tv_usec = 0;
+  ret = select(udp_socket->fd + 1, &read_set, NULL, NULL, &tv);
+
   if (ret < 0) {
 
-    LOGE("recvfrom() failed");
+    LOGE("select() failed");
+    return -1;
+
+  } else if (ret == 0) {
+
+    LOGD("select() timeout");
+    return 0;
+  }
+#endif
+  ret = recvfrom(udp_socket->fd, buf, len, 0, (struct sockaddr *)&sin, &sin_len);
+  if (ret < 0) {
+
+    if (errno == EWOULDBLOCK || errno == EAGAIN) {
+
+    } else  {
+
+      LOGE("recvfrom() failed %d", ret);
+    }
     return -1;
   }
 
@@ -182,5 +212,10 @@ int udp_socket_get_host_address(UdpSocket *udp_socket, Address *addr) {
   return ret;
 }
 
+
+void udp_resolve_mdns_host(UdpSocket *udp_socket, const char *host, Address *addr) {
+
+
+}
 
 

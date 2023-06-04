@@ -6,6 +6,8 @@
 
 typedef enum MediaCodec {
 
+  CODEC_NONE = 0,
+
   /* Video */
   CODEC_H264,
   CODEC_VP8,
@@ -15,7 +17,6 @@ typedef enum MediaCodec {
   CODEC_OPUS,
   CODEC_PCMA,
   CODEC_PCMU,
-  CODEC_NONE,
 
 } MediaCodec;
 

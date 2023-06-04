@@ -2,76 +2,62 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "index_html.h"
 #include "peer_connection.h"
 #include "signaling.h"
 
-typedef struct Datachannel {
+static PeerConnection g_pc;
 
-  GCond cond;
-  GMutex mutex;
+void on_iceconnectionstatechange(IceCandidateState state, void *data) {
 
-  PeerConnection *pc;
-  Signaling *signaling;
+  printf("state is changed: %d\n", state);
+}
 
-} Datachannel;
+void on_icecandidate(char *answersdp, void *data) {
 
-Datachannel g_datachannel = {0};
+  printf("on ice candidate\n");
+}
 
-static void on_iceconnectionstatechange(IceConnectionState state, void *data) {
+void on_connected(void *data) {
 
-  if(state == FAILED) {
-    printf("Disconnect with browser... Stop streaming");
+  printf("on connected\n");
+}
+
+void on_signaling_event(SignalingEvent event, const char *buf, size_t len, void *user_data) {
+
+  const char *local_description = NULL;
+
+  PeerOptions options = {0,};
+
+  switch (event) {
+
+    case SIGNALING_EVENT_REQUEST_OFFER:
+
+      options.b_datachannel = 1;
+      peer_connection_configure(&g_pc, &options);
+      peer_connection_init(&g_pc);
+      peer_connection_on_connected(&g_pc, on_connected);
+      peer_connection_onicecandidate(&g_pc, on_icecandidate);
+      peer_connection_oniceconnectionstatechange(&g_pc, on_iceconnectionstatechange);
+
+      local_description = peer_connection_create_offer(&g_pc);
+printf("local_description: %s\n", local_description);
+      signaling_set_local_description(local_description);
+
+      break;
+
+    case SIGNALING_EVENT_RESPONSE_ANSWER:
+
+      peer_connection_set_remote_description(&g_pc, buf);
+
+      break;
+
+    default:
+      break;
   }
-}
 
-static void on_icecandidate(char *sdp, void *data) {
-
-  signaling_send_answer_to_call(g_datachannel.signaling, sdp);
-  g_cond_signal(&g_datachannel.cond);
-}
-
-static void on_open(void *userdata) {
-
-  char msg[] = "open";
-  peer_connection_datachannel_send(g_datachannel.pc, msg, strlen(msg));
-}
-
-static void on_message(char *buf, size_t len, void *userdata) {
-  LOG_INFO("Got message %s", buf);
-  peer_connection_datachannel_send(g_datachannel.pc, buf, len);
-}
-
-void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
-
-  if(signaling_event == SIGNALING_EVENT_GET_OFFER) {
-
-    printf("Get offer from singaling\n");
-    g_mutex_lock(&g_datachannel.mutex);
-
-    peer_connection_destroy(g_datachannel.pc);
-
-    g_datachannel.pc = peer_connection_create(NULL);
-
-    peer_connection_onicecandidate(g_datachannel.pc, on_icecandidate);
-    peer_connection_oniceconnectionstatechange(g_datachannel.pc, on_iceconnectionstatechange);
-    peer_connection_ondatachannel(g_datachannel.pc, on_message, on_open, NULL);
-
-    peer_connection_set_remote_description(g_datachannel.pc, msg);
-    peer_connection_create_answer(g_datachannel.pc);
-
-    g_cond_wait(&g_datachannel.cond, &g_datachannel.mutex);
-    g_mutex_unlock(&g_datachannel.mutex);
-  }
 }
 
 void signal_handler(int signal) {
-
-  if(g_datachannel.signaling)
-    signaling_destroy(g_datachannel.signaling);
-
-  if(g_datachannel.pc)
-    peer_connection_destroy(g_datachannel.pc);
 
   exit(0);
 }
@@ -80,16 +66,15 @@ int main(int argc, char *argv[]) {
 
   signal(SIGINT, signal_handler);
 
-  SignalingOption signaling_option = {SIGNALING_PROTOCOL_HTTP, "0.0.0.0", "demo", 8000, index_html};
+  char device_id[128] = {0,};
+  
+  snprintf(device_id, sizeof(device_id), "test_666");//%d", getpid());
 
-  g_datachannel.signaling = signaling_create(signaling_option);
-  if(!g_datachannel.signaling) {
-    printf("Create signaling service failed\n");
-    return 0;
-  }
+  printf("open http://127.0.0.1?deviceId=%s\n", device_id);
 
-  signaling_on_call_event(g_datachannel.signaling, &on_call_event, NULL);
-  signaling_dispatch(g_datachannel.signaling);
+  signal(SIGINT, signal_handler);
+
+  signaling_dispatch(device_id, on_signaling_event, NULL);
 
   return 0;
 }

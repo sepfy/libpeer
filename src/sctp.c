@@ -34,8 +34,9 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len) {
 static int sctp_outgoing_data_cb(void *userdata, void *buf, size_t len, uint8_t tos, uint8_t set_df) {
 
   Sctp *sctp = (Sctp*)userdata;
-  //dtls_srtp_sctp_to_dtls(sctp->dtls_srtp, buf, len);
-
+  LOGD("send data size %ld", len);
+   //dtls_srtp_sctp_to_dtls(sctp->dtls_srtp, buf, len);
+  dtls_srtp_write(sctp->dtls_srtp, (char*)buf, len);
   return 0;
 }
 
@@ -109,16 +110,18 @@ Sctp* sctp_create(DtlsSrtp *dtls_srtp) {
   if(sctp == NULL)
     return NULL;
 
-  sctp->dtls_srtp = dtls_srtp;
-  sctp->local_port = 5000;
-  sctp->remote_port = 5000;
 
   return sctp;
 }
 
-int sctp_create_socket(Sctp *sctp) {
+int sctp_create_socket(Sctp *sctp, DtlsSrtp *dtls_srtp) {
 
   int ret = -1;
+
+  sctp->dtls_srtp = dtls_srtp;
+  sctp->local_port = 5000;
+  sctp->remote_port = 5000;
+
   usrsctp_init(0, sctp_outgoing_data_cb, NULL);
   usrsctp_sysctl_set_sctp_ecn_enable(0);
   usrsctp_register_address(sctp);

@@ -84,7 +84,6 @@ void stun_set_mapped_address(char *value, uint8_t *mask, Address *addr) {
   *family = 0x01;
   *port = htons(addr->port);
  
-  LOGD("addr port = %d, port = %.4x", addr->port, *port);
   for (i = 0; i < 4; i++) {
     ipv4[i] = addr->ipv4[i];
   }
@@ -144,7 +143,7 @@ void stun_parse_msg_buf(StunMessage *msg) {
       case STUN_ATTR_TYPE_USERNAME:
         memset(msg->username, 0, sizeof(msg->username));
         memcpy(msg->username, attr->value, ntohs(attr->length));
-        LOGD("length = %d, Username %s", ntohs(attr->length), msg->username);
+        //LOGD("length = %d, Username %s", ntohs(attr->length), msg->username);
         break;
       case STUN_ATTR_TYPE_MESSAGE_INTEGRITY:
         memcpy(msg->message_integrity, attr->value, ntohs(attr->length));
@@ -155,7 +154,7 @@ void stun_parse_msg_buf(StunMessage *msg) {
           sprintf(message_integrity_hex + 2*i, "%02x", (uint8_t)msg->message_integrity[i]);
         }
 
-        LOGD("Message Integrity: 0x%s", message_integrity_hex);
+        //LOGD("Message Integrity: 0x%s", message_integrity_hex);
 
         break;
       case STUN_ATTR_TYPE_XOR_MAPPED_ADDRESS:
@@ -165,11 +164,11 @@ void stun_parse_msg_buf(StunMessage *msg) {
       case STUN_ATTR_TYPE_PRIORITY:
         break;
       case STUN_ATTR_TYPE_USE_CANDIDATE:
-        LOGD("Use Candidate");
+        //LOGD("Use Candidate");
         break;
       case STUN_ATTR_TYPE_FINGERPRINT:
         memcpy(&msg->fingerprint, attr->value, ntohs(attr->length));
-        LOGD("Fingerprint: 0x%.4x", msg->fingerprint);
+        //LOGD("Fingerprint: 0x%.4x", msg->fingerprint);
         break;
       case STUN_ATTR_TYPE_ICE_CONTROLLED:
         break;
@@ -407,13 +406,13 @@ int stun_msg_finish(StunMessage *msg, char *password) {
 StunMsgType stun_is_stun_msg(char *buf, size_t size) {
 
   if (size < sizeof(StunHeader)) {
-    LOGE("STUN message is too short.");
+    //LOGE("STUN message is too short.");
     return STUN_MSG_TYPE_INVLID;
   }
 
   StunHeader *header = (StunHeader *)buf;
   if (header->magic_cookie != htonl(MAGIC_COOKIE)) {
-    LOGE("STUN magic cookie does not match.");
+    //LOGE("STUN magic cookie does not match.");
     return STUN_MSG_TYPE_INVLID;
   }
 
@@ -450,13 +449,13 @@ int stun_response_is_valid(char *buf, size_t size, char *password) {
   uint32_t fingerprint = 0;
   size_t length = size - 4 - sizeof(StunAttribute);
   stun_calculate_fingerprint((char*)msg.buf, length, &fingerprint);
-  LOGD("Fingerprint: 0x%08x", fingerprint);
+  //LOGD("Fingerprint: 0x%08x", fingerprint);
 
   if (fingerprint != msg.fingerprint) {
-    LOGE("Fingerprint does not match.");
+    //LOGE("Fingerprint does not match.");
     return -1;
   } else {
-    LOGD("Fingerprint matches.");
+    //LOGD("Fingerprint matches.");
   }
 
   // MESSAGE-INTEGRITY
@@ -470,13 +469,13 @@ int stun_response_is_valid(char *buf, size_t size, char *password) {
     sprintf(message_integrity_hex + 2*i, "%02x", (uint8_t)message_integrity[i]);
   }
 
-  LOGD("message_integrity: 0x%s", message_integrity_hex);
+  //LOGD("message_integrity: 0x%s", message_integrity_hex);
 
   if (memcmp(message_integrity, msg.message_integrity, 20) != 0) {
-    LOGE("Message Integrity does not match.");
+    //LOGE("Message Integrity does not match.");
     return -1;
   } else {
-    LOGD("Message Integrity matches.");
+    //LOGD("Message Integrity matches.");
   }
 
   return 0;

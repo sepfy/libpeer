@@ -93,72 +93,69 @@ int agent_send(Agent *agent, char *buf, int len) {
 int agent_recv(Agent *agent, char *buf, int len) {
 
   int ret;
-  printf("Listening port: %d\n", agent->local_candidates[0].addr.port);
 
-  while (1) {
+  memset(buf, 0, len); 
+  ret = udp_socket_recvfrom(&agent->udp_socket, &agent->nominated_pair->local->addr, buf, len);
+  if (ret > 0) {
 
-    memset(buf, 0, len); 
-    ret = udp_socket_recvfrom(&agent->udp_socket, &agent->local_candidates[0].addr, buf, len);
-    if (ret > 0) {
-
-      StunMsgType type = stun_is_stun_msg(buf, ret);
+    StunMsgType type = stun_is_stun_msg(buf, ret);
 
 
-      if (type == STUN_MSG_TYPE_BINDING_ERROR_RESPONSE) {
+    if (type == STUN_MSG_TYPE_BINDING_ERROR_RESPONSE) {
 
-        agent->nominated_pair->state = ICE_CANDIDATE_STATE_WAITING;
-        LOGD("recv STUN_MSG_TYPE_BINDING_ERROR_RESPONSE");
-      } else if (type == STUN_MSG_TYPE_BINDING_RESPONSE) {
+      agent->nominated_pair->state = ICE_CANDIDATE_STATE_WAITING;
+      LOGD("recv STUN_MSG_TYPE_BINDING_ERROR_RESPONSE");
+    } else if (type == STUN_MSG_TYPE_BINDING_RESPONSE) {
 
-        LOGD("recv STUN_MSG_TYPE_BINDING_RESPONSE");
+      LOGD("recv STUN_MSG_TYPE_BINDING_RESPONSE");
 
-        if (stun_response_is_valid(buf, ret, agent->remote_upwd) == 0) {
+      if (stun_response_is_valid(buf, ret, agent->remote_upwd) == 0) {
 
-          LOGD("recv STUN_MSG_TYPE_BINDING_RESPONSE is valid");
+        LOGD("recv STUN_MSG_TYPE_BINDING_RESPONSE is valid");
 
-          agent->nominated_pair->state = ICE_CANDIDATE_STATE_SUCCEEDED;
-          break;
-        }
-
-      } else if (type == STUN_MSG_TYPE_BINDING_REQUEST) {
-
-        if (stun_response_is_valid(buf, ret, agent->local_upwd) == 0) {
-
-          StunHeader *header = (StunHeader *)buf;
-          memcpy(agent->transaction_id, header->transaction_id, sizeof(header->transaction_id));
-          LOGD("recv STUN_MSG_TYPE_BINDING_REQUEST is valid");
-
-          StunMessage msg;
-          stun_msg_create(&msg, STUN_MSG_TYPE_BINDING_RESPONSE);
-   
-          header = (StunHeader *)msg.buf;
-          memcpy(header->transaction_id, agent->transaction_id, sizeof(header->transaction_id));
- 
-          char username[64];
-
-          snprintf(username, sizeof(username), "%s:%s", agent->local_ufrag, agent->remote_ufrag);
-
-          // TODO: XOR-MAPPED-ADDRESS
-          char mapped_address[8];
-          stun_set_mapped_address(mapped_address, NULL, &agent->nominated_pair->remote->addr);
-          stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_MAPPED_ADDRESS, 8, mapped_address);
-          stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
-          stun_msg_finish(&msg, agent->local_upwd);
-
-          udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, (char *)msg.buf, msg.size);
-
-          LOGD("send to response to remote");
-
-          break;
-        }
-      } else {
-
-        LOGD("Not STUN message recvfrom: %s", buf);
-        return ret;
+        agent->nominated_pair->state = ICE_CANDIDATE_STATE_SUCCEEDED;
       }
+
+    } else if (type == STUN_MSG_TYPE_BINDING_REQUEST) {
+
+      if (stun_response_is_valid(buf, ret, agent->local_upwd) == 0) {
+
+        StunHeader *header = (StunHeader *)buf;
+        memcpy(agent->transaction_id, header->transaction_id, sizeof(header->transaction_id));
+        //LOGD("recv STUN_MSG_TYPE_BINDING_REQUEST is valid");
+
+        StunMessage msg;
+        stun_msg_create(&msg, STUN_MSG_TYPE_BINDING_RESPONSE);
+   
+        header = (StunHeader *)msg.buf;
+        memcpy(header->transaction_id, agent->transaction_id, sizeof(header->transaction_id));
+ 
+        char username[64];
+
+        snprintf(username, sizeof(username), "%s:%s", agent->local_ufrag, agent->remote_ufrag);
+
+        // TODO: XOR-MAPPED-ADDRESS
+        char mapped_address[8];
+        stun_set_mapped_address(mapped_address, NULL, &agent->nominated_pair->remote->addr);
+        stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_MAPPED_ADDRESS, 8, mapped_address);
+        stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
+        stun_msg_finish(&msg, agent->local_upwd);
+
+        udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, (char *)msg.buf, msg.size);
+      LOGD("send binding respnse to remote ip: %d.%d.%d.%d, port: %d", agent->nominated_pair->remote->addr.ipv4[0], agent->nominated_pair->remote->addr.ipv4[1], agent->nominated_pair->remote->addr.ipv4[2], agent->nominated_pair->remote->addr.ipv4[3], agent->nominated_pair->remote->addr.port);
+
+
+      }
+    } else {
+
+      LOGD("Not STUN message recvied");
+      return ret;
+
     }
+
   }
-  return 0;
+
+  return -1;
 }
 
 
@@ -217,18 +214,15 @@ a=candidate:1 1 UDP 1 36.231.28.50 38143 typ srflx
 
 int agent_connectivity_check(Agent *agent) {
 
-
   char buf[1400];
 
   StunMessage msg;
   memset(&msg, 0, sizeof(msg));
   StunHeader *header = (StunHeader *)msg.buf;
 
-  if (agent->mode == AGENT_MODE_CONTROLLED) {
 
- 
     if (agent->nominated_pair->state == ICE_CANDIDATE_STATE_WAITING) {
- 
+
       agent_recv(agent, buf, sizeof(buf));
       stun_create_binding_request(&msg);
       char username[64];
@@ -238,7 +232,7 @@ int agent_connectivity_check(Agent *agent) {
       stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
       stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
       stun_msg_finish(&msg, agent->remote_upwd);
-      //LOGD("send binding request to remote ip: %d.%d.%d.%d, port: %d", agent->nominated_pair->remote->addr.ipv4[0], agent->nominated_pair->remote->addr.ipv4[1], agent->nominated_pair->remote->addr.ipv4[2], agent->nominated_pair->remote->addr.ipv4[3], agent->nominated_pair->remote->addr.port);
+      LOGD("send binding request to remote ip: %d.%d.%d.%d, port: %d", agent->nominated_pair->remote->addr.ipv4[0], agent->nominated_pair->remote->addr.ipv4[1], agent->nominated_pair->remote->addr.ipv4[2], agent->nominated_pair->remote->addr.ipv4[3], agent->nominated_pair->remote->addr.port);
      udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, (char *)msg.buf, msg.size);
      agent->nominated_pair->state = ICE_CANDIDATE_STATE_INPROGRESS;
 
@@ -247,157 +241,21 @@ int agent_connectivity_check(Agent *agent) {
       agent_recv(agent, buf, sizeof(buf));
     }
 
-
 #if 0
-    agent_recv(agent, buf, sizeof(buf));
-
-    if (agent->selected_pair.remote->state == ICE_CANDIDATE_STATE_INPROGRESS) {
-
-      stun_msg_create(&msg, STUN_MSG_TYPE_BINDING_RESPONSE);
-   
-      StunHeader *header = (StunHeader *)msg.buf;
-      memcpy(header->transaction_id, agent->transaction_id, sizeof(header->transaction_id));
+  if (agent->nominated_pair->state == ICE_CANDIDATE_STATE_WAITING) {
  
-      char username[64];
+    stun_create_binding_request(&msg);
+    char username[64];
+    memset(username, 0, sizeof(username));
+    snprintf(username, sizeof(username), "%s:%s", agent->remote_ufrag, agent->local_ufrag);
 
-      snprintf(username, sizeof(username), "%s:%s", agent->local_ufrag, agent->remote_ufrag);
-
-      // TODO: XOR-MAPPED-ADDRESS
-      char mapped_address[8];
-      stun_set_mapped_address(mapped_address, NULL, &agent->nominated_pair->remote->addr);
-
-      stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_MAPPED_ADDRESS, 8, mapped_address);
-
-      stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
-
-      stun_msg_finish(&msg, agent->local_upwd);
-
-      udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, (char *)msg.buf, msg.size);
-
-      LOGD("send to response to remote");
-      agent->selected_pair.remote->state = ICE_CANDIDATE_STATE_SUCCEEDED;
-      agent->state = AGENT_STATE_CONNECTED;
-
-    } else if(agent->selected_pair.local->state == ICE_CANDIDATE_STATE_SUCCEEDED) {
-
-    
-
-    } else if (agent->selected_pair.remote->state == ICE_CANDIDATE_STATE_SUCCEEDED) {
-
-      LOGD("send to request to remote");
-      stun_create_binding_request(&msg);
-
-      char username[64];
-
-      snprintf(username, sizeof(username), "%s:%s", agent->remote_ufrag, agent->local_ufrag);
-
-      stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
-
-      stun_msg_finish(&msg, agent->remote_upwd);
-
-      agent->use_candidate = 1;
-
-      udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, (char *)msg.buf, msg.size);
-
-    }
-    
-#endif
-  } else if (agent->mode == AGENT_MODE_CONTROLLING) {
-
-
-    if (agent->nominated_pair->state == ICE_CANDIDATE_STATE_WAITING) {
-      stun_create_binding_request(&msg);
-
-      char username[64];
-
-      snprintf(username, sizeof(username), "%s:%s", agent->remote_ufrag, agent->local_ufrag);
-
-      stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
-
-      stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
-
-      stun_msg_finish(&msg, agent->remote_upwd);
-
-      udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, (char *)msg.buf, msg.size);
-      agent->nominated_pair->state = ICE_CANDIDATE_STATE_INPROGRESS;
-
-      agent_recv(agent, buf, sizeof(buf));
-    } else if (agent->nominated_pair->state == ICE_CANDIDATE_STATE_INPROGRESS) {
-
-      agent_recv(agent, buf, sizeof(buf));
-    }
-
-
-#if 0
-    if (agent->selected_pair.local->state <= ICE_CANDIDATE_STATE_WAITING) {
-
-      LOGD("send to request to remote");
-      stun_create_binding_request(&msg);
-
-      char username[64];
-
-      snprintf(username, sizeof(username), "%s:%s", agent->remote_ufrag, agent->local_ufrag);
-
-      stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
-
-      stun_msg_finish(&msg, agent->remote_upwd);
-
-      udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, (char *)msg.buf, msg.size);
-
-    } else if (agent->selected_pair.local->state == ICE_CANDIDATE_STATE_INPROGRESS) {
-
-      LOGD("send to request to remote");
-      stun_create_binding_request(&msg);
-
-      char username[64];
-
-      snprintf(username, sizeof(username), "%s:%s", agent->remote_ufrag, agent->local_ufrag);
-
-      stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
-
-      stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
-
-      stun_msg_finish(&msg, agent->remote_upwd);
-
-      udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, (char *)msg.buf, msg.size);
-
-    } else if (agent->selected_pair.remote->state == ICE_CANDIDATE_STATE_INPROGRESS) {
-
-      stun_msg_create(&msg, STUN_MSG_TYPE_BINDING_RESPONSE);
-   
-      StunHeader *header = (StunHeader *)msg.buf;
-      memcpy(header->transaction_id, agent->transaction_id, sizeof(header->transaction_id));
- 
-      char username[64];
-
-      snprintf(username, sizeof(username), "%s:%s", agent->local_ufrag, agent->remote_ufrag);
-
-      // TODO: XOR-MAPPED-ADDRESS
-      char mapped_address[8];
-      stun_set_mapped_address(mapped_address, NULL, &agent->nominated_pair->remote->addr);
-
-      stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_MAPPED_ADDRESS, 8, mapped_address);
-
-      stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
-
-      stun_msg_finish(&msg, agent->local_upwd);
-
-      udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, (char *)msg.buf, msg.size);
-
-      LOGD("send to response to remote");
-      agent->selected_pair.remote->state = ICE_CANDIDATE_STATE_SUCCEEDED;
-
-    } else {
-
-      char test[64];
-      sprintf(test, "test\n");
-      udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, test, strlen(test));
-    }
-
-    agent_recv(agent, buf, sizeof(buf));
-#endif
+    stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
+    stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
+    stun_msg_finish(&msg, agent->remote_upwd);
+    udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, (char *)msg.buf, msg.size);
+    agent->nominated_pair->state = ICE_CANDIDATE_STATE_INPROGRESS;
   }
-
+#endif
   return agent->nominated_pair->state == ICE_CANDIDATE_STATE_SUCCEEDED;
 }
 
@@ -405,9 +263,13 @@ void agent_select_candidate_pair(Agent *agent) {
 
   int i;
 
-  static int count = 0;
+  static time_t t1 = 0;
+  if (t1 == 0) {
+    t1 = time(NULL);
+  }
 
-  count++;
+  time_t t2 = time(NULL);
+
 
   //LOGD("Mode: %d", agent->mode);
 
@@ -420,18 +282,22 @@ void agent_select_candidate_pair(Agent *agent) {
       agent->nominated_pair->state = ICE_CANDIDATE_STATE_WAITING;
       break;
 
-    } else if (agent->candidate_pairs[i].state == ICE_CANDIDATE_STATE_INPROGRESS && count >= 10) {
-
+    } else if (agent->candidate_pairs[i].state == ICE_CANDIDATE_STATE_INPROGRESS && (t2 - t1) > 2) {
+      LOGD("timeout for nominate (pair %d)", i);
       agent->nominated_pair->state = ICE_CANDIDATE_STATE_FAILED;
-      count = 0;
+      t1 = t2;
 
-    } else if (agent->candidate_pairs[i].state <= ICE_CANDIDATE_STATE_INPROGRESS) {
+    } else if (agent->candidate_pairs[i].state == ICE_CANDIDATE_STATE_FAILED) {
+
+    } else if (agent->candidate_pairs[i].state <= ICE_CANDIDATE_STATE_SUCCEEDED) {
       // still in progress. wait for it 
       agent->nominated_pair = &agent->candidate_pairs[i];
       break;
     }
 
   }
+
+  //LOGD("nominated_pair: %p", agent->nominated_pair);
 }
 
 int agent_loop(Agent *agent) {
@@ -444,16 +310,13 @@ int agent_loop(Agent *agent) {
     agent_select_candidate_pair(agent);
 
     if (agent_connectivity_check(agent)) {
-      LOGD("Connectivity check success");
+
+      LOGD("Connectivity check success. pair: %p", agent->nominated_pair);
 
       agent->state = AGENT_STATE_CONNECTED;
       agent->selected_pair = agent->nominated_pair;
     }
-
-  } else if (agent->state == AGENT_STATE_CONNECTED) {
-
-    // TODO: add send buffer
-    //agent_send(agent, "hello", 5);
-    agent_recv(agent, buf, sizeof(buf));
   }
+
+  agent_recv(agent, buf, sizeof(buf));
 }

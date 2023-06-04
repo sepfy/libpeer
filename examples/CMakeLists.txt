@@ -7,6 +7,6 @@ add_subdirectory(surveillance)
 add_subdirectory(signaling)
 #add_subdirectory(home_camera)
 #add_subdirectory(screencast)
-#add_subdirectory(datachannel)
+add_subdirectory(datachannel)
 
 

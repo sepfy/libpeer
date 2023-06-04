@@ -14,6 +14,7 @@ extern "C" {
 #include "dtls_srtp.h"
 #include "sdp.h"
 #include "codec.h"
+#include "task.h"
 
 #ifdef HAVE_GST
 #include "gst/media_stream.h"
@@ -25,7 +26,7 @@ typedef struct PeerOptions {
   MediaCodec audio_codec;
   MediaCodec video_codec;
   int b_datachannel;
-
+  
 #ifdef HAVE_GST
   const char *audio_outgoing_pipeline;
   const char *audio_incoming_pipeline;
@@ -43,6 +44,8 @@ struct PeerConnection {
   Agent agent;
   DtlsSrtp dtls_srtp;
   Sctp sctp;
+
+  Task task;
 
   Sdp local_sdp;
   Sdp remote_sdp;
