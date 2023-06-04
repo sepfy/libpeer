@@ -69,6 +69,8 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp *dtls_srtp) {
 
   mbedtls_x509write_cert crt;
 
+  mbedtls_mpi serial;
+
   unsigned char cert_buf[CERT_BUF_SIZE];
 
   const char *pers = "dtls_srtp";
@@ -94,6 +96,12 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp *dtls_srtp) {
   mbedtls_x509write_crt_set_subject_name(&crt, "CN=dtls_srtp");
 
   mbedtls_x509write_crt_set_issuer_name(&crt, "CN=dtls_srtp");
+
+  mbedtls_mpi_init(&serial);
+
+  mbedtls_mpi_fill_random(&serial, 16, mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
+
+  mbedtls_x509write_crt_set_serial(&crt, &serial);
 
   mbedtls_x509write_crt_set_validity(&crt, "20180101000000", "20280101000000");
 
@@ -418,7 +426,6 @@ int dtls_srtp_write(DtlsSrtp *dtls_srtp, const unsigned char *buf, size_t len) {
     ret = mbedtls_ssl_write(&dtls_srtp->ssl, buf, len);
 
   } while (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE);
-
   return ret;
 }
 
@@ -437,6 +444,10 @@ int dtls_srtp_read(DtlsSrtp *dtls_srtp, unsigned char *buf, size_t len) {
   return ret;
 }
 
+void dtls_srtp_descrypt(DtlsSrtp *dtls_srtp, uint8_t *encrypted_data, size_t len, uint8_t *decrypted_data, size_t decrypted_len) {
+
+
+}
 
 void dtls_srtp_encrypt_rtp_packet(DtlsSrtp *dtls_srtp, uint8_t *packet, int *bytes) {
 

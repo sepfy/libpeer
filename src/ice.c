@@ -104,6 +104,9 @@ int ice_candidate_from_description(IceCandidate *candidate, char *description) {
     candidate->addr.ipv4[2] = 1;
     candidate->addr.ipv4[3] = 110;
 
+  } else if (strstr(description, "UDP") == 0 && strstr(description, "udp") == 0) {
+    // Only accept UDP candidates
+    return -1;
   } else if (sscanf(description, "a=candidate:%d %d %s %" SCNu32 " %hhu.%hhu.%hhu.%hhu %hd typ %s",
    &candidate->foundation,
    &candidate->component,

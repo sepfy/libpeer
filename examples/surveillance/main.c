@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
 
   snprintf(device_id, sizeof(device_id), "test_666");//%d", getpid());
 
-  printf("device id: %s\n", device_id);
+  printf("open http://127.0.0.1?deviceId=%s\n", device_id);
 
   signal(SIGINT, signal_handler);
 
