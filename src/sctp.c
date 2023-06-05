@@ -21,7 +21,13 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len) {
 
   spa.sendv_sndinfo.snd_sid = 0;
   spa.sendv_sndinfo.snd_flags = SCTP_EOR;
-  spa.sendv_sndinfo.snd_ppid = htonl(51);
+
+  // check ACSII
+  if ((buf[0] & 0x80) || (buf[1] & 0x80)) {
+    spa.sendv_sndinfo.snd_ppid = htonl(53);
+  } else {
+    spa.sendv_sndinfo.snd_ppid = htonl(51);
+  }
 
   if(usrsctp_sendv(sctp->sock, buf, len, NULL, 0, &spa, sizeof(spa), SCTP_SENDV_SPA, 0) < 0) {
     LOGE("sctp sendv error");

@@ -127,6 +127,16 @@ void peer_connection_ondatachannel(PeerConnection *pc,
  void (*onopen)(void *userdata),
  void (*onclose)(void *userdata));
 
+/**
+ * @brief send message to data channel
+ * @param[in] peer connection
+ * @param[in] message buffer
+ * @param[in] length of message
+ */
+int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len);
+
+
+
 int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);
 
 
@@ -209,14 +219,6 @@ int peer_connection_get_rtpmap(PeerConnection *pc, MediaCodec codec);
  * @param Boolean. Default is FALSE.
  */
 void peer_connection_enable_mdns(PeerConnection *pc, int b_enabled);
-
-/**
- * @brief send message to data channel
- * @param[in] peer connection
- * @param[in] message buffer
- * @param[in] length of message
- */
-int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len);
 
 // To confirm:
 void peer_connection_media_stream_playback(PeerConnection *pc);

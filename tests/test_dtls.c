@@ -31,12 +31,12 @@ int main(int argc, char *argv[]) {
   if (strstr(argv[1], "client")) {
 
     local_addr.port = 1234;
-    remote_addr.port = 5678;
+    remote_addr.port = 5677; // 5678 for MNDP
     dtls_srtp_init(&dtls_srtp, DTLS_SRTP_ROLE_CLIENT, &udp_socket);
 
   } else {
 
-    local_addr.port = 5678;
+    local_addr.port = 5677; // 5678 for MNDP
     remote_addr.port = 1234;
     dtls_srtp_init(&dtls_srtp, DTLS_SRTP_ROLE_SERVER, &udp_socket);
   }

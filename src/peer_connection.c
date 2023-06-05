@@ -60,6 +60,15 @@ void peer_connection_init(PeerConnection *pc) {
 
 }
 
+int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len) {
+
+  if(sctp_is_connected(&pc->sctp))
+    return sctp_outgoing_data(&pc->sctp, message, len);
+
+  return -1;
+}
+
+
 static void peer_connection_task(void *user_data) {
 
   PeerConnection *pc = (PeerConnection *) user_data;
@@ -864,14 +873,6 @@ void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp_
     g_slist_free_full(plist, (GDestroyNotify)&nice_candidate_free);
   }
 
-}
-
-int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len) {
-
-  if(sctp_is_connected(pc->sctp))
-    return sctp_outgoing_data(pc->sctp, message, len);
-
-  return -1;
 }
 
 uint32_t peer_connection_get_ssrc(PeerConnection *pc, const char *type) {
