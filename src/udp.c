@@ -5,7 +5,10 @@
 #include <fcntl.h>
 #include <string.h>
 #include <sys/types.h>
+
+#if 0
 #include <ifaddrs.h>
+#endif
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <errno.h>
@@ -20,6 +23,7 @@ int udp_socket_open(UdpSocket *udp_socket) {
   int flags = fcntl(udp_socket->fd, F_GETFL, 0);
 
   fcntl(udp_socket->fd, F_SETFL, flags | O_NONBLOCK);
+  return 0;
 }
 
 int udp_socket_bind(UdpSocket *udp_socket, Address *addr) {
@@ -82,7 +86,7 @@ int udp_get_local_address(UdpSocket *udp_socket, Address *addr) {
   return 0;
 }
 
-int udp_socket_sendto(UdpSocket *udp_socket, Address *addr, const char *buf, int len) {
+int udp_socket_sendto(UdpSocket *udp_socket, Address *addr, const uint8_t *buf, int len) {
 
   if (udp_socket->fd < 0) {
 
@@ -111,7 +115,7 @@ int udp_socket_sendto(UdpSocket *udp_socket, Address *addr, const char *buf, int
   return ret;
 }
 
-int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, char *buf, int len) {
+int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, uint8_t *buf, int len) {
 
   struct sockaddr_in sin;
 
@@ -169,8 +173,8 @@ int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, char *buf, int len
 }
 
 int udp_socket_get_host_address(UdpSocket *udp_socket, Address *addr) {
-
   int ret = 0;
+#if 0
 
   struct ifaddrs *addrs,*tmp;
 
@@ -209,6 +213,7 @@ int udp_socket_get_host_address(UdpSocket *udp_socket, Address *addr) {
   }
 
   freeifaddrs(addrs);
+#endif
   return ret;
 }
 

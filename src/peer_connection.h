@@ -20,6 +20,17 @@ extern "C" {
 #include "gst/media_stream.h"
 #endif
 
+typedef enum PeerConnectionState {
+
+  PEER_CONNECTION_CLOSED = 0,
+  PEER_CONNECTION_NEW,
+  PEER_CONNECTION_CHECKING,
+  PEER_CONNECTION_CONNECTED,
+  PEER_CONNECTION_COMPLETED,
+  PEER_CONNECTION_FAILED,
+  PEER_CONNECTION_DISCONNECTED,
+
+} PeerConnectionState;
 
 typedef struct PeerOptions {
 
@@ -41,6 +52,7 @@ typedef struct PeerConnection PeerConnection;
 struct PeerConnection {
 
   PeerOptions options;
+  PeerConnectionState state;
   Agent agent;
   DtlsSrtp dtls_srtp;
   Sctp sctp;
@@ -72,6 +84,8 @@ void peer_connection_init(PeerConnection *pc);
 void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp);
 
 const char* peer_connection_create_offer(PeerConnection *pc);
+
+int peer_connection_loop(PeerConnection *pc);
 
 /**
  * @brief register callback function to handle packet loss from RTCP receiver report

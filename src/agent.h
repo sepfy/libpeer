@@ -61,6 +61,8 @@ struct Agent {
 
   UdpSocket udp_socket;
 
+  Address host_addr;
+  int b_host_addr;
   int controlling;
 
   AgentState state;
@@ -87,9 +89,9 @@ void agent_get_local_description(Agent *agent, char *description, int length);
 
 int agent_loop(Agent *agent);
 
-int agent_send(Agent *agent, char *buf, int len);
+int agent_send(Agent *agent, const uint8_t *buf, int len);
 
-int agent_recv(Agent *agent, char *buf, int len);
+int agent_recv(Agent *agent, uint8_t *buf, int len);
 
 void agent_set_remote_description(Agent *agent, char *description);
 
@@ -98,6 +100,10 @@ void *agent_thread(void *arg);
 void agent_select_candidate_pair(Agent *agent);
 
 void agent_attach_recv_cb(Agent *agent, void (*data_recv_cb)(char *buf, int len, void *user_data));
+
+void agent_set_host_address(Agent *agent, const char *addr);
+
+int agent_connectivity_check(Agent *agent);
 
 #endif // AGENT_H_
 
