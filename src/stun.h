@@ -73,7 +73,7 @@ struct StunMessage {
   uint32_t fingerprint;
   char username[10];
   Address mapped_addr;
-  char buf[STUN_ATTR_BUF_SIZE];
+  uint8_t buf[STUN_ATTR_BUF_SIZE];
   size_t size;
 };  
 
@@ -97,9 +97,9 @@ int stun_msg_write_attr2(StunMessage *msg, StunAttrType type, uint16_t length, c
 
 int stun_msg_write_attr(StunMessage *msg, uint16_t type, uint16_t length, char *value);
 
-StunMsgType stun_is_stun_msg(char *buf, size_t len);
+StunMsgType stun_is_stun_msg(uint8_t *buf, size_t len);
 
-int stun_response_is_valid(char *buf, size_t len, char *password);
+int stun_response_is_valid(uint8_t *buf, size_t len, char *password);
 
 int stun_msg_finish(StunMessage *msg, char *password);
 

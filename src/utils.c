@@ -11,7 +11,7 @@
 
 // http://haoyuanliu.github.io/2017/01/16/%E5%9C%B0%E5%9D%80%E6%9F%A5%E8%AF%A2%E5%87%BD%E6%95%B0gethostbyname-%E5%92%8Cgetaddrinfo/
 int utils_get_ipv4addr(char *hostname, char *ipv4addr, size_t size) {
-
+#if 0
   struct addrinfo *ai, *aip;
   struct addrinfo hint;
   struct sockaddr_in *sinp;
@@ -38,14 +38,17 @@ int utils_get_ipv4addr(char *hostname, char *ipv4addr, size_t size) {
       return 0;
     }
   }
-
+#endif
   return -1;
 }
 
 int utils_is_valid_ip_address(char *ip_address) {
+#if 0
   struct sockaddr_in sa;
   int result = inet_pton(AF_INET, ip_address, &(sa.sin_addr));
   return result == 0;
+#endif
+  return 0;
 }
 
 Buffer* utils_buffer_new(int size) {
@@ -86,6 +89,7 @@ int utils_buffer_push(Buffer *rb, uint8_t *data, int size) {
       memcpy(rb->data + rb->tail, data, size);
   }
   rb->tail = tail_end;
+  return size;
 }
 
 int utils_buffer_pop(Buffer *rb, uint8_t *data, int size) {

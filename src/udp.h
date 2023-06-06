@@ -17,9 +17,9 @@ int udp_socket_bind(UdpSocket *udp_socket, Address *addr);
 
 void udp_socket_close(UdpSocket *udp_socket);
 
-int udp_socket_sendto(UdpSocket *udp_socket, Address *addr, const char *buf, int len);
+int udp_socket_sendto(UdpSocket *udp_socket, Address *addr, const uint8_t *buf, int len);
 
-int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, char *buf, int len);
+int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, uint8_t *buf, int len);
 
 int udp_socket_get_host_address(UdpSocket *udp_socket, Address *addr);
 

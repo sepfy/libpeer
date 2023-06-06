@@ -23,9 +23,16 @@ static void agent_get_stun_candidates(Agent *agent) {
 
 }
 
+void agent_set_host_address(Agent *agent, const char *ip) {
+
+  agent->host_addr.family = AF_INET;
+  inet_pton(AF_INET, ip, agent->host_addr.ipv4);
+  agent->b_host_addr = 1;
+}
+
 void agent_gather_candidates(Agent *agent) {
 
-  int ret, i, j, candidate_count;
+  int ret, i;
 
   Address addr[AGENT_MAX_CANDIDATES];
 
@@ -33,7 +40,13 @@ void agent_gather_candidates(Agent *agent) {
 
   udp_socket_open(&agent->udp_socket);
 
-  ret = udp_socket_get_host_address(&agent->udp_socket, addr);
+  if (agent->b_host_addr) {
+
+    memcpy(&addr[0], &agent->host_addr, sizeof(agent->host_addr));
+    ret = 1;
+  } else {
+    ret = udp_socket_get_host_address(&agent->udp_socket, addr);
+  }
 
   for (i = 0; i < ret; i++) {
 
@@ -52,8 +65,6 @@ void agent_gather_candidates(Agent *agent) {
 void agent_get_local_description(Agent *agent, char *description, int length) {
 
   char buffer[1024];
-
-  char upwd[ICE_UPWD_LENGTH + 1];
 
   memset(description, 0, length);
 
@@ -82,7 +93,7 @@ void agent_get_local_description(Agent *agent, char *description, int length) {
   udp_socket_bind(&agent->udp_socket, &agent->local_candidates[0].addr);
 }
 
-int agent_send(Agent *agent, char *buf, int len) {
+int agent_send(Agent *agent, const uint8_t *buf, int len) {
 
   //printf("send to ip: %d.%d.%d.%d:%d\n", agent->remote_candidates[0].addr.ipv4[0], agent->remote_candidates[0].addr.ipv4[1], agent->remote_candidates[0].addr.ipv4[2], agent->remote_candidates[0].addr.ipv4[3], agent->remote_candidates[0].addr.port);
 
@@ -90,7 +101,7 @@ int agent_send(Agent *agent, char *buf, int len) {
   return udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, buf, len);
 }
 
-int agent_recv(Agent *agent, char *buf, int len) {
+int agent_recv(Agent *agent, uint8_t *buf, int len) {
 
   int ret;
 
@@ -141,7 +152,7 @@ int agent_recv(Agent *agent, char *buf, int len) {
         stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
         stun_msg_finish(&msg, agent->local_upwd);
 
-        udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, (char *)msg.buf, msg.size);
+        udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
       LOGD("send binding respnse to remote ip: %d.%d.%d.%d, port: %d", agent->nominated_pair->remote->addr.ipv4[0], agent->nominated_pair->remote->addr.ipv4[1], agent->nominated_pair->remote->addr.ipv4[2], agent->nominated_pair->remote->addr.ipv4[3], agent->nominated_pair->remote->addr.port);
 
 
@@ -209,12 +220,12 @@ a=candidate:1 1 UDP 1 36.231.28.50 38143 typ srflx
     }
   }
 
-
+  agent->state = AGENT_STATE_READY;
 }
 
 int agent_connectivity_check(Agent *agent) {
 
-  char buf[1400];
+  uint8_t buf[1400];
 
   StunMessage msg;
   memset(&msg, 0, sizeof(msg));
@@ -233,7 +244,9 @@ int agent_connectivity_check(Agent *agent) {
       stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
       stun_msg_finish(&msg, agent->remote_upwd);
       LOGD("send binding request to remote ip: %d.%d.%d.%d, port: %d", agent->nominated_pair->remote->addr.ipv4[0], agent->nominated_pair->remote->addr.ipv4[1], agent->nominated_pair->remote->addr.ipv4[2], agent->nominated_pair->remote->addr.ipv4[3], agent->nominated_pair->remote->addr.port);
-     udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, (char *)msg.buf, msg.size);
+
+     udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
+
      agent->nominated_pair->state = ICE_CANDIDATE_STATE_INPROGRESS;
 
     } else if (agent->nominated_pair->state == ICE_CANDIDATE_STATE_INPROGRESS) {
@@ -302,7 +315,7 @@ void agent_select_candidate_pair(Agent *agent) {
 
 int agent_loop(Agent *agent) {
 
-  char buf[1024];
+  uint8_t buf[1024];
   // try to connect to remote
 
   if (agent->state < AGENT_STATE_CONNECTED && agent->selected_pair == NULL) {
@@ -319,4 +332,5 @@ int agent_loop(Agent *agent) {
   }
 
   agent_recv(agent, buf, sizeof(buf));
+  return 0;
 }

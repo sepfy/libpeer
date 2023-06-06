@@ -9,14 +9,14 @@
 #include "udp.h"
 #include "utils.h"
 
-#define CERT_BUF_SIZE 4096
+#define CERT_BUF_SIZE 1024 
 
 int dtls_srtp_udp_send(void *ctx, const unsigned char *buf, size_t len) {
 
   DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx;
   UdpSocket *udp_socket = (UdpSocket*)dtls_srtp->user_data;
 
-  int ret = udp_socket_sendto(udp_socket, dtls_srtp->remote_addr, (char*)buf, len);
+  int ret = udp_socket_sendto(udp_socket, dtls_srtp->remote_addr, buf, len);
 
   LOGD("dtls_srtp_udp_send (%d)", ret);
 
@@ -28,7 +28,7 @@ int dtls_srtp_udp_recv(void *ctx, unsigned char *buf, size_t len) {
   DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx;
   UdpSocket *udp_socket = (UdpSocket*)dtls_srtp->user_data;
 
-  int ret = udp_socket_recvfrom(udp_socket, &udp_socket->bind_addr, (char*)buf, len);
+  int ret = udp_socket_recvfrom(udp_socket, &udp_socket->bind_addr, buf, len);
 
   LOGD("dtls_srtp_udp_recv (%d)", ret);
 
@@ -79,7 +79,7 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp *dtls_srtp) {
 
   mbedtls_pk_setup(&dtls_srtp->pkey, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
  
-  mbedtls_rsa_gen_key(mbedtls_pk_rsa(dtls_srtp->pkey), mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg, 2048, 65537);
+  mbedtls_rsa_gen_key(mbedtls_pk_rsa(dtls_srtp->pkey), mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg, 512, 65537);
 
   mbedtls_x509write_crt_init(&crt);
 
@@ -210,7 +210,7 @@ static void dtls_srtp_key_derivation(void *context, mbedtls_ssl_key_export_type 
 
   const char *dtls_srtp_label = "EXTRACTOR-dtls_srtp";
 
-  char randbytes[64];
+  unsigned char randbytes[64];
 
   uint8_t key_material[DTLS_SRTP_KEY_MATERIAL_LENGTH];
 

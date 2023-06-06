@@ -389,7 +389,7 @@ int stun_msg_finish(StunMessage *msg, char *password) {
   header->length = htons(header_length + 24); /* HMAC-SHA1 */
   stun_attr->type = htons(STUN_ATTRIBUTE_MESSAGE_INTEGRITY);
   stun_attr->length = htons(20);
-  utils_get_sha1((char*)msg->buf, msg->size, password, stun_attr->value);
+  utils_get_sha1((char*)msg->buf, msg->size, password, (unsigned char*)stun_attr->value);
   msg->size += sizeof(StunAttribute) + 20;
 
   // FINGERPRINT
@@ -403,7 +403,7 @@ int stun_msg_finish(StunMessage *msg, char *password) {
   return 0;
 }
 
-StunMsgType stun_is_stun_msg(char *buf, size_t size) {
+StunMsgType stun_is_stun_msg(uint8_t *buf, size_t size) {
 
   if (size < sizeof(StunHeader)) {
     //LOGE("STUN message is too short.");
@@ -435,7 +435,7 @@ StunMsgType stun_is_stun_msg(char *buf, size_t size) {
   return 0;
 }
 
-int stun_response_is_valid(char *buf, size_t size, char *password) {
+int stun_response_is_valid(uint8_t *buf, size_t size, char *password) {
 
   StunMessage msg;
 
@@ -459,14 +459,14 @@ int stun_response_is_valid(char *buf, size_t size, char *password) {
   }
 
   // MESSAGE-INTEGRITY
-  char message_integrity_hex[41];
-  char message_integrity[20];
+  unsigned char message_integrity_hex[41];
+  unsigned char message_integrity[20];
   header->length = htons(ntohs(header->length) - 4 - sizeof(StunAttribute));
   length = length - 20 - sizeof(StunAttribute);
   utils_get_sha1((char*)msg.buf, length, password, message_integrity);
 
   for (int i = 0; i < 20; i++) {
-    sprintf(message_integrity_hex + 2*i, "%02x", (uint8_t)message_integrity[i]);
+    sprintf((char*)&message_integrity_hex[2*i], "%02x", (uint8_t)message_integrity[i]);
   }
 
   //LOGD("message_integrity: 0x%s", message_integrity_hex);

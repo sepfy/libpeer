@@ -1,7 +1,9 @@
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef HAVE_USRSCTP
 #include <usrsctp.h>
-#include <pthread.h>
+#endif
 
 #include "dtls_srtp.h"
 #include "sctp.h"
@@ -15,6 +17,7 @@
 
 int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len) {
 
+#ifdef HAVE_USRSCTP
   struct sctp_sendv_spa spa = {0};
 
   spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
@@ -33,28 +36,31 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len) {
     LOGE("sctp sendv error");
     return -1;
   }
-
+#endif
   return len;
 }
 
 static int sctp_outgoing_data_cb(void *userdata, void *buf, size_t len, uint8_t tos, uint8_t set_df) {
 
   Sctp *sctp = (Sctp*)userdata;
-  LOGD("send data size %ld", len);
+ // LOGD("send data size %ld", len);
    //dtls_srtp_sctp_to_dtls(sctp->dtls_srtp, buf, len);
-  dtls_srtp_write(sctp->dtls_srtp, (char*)buf, len);
+  dtls_srtp_write(sctp->dtls_srtp, (const unsigned char*)buf, len);
   return 0;
 }
 
 void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
 
+#ifdef HAVE_USRSCTP
   if(!sctp)
     return;
   usrsctp_conninput(sctp, buf, len, 0);
+#endif
 }
 
 static int sctp_handle_incoming_data(Sctp *sctp, char *data, size_t len, uint32_t ppid, uint16_t stream, int flags) {
 
+#ifdef HAVE_USRSCTP
   char *msg = NULL;
 
   switch(ppid) {
@@ -85,13 +91,14 @@ static int sctp_handle_incoming_data(Sctp *sctp, char *data, size_t len, uint32_
     default:
       break;
   }
-
+#endif
+  return 0;
 }
 
 
+#ifdef HAVE_USRSCTP
 static int sctp_incoming_data_cb(struct socket *sock, union sctp_sockstore addr,
  void *data, size_t len, struct sctp_rcvinfo recv_info, int flags, void *userdata) {
-
   Sctp *sctp = (Sctp*)userdata;
   LOGD("Data of length %u received on stream %u with SSN %u, TSN %u, PPID %u\n",
     (uint32_t)len,
@@ -106,24 +113,14 @@ static int sctp_incoming_data_cb(struct socket *sock, union sctp_sockstore addr,
   else {
     sctp_handle_incoming_data(sctp, data, len, ntohl(recv_info.rcv_ppid), recv_info.rcv_sid, flags);
   }
-
+  return 0;
 }
-
-Sctp* sctp_create(DtlsSrtp *dtls_srtp) {
-
-  Sctp *sctp = (Sctp*)calloc(1, sizeof(Sctp));
-
-  if(sctp == NULL)
-    return NULL;
-
-
-  return sctp;
-}
+#endif
 
 int sctp_create_socket(Sctp *sctp, DtlsSrtp *dtls_srtp) {
 
   int ret = -1;
-
+#ifdef HAVE_USRSCTP
   sctp->dtls_srtp = dtls_srtp;
   sctp->local_port = 5000;
   sctp->remote_port = 5000;
@@ -207,7 +204,7 @@ int sctp_create_socket(Sctp *sctp, DtlsSrtp *dtls_srtp) {
   }
 
   sctp->sock = sock;
-
+#endif
   return 0;
 }
 
@@ -217,7 +214,7 @@ int sctp_is_connected(Sctp *sctp) {
 }
 
 void sctp_destroy(Sctp *sctp) {
-
+#ifdef HAVE_USRSCTP
   if(sctp) {
 
     if(sctp->sock) {
@@ -229,6 +226,7 @@ void sctp_destroy(Sctp *sctp) {
     free(sctp);
     sctp = NULL;
   }
+#endif
 }
 
 void sctp_onmessage(Sctp *sctp, void (*onmessasge)(char *msg, size_t len, void *userdata)) {

@@ -19,7 +19,7 @@ int sdp_append(Sdp *sdp, const char *format, ...) {
 
   strcat(sdp->content, attr);
   strcat(sdp->content, "\r\n");
-
+  return 0;
 }
 
 void sdp_reset(Sdp *sdp) {
@@ -47,6 +47,11 @@ void sdp_append_pcma(Sdp *sdp) {
 
   sdp_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 8");
   sdp_append(sdp, "a=rtpmap:8 PCMA/8000");
+  sdp_append(sdp, "a=ssrc:2 cname:webrtc-pcma");
+  sdp_append(sdp, "a=sendrecv");
+  sdp_append(sdp, "a=mid:0");
+  sdp_append(sdp, "a=IN IP4 0.0.0.0");
+  sdp_append(sdp, "a=rtcp-mux");
 }
 
 void sdp_append_datachannel(Sdp *sdp) {
