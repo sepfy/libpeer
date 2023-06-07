@@ -1,12 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "sctp.h"
 #ifdef HAVE_USRSCTP
 #include <usrsctp.h>
 #endif
 
 #include "dtls_srtp.h"
-#include "sctp.h"
 #include "utils.h"
 
 #define DATA_CHANNEL_PPID_CONTROL           50

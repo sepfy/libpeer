@@ -1,6 +1,7 @@
 #ifndef SCTP_H_
 #define SCTP_H_
 
+#include "config.h"
 #include "dtls_srtp.h"
 
 typedef struct Sctp Sctp;

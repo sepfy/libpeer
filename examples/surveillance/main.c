@@ -11,6 +11,16 @@ const char PIPE_LINE[] = "v4l2src ! video/x-raw,width=640,height=480,framerate=3
 
 static PeerConnection g_pc;
 
+void* peer_connection_thread(void *data) {
+
+  while (1) {
+    peer_connection_loop(&g_pc);
+    usleep(1*1000);
+  }
+
+  pthread_exit(NULL);
+}
+
 void on_iceconnectionstatechange(IceCandidateState state, void *data) {
 
   printf("state is changed: %d\n", state);
@@ -29,13 +39,13 @@ void on_connected(void *data) {
 void on_signaling_event(SignalingEvent event, const char *buf, size_t len, void *user_data) {
 
   const char *local_description = NULL;
-
   PeerOptions options = {0,};
 
   switch (event) {
   
     case SIGNALING_EVENT_REQUEST_OFFER:
 
+      options.video_codec = CODEC_H264;
       options.video_outgoing_pipeline = PIPE_LINE;
 
       peer_connection_configure(&g_pc, &options);
@@ -53,7 +63,7 @@ void on_signaling_event(SignalingEvent event, const char *buf, size_t len, void 
     case SIGNALING_EVENT_RESPONSE_ANSWER:
 
       peer_connection_set_remote_description(&g_pc, buf);
-
+ 
       break;
 
     default:
@@ -71,12 +81,15 @@ void signal_handler(int signal) {
 int main(int argc, char *argv[]) {
 
   char device_id[128] = {0,};
+  static pthread_t thread;
 
   snprintf(device_id, sizeof(device_id), "test_666");//%d", getpid());
 
   printf("open http://127.0.0.1?deviceId=%s\n", device_id);
 
   signal(SIGINT, signal_handler);
+
+  pthread_create(&thread, NULL, peer_connection_thread, NULL);
 
   signaling_dispatch(device_id, on_signaling_event, NULL);
 

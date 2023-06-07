@@ -1,13 +1,11 @@
-# Home Camera
+# Surveillance
 
-Build Raspberry Pi as a home camera. Support video camera, 2-way audio.
+Build Raspberry Pi as a surveillance camera and watch the video remotely.
 
 ### Hardware Configuration
 
-* [Raspberry Pi 3A+](https://www.raspberrypi.com/products/raspberry-pi-3-model-a-plus/)
-* [Camera Module](https://www.raspberrypi.com/products/camera-module-v2/)
-* [ReSpeaker 2-Mics Pi HAT](https://wiki.seeedstudio.com/ReSpeaker_2_Mics_Pi_HAT_Raspberry/)
-* Speaker
+* Raspberry Pi Zero W
+* Camera Module
 
 ### Run Example
 
@@ -15,9 +13,8 @@ Build Raspberry Pi as a home camera. Support video camera, 2-way audio.
 cd pear && mkdir cmake && cd cmake
 cmake -DENABLE_EXAMPLES=on ..
 make
-./examples/home_camera/home_camera
+./examples/surveillance/surveillance
 ```
 
-Open Google-Chrome and go to https://raspberrypi.local. You can communication with Raspberry Pi and watch the camera video remotely.
-
+Open Google-Chrome and go to https://raspberrypi.local. You will see real-time of the camera video.
 

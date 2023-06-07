@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "rtcp_packet.h"
-#include "rtp_packet.h"
+#include "rtp.h"
 
 int rtcp_packet_validate(char *packet, size_t size) {
 

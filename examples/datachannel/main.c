@@ -22,6 +22,21 @@ void on_connected(void *data) {
   printf("on connected\n");
 }
 
+void onmessasge(char *msg, size_t len, void *userdata) {
+
+}
+
+void onopen(void *userdata) {
+
+  printf("on open\n");
+  //pthread_create(&g_mjpeg_thread, NULL, mjpeg_stream, NULL);
+}
+
+void onclose(void *userdata) {
+  
+}
+
+
 void on_signaling_event(SignalingEvent event, const char *buf, size_t len, void *user_data) {
 
   const char *local_description = NULL;
@@ -38,9 +53,8 @@ void on_signaling_event(SignalingEvent event, const char *buf, size_t len, void 
       peer_connection_on_connected(&g_pc, on_connected);
       peer_connection_onicecandidate(&g_pc, on_icecandidate);
       peer_connection_oniceconnectionstatechange(&g_pc, on_iceconnectionstatechange);
-
+      peer_connection_ondatachannel(&g_pc, onmessasge, onopen, onclose);
       local_description = peer_connection_create_offer(&g_pc);
-printf("local_description: %s\n", local_description);
       signaling_set_local_description(local_description);
 
       break;
@@ -62,7 +76,19 @@ void signal_handler(int signal) {
   exit(0);
 }
 
+void* peer_connection_thread(void *data) {
+
+  while (1) {
+    peer_connection_loop(&g_pc);
+    usleep(1*1000); 
+  }
+
+  pthread_exit(NULL); 
+}
+
 int main(int argc, char *argv[]) {
+
+  pthread_t thread;
 
   signal(SIGINT, signal_handler);
 
@@ -73,6 +99,8 @@ int main(int argc, char *argv[]) {
   printf("open http://127.0.0.1?deviceId=%s\n", device_id);
 
   signal(SIGINT, signal_handler);
+
+  pthread_create(&thread, NULL, peer_connection_thread, NULL);
 
   signaling_dispatch(device_id, on_signaling_event, NULL);
 

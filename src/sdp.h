@@ -18,7 +18,7 @@ void sdp_append_pcma(Sdp *sdp);
   
 void sdp_append_datachannel(Sdp *sdp);
 
-void sdp_create(Sdp *sdp);
+void sdp_create(Sdp *sdp, int b_video, int b_audio, int b_datachannel);
 
 int sdp_append(Sdp *sdp, const char *format, ...);
 
