@@ -99,10 +99,8 @@ int ice_candidate_from_description(IceCandidate *candidate, char *description) {
      mdns,
      &candidate->addr.port, type);
 
-    candidate->addr.ipv4[0] = 192;
-    candidate->addr.ipv4[1] = 168;
-    candidate->addr.ipv4[2] = 1;
-    candidate->addr.ipv4[3] = 110;
+    udp_resolve_mdns_host(mdns, &candidate->addr);
+    LOGD("mDNS host: %s, ip: %d.%d.%d.%d", mdns, candidate->addr.ipv4[0], candidate->addr.ipv4[1], candidate->addr.ipv4[2], candidate->addr.ipv4[3]);
 
   } else if (strstr(description, "UDP") == 0 && strstr(description, "udp") == 0) {
     // Only accept UDP candidates

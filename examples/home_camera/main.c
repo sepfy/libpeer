@@ -1,27 +1,25 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
 
-#include "index_html.h"
-#include "peer_connection.h"
 #include "signaling.h"
+#include "peer_connection.h"
 
-const char VIDEO_SINK_PIPELINE[] = "v4l2src ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15";
+const char VIDEO_OUTGOING_PIPELINE[] = "v4l2src ! video/x-raw,width=640,height=480,framerate=30/1 ! videoconvert ! queue ! x264enc bitrate=6000 speed-preset=ultrafast tune=zerolatency key-int-max=15";
 
-const char AUDIO_SINK_PIPELINE[] = "alsasrc latency-time=20000 device=plughw:U0x46d0x81b,0 ! audio/x-raw,channels=1,rate=8000 ! identity name=aec-cap ! alawenc";
+const char AUDIO_OUTGOING_PIPELINE[] = "alsasrc device=plughw:U0x46d0x81b,0 ! audio/x-raw,channels=1,rate=8000 ! alawenc";
 
-const char AUDIO_SRC_PIPELINE[] = "alawdec ! audio/x-raw,channels=1,rate=8000 ! queue ! identity name=aec-far ! audioresample ! audioconvert ! audio/x-raw,format=S16LE,channels=2,rate=48000 ! alsasink device=hdmi:vc4hdmi,0";
+static PeerConnection g_pc;
 
-void on_iceconnectionstatechange(IceConnectionState state, void *data) {
+void on_iceconnectionstatechange(IceCandidateState state, void *data) {
 
-  if(state == FAILED) {
-
-    printf("Disconnect with browser.\n");
-  }
+  printf("state is changed: %d\n", state);
 }
 
 void on_icecandidate(char *answersdp, void *data) {
 
-  signaling_set_answer(answersdp);
+  printf("on ice candidate\n");
 }
 
 void on_connected(void *data) {
@@ -29,33 +27,54 @@ void on_connected(void *data) {
   printf("on connected\n");
 }
 
-void signaling_on_offersdp_get(char *offersdp, size_t len) {
+void on_signaling_event(SignalingEvent event, const char *buf, size_t len, void *user_data) {
 
-  static PeerConnection *pc = NULL;
+  const char *local_description = NULL;
 
-  if(pc) {
+  PeerOptions options = {0,};
 
-    printf("destroy\n");
-    peer_connection_destroy(pc);
+  switch (event) {
+  
+    case SIGNALING_EVENT_REQUEST_OFFER:
+
+      options.video_codec = CODEC_H264;
+      options.audio_codec = CODEC_PCMA;
+      options.video_outgoing_pipeline = VIDEO_OUTGOING_PIPELINE;
+      options.audio_outgoing_pipeline = AUDIO_OUTGOING_PIPELINE;
+
+      peer_connection_configure(&g_pc, &options);
+      peer_connection_init(&g_pc);
+      peer_connection_on_connected(&g_pc, on_connected);
+      peer_connection_onicecandidate(&g_pc, on_icecandidate);
+      peer_connection_oniceconnectionstatechange(&g_pc, on_iceconnectionstatechange);
+
+      local_description = peer_connection_create_offer(&g_pc);
+
+      signaling_set_local_description(local_description);
+
+      break;
+
+    case SIGNALING_EVENT_RESPONSE_ANSWER:
+
+      peer_connection_set_remote_description(&g_pc, buf);
+
+      break;
+
+    default:
+      break;
   }
 
-  pc = peer_connection_create(NULL);
-
-  peer_connection_add_stream(pc, CODEC_H264, VIDEO_SINK_PIPELINE, NULL);
-
-  peer_connection_add_stream(pc, CODEC_PCMA, AUDIO_SINK_PIPELINE, AUDIO_SRC_PIPELINE);
-
-  peer_connection_onicecandidate(pc, on_icecandidate);
-
-  peer_connection_oniceconnectionstatechange(pc, on_iceconnectionstatechange);
-
-  peer_connection_on_connected(pc, on_connected);
-
-  peer_connection_set_remote_description(pc, offersdp);
-
-  peer_connection_create_answer(pc);
-
 }
+
+void* peer_connection_thread(void *data) {
+
+  while (1) {
+    peer_connection_loop(&g_pc);
+    usleep(1000);
+  }
+
+  pthread_exit(NULL);
+} 
 
 void signal_handler(int signal) {
 
@@ -63,11 +82,20 @@ void signal_handler(int signal) {
   exit(0);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char *argv[]) {
+
+  char device_id[128] = {0,};
+
+  snprintf(device_id, sizeof(device_id), "test_666");//%d", getpid());
+
+  printf("open http://127.0.0.1?deviceId=%s\n", device_id);
 
   signal(SIGINT, signal_handler);
 
-  signaling_dispatch(8000, index_html, signaling_on_offersdp_get);
+  pthread_t thread;
+  pthread_create(&thread, NULL, peer_connection_thread, NULL);
+
+  signaling_dispatch(device_id, on_signaling_event, NULL);
 
   return 0;
 }

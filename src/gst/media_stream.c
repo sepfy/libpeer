@@ -229,7 +229,7 @@ MediaStream* media_stream_create(MediaCodec codec,
         break;
     }
 
-    media_stream->outgoing_rb = utils_buffer_new(1404*64);
+    media_stream->outgoing_rb = utils_buffer_new(1404*256);
 
     LOGD("outgoing pipeline: %s", media_stream->outgoing_pipeline_text);
     media_stream->outgoing_pipeline = gst_parse_launch(media_stream->outgoing_pipeline_text, NULL);

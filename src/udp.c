@@ -6,7 +6,8 @@
 #include <string.h>
 #include <sys/types.h>
 
-#if 0
+#if 1
+#include <netdb.h>
 #include <ifaddrs.h>
 #endif
 #include <net/if.h>
@@ -218,9 +219,33 @@ int udp_socket_get_host_address(UdpSocket *udp_socket, Address *addr) {
 }
 
 
-void udp_resolve_mdns_host(UdpSocket *udp_socket, const char *host, Address *addr) {
+int udp_resolve_mdns_host(const char *host, Address *addr) {
 
+  int ret = -1;
+  struct addrinfo hints, *res, *p;
+  int status;
+  char ipstr[INET6_ADDRSTRLEN];
 
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+
+  if ((status = getaddrinfo(host, NULL, &hints, &res)) != 0) {
+    LOGE("getaddrinfo error: %s\n", gai_strerror(status));
+    return ret;
+  }
+
+ for (p = res; p != NULL; p = p->ai_next) {
+
+    if (p->ai_family == AF_INET) {
+      struct sockaddr_in *ipv4 = (struct sockaddr_in *)p->ai_addr;
+      ret = 0;
+      memcpy(addr->ipv4, &ipv4->sin_addr.s_addr, 4);
+    }
+  }
+
+  freeaddrinfo(res); 
+  return ret;
 }
 
 

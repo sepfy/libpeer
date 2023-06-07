@@ -15,6 +15,10 @@ extern "C" {
 #include "sdp.h"
 #include "codec.h"
 #include "task.h"
+#include "config.h"
+#include "rtp.h"
+#include "rtcp_packet.h"
+
 
 #ifdef HAVE_GST
 #include "gst/media_stream.h"
@@ -57,8 +61,6 @@ struct PeerConnection {
   DtlsSrtp dtls_srtp;
   Sctp sctp;
 
-  Task task;
-
   Sdp local_sdp;
   Sdp remote_sdp;
 
@@ -69,6 +71,9 @@ struct PeerConnection {
   void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *user_data);
 
   void *user_data;
+
+  uint8_t agent_buf[CONFIG_MTU];
+  int agent_ret;
 
 #ifdef HAVE_GST
   MediaStream *audio_stream;

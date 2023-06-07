@@ -241,8 +241,10 @@ int agent_connectivity_check(Agent *agent) {
       snprintf(username, sizeof(username), "%s:%s", agent->remote_ufrag, agent->local_ufrag);
 
       stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
+      stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_PRIORITY, 4, (char *)&agent->nominated_pair->priority); 
       stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
       stun_msg_finish(&msg, agent->remote_upwd);
+
       LOGD("send binding request to remote ip: %d.%d.%d.%d, port: %d", agent->nominated_pair->remote->addr.ipv4[0], agent->nominated_pair->remote->addr.ipv4[1], agent->nominated_pair->remote->addr.ipv4[2], agent->nominated_pair->remote->addr.ipv4[3], agent->nominated_pair->remote->addr.port);
 
      udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, msg.buf, msg.size);

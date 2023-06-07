@@ -5,7 +5,7 @@
 #include "base64.h"
 #include "utils.h"
 
-#define MQTT_HOST "test.mosquitto.org"
+#define MQTT_HOST "mqtt.eclipseprojects.io"
 #define MQTT_PORT 1883
 #define KEEPALIVE 60
 
