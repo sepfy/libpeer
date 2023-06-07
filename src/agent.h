@@ -101,7 +101,7 @@ void agent_select_candidate_pair(Agent *agent);
 
 void agent_attach_recv_cb(Agent *agent, void (*data_recv_cb)(char *buf, int len, void *user_data));
 
-void agent_set_host_address(Agent *agent, const char *addr);
+void agent_set_host_address(Agent *agent, Address *addr);
 
 int agent_connectivity_check(Agent *agent);
 

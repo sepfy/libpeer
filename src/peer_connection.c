@@ -279,6 +279,14 @@ int peer_connection_send_rtcp_pil(PeerConnection *pc, uint32_t ssrc) {
   return ret;
 }
 
+void peer_connection_set_host_address(PeerConnection *pc, const char *host) {
+
+  Address addr;
+  addr.family = AF_INET;
+  inet_pton(AF_INET, host, addr.ipv4);
+  agent_set_host_address(&pc->agent, &addr);
+}
+
 // callbacks
 void peer_connection_on_connected(PeerConnection *pc, void (*on_connected)(void *userdata)) {
 

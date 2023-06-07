@@ -13,6 +13,31 @@
 #include "base64.h"
 #include "agent.h"
 
+static int agent_get_host_candidates(Agent *agent) {
+
+  int ret, i;
+
+  Address addr[AGENT_MAX_CANDIDATES];
+
+  if (agent->b_host_addr) {
+
+    memcpy(&addr[0], &agent->host_addr, sizeof(agent->host_addr));
+
+    ret = 1;
+
+  } else {
+
+    ret = udp_socket_get_host_address(&agent->udp_socket, addr);
+  }
+
+  for (i = 0; i < ret; i++) {
+
+    ice_candidate_create(&agent->local_candidates[agent->local_candidates_count++], ICE_CANDIDATE_TYPE_HOST, &addr[i]);
+  }
+
+  return ret;
+}
+
 static void agent_get_stun_candidates(Agent *agent) {
 
   Address addr;
@@ -23,10 +48,9 @@ static void agent_get_stun_candidates(Agent *agent) {
 
 }
 
-void agent_set_host_address(Agent *agent, const char *ip) {
+void agent_set_host_address(Agent *agent, Address *addr) {
 
-  agent->host_addr.family = AF_INET;
-  inet_pton(AF_INET, ip, agent->host_addr.ipv4);
+  memcpy(&agent->host_addr, addr, sizeof(agent->host_addr));
   agent->b_host_addr = 1;
 }
 
@@ -34,32 +58,17 @@ void agent_gather_candidates(Agent *agent) {
 
   int ret, i;
 
-  Address addr[AGENT_MAX_CANDIDATES];
-
   memset(agent->local_candidates, 0, sizeof(agent->local_candidates));
 
   udp_socket_open(&agent->udp_socket);
 
-  if (agent->b_host_addr) {
-
-    memcpy(&addr[0], &agent->host_addr, sizeof(agent->host_addr));
-    ret = 1;
-  } else {
-    ret = udp_socket_get_host_address(&agent->udp_socket, addr);
-  }
-
-  for (i = 0; i < ret; i++) {
-
-    ice_candidate_create(&agent->local_candidates[agent->local_candidates_count++], ICE_CANDIDATE_TYPE_HOST, &addr[i]);
-  }
+  ret = agent_get_host_candidates(agent);
 
   agent_get_stun_candidates(agent);
 
   for (i = 0; i < ret; i++) {
-
     agent->local_candidates[i].addr.port = agent->local_candidates[agent->local_candidates_count-1].addr.port;
   }
-
 }
 
 void agent_get_local_description(Agent *agent, char *description, int length) {

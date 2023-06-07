@@ -27,18 +27,19 @@ if(ENABLE_GST)
   add_definitions(-DHAVE_GST)
 endif() 
 
+if(ENABLE_EXAMPLES)
+  set(TARGET_LIBS ${TARGET_LIBS} mosquitto pthread cjson)
+  add_subdirectory(examples)
+endif()
+
 if(ENABLE_AEC)
   set(TARGET_LIBS ${TARGET_LIBS} speexdsp)
 endif()
  
-add_subdirectory(src)
-
 if(ENABLE_TESTS)
-add_subdirectory(tests)
+  add_subdirectory(tests)
 endif()
 
-if(ENABLE_EXAMPLES)
-add_subdirectory(examples)
-endif()
+add_subdirectory(src)
 
 

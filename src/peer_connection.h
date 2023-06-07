@@ -154,95 +154,9 @@ void peer_connection_ondatachannel(PeerConnection *pc,
  */
 int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len);
 
-
-
 int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);
 
-
-#if 0
-#include "utils.h"
-#include "session_description.h"
-#include "dtls_transport.h"
-#include "media_stream.h"
-
-typedef enum IceConnectionState {
-
-  DISCONNECTED,
-  GATHERING,
-  CONNECTING,
-  CONNECTED,
-  READY,
-  FAILED,
-
-} IceConnectionState;
-
-typedef struct PeerConnection PeerConnection;
-
-/**
- * @brief Create a struct PeerConnection and initialize it.
- * @return Pointer of PeerConnection.
- */
-PeerConnection* peer_connection_create(void *userdata);
-
-/**
- * @brief Destory a struct PeerConnection.
- */
-void peer_connection_destroy(PeerConnection *pc);
-
-/**
- * @brief Let PeerConnection send RTCP PIL.
- * @param PeerConnection
- * @param RTP ssrc
- */
-int peer_connection_send_rtcp_pil(PeerConnection *pc, uint32_t ssrc);
-
-/**
- * @brief Add audio or video stream to PeerConnection.
- * @param A PeerConnection.
- * @param A MediaStream.
- */
-void peer_connection_add_stream(PeerConnection *pc, MediaCodec codec,
- const char *outgoing_pipeline,
- const char *incoming_pipeline);
-
-/**
- * @brief sets the specified session description as the remote peer's current offer or answer.
- * @param PeerConnection.
- * @param SDP string.
- */
-void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp);
-
-/**
- * @brief PeerConnection creates an answer.
- * @param PeerConnection.
- */
-int peer_connection_create_answer(PeerConnection *pc);
-
-/**
- * @brief Get audio and video ssrc from a PeerConnection after set remote description.
- * @param PeerConnection.
- * @param Media type of audio and video.
- */
-uint32_t peer_connection_get_ssrc(PeerConnection *pc, const char *type);
-
-/**
- * @brief Get payload type of codec in SDP.
- * @param PeerConnection.
- * @param Media Codec of audio or video.
- */
-int peer_connection_get_rtpmap(PeerConnection *pc, MediaCodec codec);
-
-/**
- * @brief Support to resolve mDNS candidate.
- * @param PeerConnection.
- * @param Boolean. Default is FALSE.
- */
-void peer_connection_enable_mdns(PeerConnection *pc, int b_enabled);
-
-// To confirm:
-void peer_connection_media_stream_playback(PeerConnection *pc);
-#endif
-
+void peer_connection_set_host_address(PeerConnection *pc, const char *host);
 
 #ifdef __cplusplus
 }

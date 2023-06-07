@@ -6,10 +6,11 @@
 #include <string.h>
 #include <sys/types.h>
 
-#if 1
+#ifndef FREERTOS
 #include <netdb.h>
 #include <ifaddrs.h>
 #endif
+
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <errno.h>
@@ -174,9 +175,10 @@ int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, uint8_t *buf, int 
 }
 
 int udp_socket_get_host_address(UdpSocket *udp_socket, Address *addr) {
-  int ret = 0;
-#if 0
 
+  int ret = 0;
+
+#ifndef FREERTOS
   struct ifaddrs *addrs,*tmp;
 
   struct ifreq ifr;
@@ -186,7 +188,6 @@ int udp_socket_get_host_address(UdpSocket *udp_socket, Address *addr) {
     LOGE("get_host_address before socket init");
     return -1;
   }
-
 
   getifaddrs(&addrs);
 
@@ -198,7 +199,7 @@ int udp_socket_get_host_address(UdpSocket *udp_socket, Address *addr) {
 
       strncpy(ifr.ifr_name, tmp->ifa_name, IFNAMSIZ); 
 
-      if (strstr(ifr.ifr_name, "wlx2887ba6688d7") != 0 && ioctl(udp_socket->fd, SIOCGIFADDR, &ifr) == 0) {
+      if (ioctl(udp_socket->fd, SIOCGIFADDR, &ifr) == 0) {
 
         LOGD("interface: %s, address: %s", ifr.ifr_name, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
 
