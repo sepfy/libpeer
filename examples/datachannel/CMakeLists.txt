@@ -2,6 +2,6 @@ project(datachannel)
 
 file(GLOB SRCS "*.c")
 
-add_executable(datachannel ${SRCS} ../signaling/signaling.c)
+add_executable(datachannel ${SRCS})
 
-target_link_libraries(datachannel pear ${TARGET_LIBS} pthread mosquitto cjson)
+target_link_libraries(datachannel ${EXAMPLE_LIBS})

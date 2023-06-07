@@ -8,7 +8,11 @@ if(ENABLE_GST)
   file(GLOB GST_SRCS "gst/*.c")
 endif()
 
-add_library(pear SHARED ${SRCS} ${GST_SRCS})
+if(ENABLE_EXAMPLES)
+  file(GLOB SIGNALING_SRCS "signaling/signaling.c")
+endif()
+
+add_library(pear SHARED ${SRCS} ${GST_SRCS} ${SIGNALING_SRCS})
 
 target_include_directories(pear PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
