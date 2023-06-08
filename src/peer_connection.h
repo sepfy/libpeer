@@ -75,9 +75,14 @@ struct PeerConnection {
   uint8_t agent_buf[CONFIG_MTU];
   int agent_ret;
 
+  Buffer *outgoing_rtp_rb;
+
 #ifdef HAVE_GST
   MediaStream *audio_stream;
   MediaStream *video_stream;
+#else
+  RtpPacketizer audio_packetizer;
+  RtpPacketizer video_packetizer;
 #endif
 
 };
@@ -157,6 +162,10 @@ int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t l
 int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);
 
 void peer_connection_set_host_address(PeerConnection *pc, const char *host);
+
+int peer_connection_send_audio(PeerConnection *pc, const uint8_t *packet, size_t bytes);
+
+int peer_connection_send_video(PeerConnection *pc, const uint8_t *packet, size_t bytes);
 
 #ifdef __cplusplus
 }

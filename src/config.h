@@ -3,7 +3,7 @@
 
 #define CONFIG_MTU (1500)
 
-#ifndef CONFIG_FREERTOS
+#ifndef FREERTOS
 #define HAVE_USRSCTP
 #endif
 

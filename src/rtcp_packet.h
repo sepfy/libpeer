@@ -71,11 +71,11 @@ typedef struct RtcpFb {
 
 } RtcpFb;
 
-int rtcp_packet_validate(char *packet, size_t size);
+int rtcp_packet_validate(uint8_t *packet, size_t size);
 
-int rtcp_packet_get_pli(char *packet, int len, uint32_t ssrc);
+int rtcp_packet_get_pli(uint8_t *packet, int len, uint32_t ssrc);
 
-int rtcp_packet_get_fir(char *packet, int len, int *seqnr);
+int rtcp_packet_get_fir(uint8_t *packet, int len, int *seqnr);
 
 RtcpRr rtcp_packet_parse_rr(uint8_t *packet);
 

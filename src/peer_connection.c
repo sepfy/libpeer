@@ -6,6 +6,16 @@
 
 #define PEER_MTU 1500
 
+static void peer_connection_on_rtp_packet(const uint8_t *packet, size_t bytes, void *user_data) {
+
+  PeerConnection *pc = (PeerConnection*) user_data;
+
+  if (pc->outgoing_rtp_rb) {
+    utils_buffer_push(pc->outgoing_rtp_rb, (uint8_t*)&bytes, sizeof(bytes));
+    utils_buffer_push(pc->outgoing_rtp_rb, (uint8_t*)packet, bytes);
+  }
+}
+
 static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t len) {
  
   int ret; 
@@ -60,7 +70,6 @@ static void peer_connection_incoming_rtcp(PeerConnection *pc, uint8_t *buf, size
   }
 }
 
-
 void peer_connection_configure(PeerConnection *pc, PeerOptions *options) {
 
   memcpy(&pc->options, options, sizeof(PeerOptions));
@@ -75,6 +84,8 @@ void peer_connection_init(PeerConnection *pc) {
   pc->dtls_srtp.udp_recv = peer_connection_dtls_srtp_recv;
   pc->dtls_srtp.udp_send = peer_connection_dtls_srtp_send;
 
+  pc->outgoing_rtp_rb = utils_buffer_new(2048);
+
 #ifdef HAVE_GST
   gst_init(NULL, NULL);
 
@@ -85,14 +96,43 @@ void peer_connection_init(PeerConnection *pc) {
   if (pc->options.video_codec) {
     pc->video_stream = media_stream_create(pc->options.video_codec, pc->options.video_outgoing_pipeline, pc->options.video_incoming_pipeline);
   }
+#else
+  uint32_t ssrc;
+  RtpPayloadType type;
+  switch (pc->options.audio_codec) {
+    case CODEC_PCMA:
+      type = PT_PCMA;
+      ssrc =3;
+      break;
+    case CODEC_PCMU:
+    default:
+      type = PT_PCMU;
+      ssrc = 4;
+      break;
+  }
+  rtp_packetizer_init(&pc->audio_packetizer, type, ssrc, peer_connection_on_rtp_packet, pc);
 #endif
 }
 
-int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len) {
+int peer_connection_send_audio(PeerConnection *pc, const uint8_t *buf, size_t len) {
+#ifndef HAV4yyE_GST
+  rtp_packetizer_encode(&pc->audio_packetizer, (uint8_t*)buf, len);
+#endif
+  return 0;
+}
 
+int peer_connection_send_video(PeerConnection *pc, const uint8_t *buf, size_t len) {
+#ifndef HAVE_GST
+  rtp_packetizer_encode(&pc->video_packetizer, (uint8_t*)buf, len);
+#endif
+  return 0;
+}
+
+int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len) {
+#ifdef HAVE_SCTP
   if(sctp_is_connected(&pc->sctp))
     return sctp_outgoing_data(&pc->sctp, message, len);
-
+#endif
   return -1;
 }
 
@@ -141,6 +181,10 @@ int peer_connection_loop(PeerConnection *pc) {
 
           LOGD("DTLS-SRTP handshake done");
 
+          if (pc->on_connected) {
+            pc->on_connected(pc->user_data);
+          }
+
 #ifdef HAVE_GST
           if (pc->audio_stream) {
             media_stream_play(pc->audio_stream);
@@ -150,10 +194,13 @@ int peer_connection_loop(PeerConnection *pc) {
             media_stream_play(pc->video_stream);
           }
 #endif
+
+#ifdef HAVE_SCTP
           if (pc->options.b_datachannel) {
             LOGI("SCTP create socket");
             sctp_create_socket(&pc->sctp, &pc->dtls_srtp);
           }
+#endif
 
         }
       } else if (pc->dtls_srtp.state == DTLS_SRTP_STATE_CONNECTED) {
@@ -165,6 +212,13 @@ int peer_connection_loop(PeerConnection *pc) {
         if (pc->audio_stream && (utils_buffer_pop(pc->audio_stream->outgoing_rb, pc->agent_buf, size) == size)) {
           memcpy(&packet_size, pc->agent_buf, sizeof(size_t));
           peer_connection_send_rtp_packet(pc, pc->agent_buf + sizeof(size_t), packet_size);
+        }
+#else
+        if (utils_buffer_pop(pc->outgoing_rtp_rb, (uint8_t*)&packet_size, sizeof(size_t)) == sizeof(size_t)) {
+LOGD("packet_size %d", packet_size);
+          if (utils_buffer_pop(pc->outgoing_rtp_rb, pc->agent_buf, packet_size) == packet_size) {
+            peer_connection_send_rtp_packet(pc, pc->agent_buf, packet_size);
+	  }
         }
 #endif
 
@@ -182,8 +236,9 @@ int peer_connection_loop(PeerConnection *pc) {
 
             int ret = dtls_srtp_read(&pc->dtls_srtp, dtls_data, sizeof(dtls_data));
             LOGD("DTLS-SRTP read %d", ret);
+#ifdef HAVE_SCTP
             sctp_incoming_data(&pc->sctp, dtls_data, ret);
-
+#endif
           } else if (rtp_packet_validate(pc->agent_buf, pc->agent_ret)) {
 
             LOGD("RTP packet");
@@ -268,11 +323,11 @@ int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int byt
 int peer_connection_send_rtcp_pil(PeerConnection *pc, uint32_t ssrc) {
 
   int ret = -1;
-  guint size = 12;
   uint8_t plibuf[128];
   rtcp_packet_get_pli(plibuf, 12, ssrc);
  
   //TODO: encrypt rtcp packet
+  //guint size = 12;
   //dtls_transport_encrypt_rctp_packet(pc->dtls_transport, plibuf, &size);
   //ret = nice_agent_send(pc->nice_agent, pc->stream_id, pc->component_id, size, (gchar*)plibuf);
 

@@ -79,9 +79,9 @@ int dtls_srtp_create_cert(DtlsSrtp *dtls_srtp);
 
 int dtls_srtp_handshake(DtlsSrtp *dtls_srtp, Address *addr);
 
-int dtls_srtp_write(DtlsSrtp *dtls_srtp, const unsigned char *buf, size_t len);
+int dtls_srtp_write(DtlsSrtp *dtls_srtp, const uint8_t *buf, size_t len);
   
-int dtls_srtp_read(DtlsSrtp *dtls_srtp, unsigned char *buf, size_t len);
+int dtls_srtp_read(DtlsSrtp *dtls_srtp, uint8_t *buf, size_t len);
 
 void dtls_srtp_encrypt_rtp_packet(DtlsSrtp *dtls_srtp, uint8_t *packet, int *bytes);
 

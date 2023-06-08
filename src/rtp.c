@@ -5,7 +5,7 @@
 #include "rtp.h"
 #include "utils.h"
 
-int rtp_packet_validate(char *packet, size_t size) {
+int rtp_packet_validate(uint8_t *packet, size_t size) {
 
   if(size < 12)
     return 0;
@@ -28,6 +28,7 @@ static int rtp_packetizer_encode_generic(RtpPacketizer *rtp_packetizer, uint8_t 
   rtp_header->timestamp = htonl(rtp_packetizer->timestamp);
   rtp_header->ssrc = htonl(rtp_packetizer->ssrc);
   memcpy(rtp_packetizer->buf + sizeof(RtpHeader), buf, size);
+
   rtp_packetizer->on_packet(rtp_packetizer->buf, size + sizeof(RtpHeader), rtp_packetizer->user_data);
   
   return 0;

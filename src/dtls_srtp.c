@@ -11,7 +11,7 @@
 
 #define CERT_BUF_SIZE 1024 
 
-int dtls_srtp_udp_send(void *ctx, const unsigned char *buf, size_t len) {
+int dtls_srtp_udp_send(void *ctx, const uint8_t *buf, size_t len) {
 
   DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx;
   UdpSocket *udp_socket = (UdpSocket*)dtls_srtp->user_data;
@@ -23,7 +23,7 @@ int dtls_srtp_udp_send(void *ctx, const unsigned char *buf, size_t len) {
   return ret;
 }
 
-int dtls_srtp_udp_recv(void *ctx, unsigned char *buf, size_t len) {
+int dtls_srtp_udp_recv(void *ctx, uint8_t *buf, size_t len) {
 
   DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx;
   UdpSocket *udp_socket = (UdpSocket*)dtls_srtp->user_data;
