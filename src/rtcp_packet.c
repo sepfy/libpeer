@@ -5,7 +5,7 @@
 #include "rtcp_packet.h"
 #include "rtp.h"
 
-int rtcp_packet_validate(char *packet, size_t size) {
+int rtcp_packet_validate(uint8_t *packet, size_t size) {
 
   if(size < 8)
     return -1;
@@ -14,7 +14,7 @@ int rtcp_packet_validate(char *packet, size_t size) {
   return ((header->type >= 64) && (header->type < 96));
 }
 
-int rtcp_packet_get_pli(char *packet, int len, uint32_t ssrc) {
+int rtcp_packet_get_pli(uint8_t *packet, int len, uint32_t ssrc) {
 
   if(packet == NULL || len != 12)
     return -1;
@@ -30,7 +30,7 @@ int rtcp_packet_get_pli(char *packet, int len, uint32_t ssrc) {
   return 12;
 }
 
-int rtcp_packet_get_fir(char *packet, int len, int *seqnr) {
+int rtcp_packet_get_fir(uint8_t *packet, int len, int *seqnr) {
 
   if(packet == NULL || len != 20 || seqnr == NULL)
     return -1;
