@@ -23,7 +23,7 @@ static int rtp_packetizer_encode_generic(RtpPacketizer *rtp_packetizer, uint8_t 
   rtp_header->csrccount = 0;
   rtp_header->markerbit = 0;
   rtp_header->type = rtp_packetizer->type;
-  rtp_header->seq_number = htons(1);
+  rtp_header->seq_number = htons(rtp_packetizer->seq_number++);
   rtp_packetizer->timestamp += size; // 8000 HZ. 
   rtp_header->timestamp = htonl(rtp_packetizer->timestamp);
   rtp_header->ssrc = htonl(rtp_packetizer->ssrc);
@@ -34,25 +34,31 @@ static int rtp_packetizer_encode_generic(RtpPacketizer *rtp_packetizer, uint8_t 
   return 0;
 }
 
-void rtp_packetizer_init(RtpPacketizer *rtp_packetizer, RtpPayloadType type, uint32_t ssrc,
- void (*on_packet)(const uint8_t *packet, size_t bytes, void *user_data), void *user_data) {
+void rtp_packetizer_init(RtpPacketizer *rtp_packetizer, MediaCodec codec, void (*on_packet)(const uint8_t *packet, size_t bytes, void *user_data), void *user_data) {
 
-  rtp_packetizer->type = type;
   rtp_packetizer->on_packet = on_packet;
   rtp_packetizer->user_data = user_data;
-  rtp_packetizer->ssrc = ssrc;
   rtp_packetizer->timestamp = 0;
+  rtp_packetizer->seq_number = 0;
 
-  switch (rtp_packetizer->type) {
+  switch (codec) {
 
-    case PT_H264:
-      LOGD("Not implemented yes");
+    case CODEC_H264:
+      rtp_packetizer->type = PT_H264;
+      rtp_packetizer->ssrc = SSRC_H264;
+      LOGD("Not implemented yet");
       break;
-    case PT_PCMU:
-    case PT_PCMA:
-    default:
+    case CODEC_PCMA:
+      rtp_packetizer->type = PT_PCMA;
+      rtp_packetizer->ssrc = SSRC_PCMA;
       rtp_packetizer->encode_func = rtp_packetizer_encode_generic;
-    break;
+      break;
+    case CODEC_PCMU:
+      rtp_packetizer->type = PT_PCMU;
+      rtp_packetizer->ssrc = SSRC_PCMU;
+      rtp_packetizer->encode_func = rtp_packetizer_encode_generic;
+    default:
+      break;
   }
 }
 

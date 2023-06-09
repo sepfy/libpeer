@@ -223,6 +223,7 @@ int udp_socket_get_host_address(UdpSocket *udp_socket, Address *addr) {
 int udp_resolve_mdns_host(const char *host, Address *addr) {
 
   int ret = -1;
+#ifndef FREERTOS
   struct addrinfo hints, *res, *p;
   int status;
   char ipstr[INET6_ADDRSTRLEN];
@@ -246,6 +247,12 @@ int udp_resolve_mdns_host(const char *host, Address *addr) {
   }
 
   freeaddrinfo(res); 
+#else // FreeRTOS not support getaddrinfo
+  addr->ipv4[0] = 192;
+  addr->ipv4[1] = 168;
+  addr->ipv4[2] = 1;
+  addr->ipv4[3] = 110;
+#endif
   return ret;
 }
 

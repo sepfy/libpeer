@@ -65,7 +65,7 @@ struct PeerConnection {
   Sdp remote_sdp;
 
   void (*onicecandidate)(char *sdp, void *user_data);
-  void (*oniceconnectionstatechange)(IceCandidateState state, void *user_data);
+  void (*oniceconnectionstatechange)(PeerConnectionState state, void *user_data);
   void (*ontrack)(uint8_t *packet, size_t bytes, void *user_data);
   void (*on_connected)(void *userdata);
   void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *user_data);
@@ -128,7 +128,7 @@ void peer_connection_onicecandidate(PeerConnection *pc, void (*onicecandidate)(c
  * @param A userdata which is pass to callback function. 
  */
 void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
- void (*oniceconnectionstatechange)(IceCandidateState state, void *userdata));
+ void (*oniceconnectionstatechange)(PeerConnectionState state, void *userdata));
 
 /**
  * @brief Set the callback function to handle ontrack event.
