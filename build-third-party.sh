@@ -29,7 +29,7 @@ make WITH_STATIC_LIBRARIES=yes
 # Build mbedTLS
 cd $BASE_DIR/third_party/mbedtls
 sed -i 's/\/\/#define MBEDTLS_SSL_DTLS_SRTP/#define MBEDTLS_SSL_DTLS_SRTP/g' include/mbedtls/mbedtls_config.h
-make -j4
+make lib CFLAGS=-fPIC
 
 cd $BASE_DIR/third_party/usrsctp
 mkdir -p build && cd build
