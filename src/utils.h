@@ -16,7 +16,7 @@
 #define DEBUG_TAG "DEBUG"
 
 #ifndef LOG_LEVEL
-#define LOG_LEVEL LEVEL_DEBUG
+#define LOG_LEVEL LEVEL_INFO
 #endif
 
 #define LOG_PRINT(level_tag, fmt, ...) \
@@ -65,8 +65,10 @@ int utils_is_valid_ip_address(char *ip_address);
 
 Buffer* utils_buffer_new(int size);
 
-int utils_buffer_push(Buffer *rb, uint8_t *data, int size);
+int utils_buffer_push(Buffer *rb, const uint8_t *data, int size);
    
 int utils_buffer_pop(Buffer *rb, uint8_t *data, int size);
+
+void utils_buffer_clear(Buffer *rb);
 
 #endif // UTILS_H_

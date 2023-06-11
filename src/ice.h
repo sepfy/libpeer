@@ -2,6 +2,7 @@
 #define ICE_H_
 
 #include <stdlib.h>
+#include <time.h>
 
 #include "address.h"
 #include "stun.h"
@@ -57,6 +58,8 @@ struct IceCandidatePair {
   IceCandidate *local;
 
   IceCandidate *remote;
+
+  time_t nominated_time;
 
   uint64_t priority;
 };

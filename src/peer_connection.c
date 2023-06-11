@@ -6,19 +6,25 @@
 
 #define PEER_MTU 1500
 
-#define NOTIFY_STATE_CHANGE(pc, curr_state) if(pc->oniceconnectionstatechange && pc->state != curr_state) { pc->oniceconnectionstatechange(curr_state, pc->user_data); pc->state = curr_state; }
+#define STATE_CHANGED(pc, curr_state) if(pc->oniceconnectionstatechange && pc->state != curr_state) { pc->oniceconnectionstatechange(curr_state, pc->user_data); pc->state = curr_state; }
 
 static void peer_connection_on_rtp_packet(const uint8_t *packet, size_t bytes, void *user_data) {
 
-  PeerConnection *pc = (PeerConnection*) user_data;
+  Buffer **rb = (Buffer**) user_data;
 
-  if (pc->outgoing_rtp_rb) {
-    utils_buffer_push(pc->outgoing_rtp_rb, (uint8_t*)packet, bytes);
+  if (rb) {
+
+    if (utils_buffer_push(rb[1], packet, bytes) == bytes) {
+
+      utils_buffer_push(rb[0], (uint8_t*)&bytes, sizeof(bytes));
+    }
   }
 }
 
 static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t len) {
- 
+
+  static const int MAX_RECV = 100;
+  int recv_max = 0; 
   int ret; 
   DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx; 
   PeerConnection *pc = (PeerConnection *) dtls_srtp->user_data;
@@ -29,13 +35,15 @@ static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t 
     return pc->agent_ret;
   }
 
-  while (1) {
+  while (recv_max < MAX_RECV) {
 
     ret = agent_recv(&pc->agent, buf, len);
 
     if (ret > 0) {
       break;
     }
+    usleep(10*1000);
+    recv_max++;
 
   }
   return ret;	
@@ -78,6 +86,13 @@ void peer_connection_configure(PeerConnection *pc, PeerOptions *options) {
 
 void peer_connection_init(PeerConnection *pc) {
 
+  uint32_t ssrc;
+  RtpPayloadType type;
+
+#ifdef HAVE_GST
+  gst_init(NULL, NULL);
+#endif
+
   pc->agent.mode = AGENT_MODE_CONTROLLED;
 
   dtls_srtp_init(&pc->dtls_srtp, DTLS_SRTP_ROLE_SERVER, pc);
@@ -85,193 +100,79 @@ void peer_connection_init(PeerConnection *pc) {
   pc->dtls_srtp.udp_recv = peer_connection_dtls_srtp_recv;
   pc->dtls_srtp.udp_send = peer_connection_dtls_srtp_send;
 
-  pc->outgoing_rtp_rb = utils_buffer_new(2048);
-
-#ifdef HAVE_GST
-  gst_init(NULL, NULL);
+  pc->video_rb[0] = utils_buffer_new(VIDEO_RB_SIZE_LENGTH);
+  pc->video_rb[1] = utils_buffer_new(VIDEO_RB_DATA_LENGTH);
+  pc->audio_rb[0] = utils_buffer_new(AUDIO_RB_SIZE_LENGTH);
+  pc->audio_rb[1] = utils_buffer_new(AUDIO_RB_DATA_LENGTH);
 
   if (pc->options.audio_codec) {
-    pc->audio_stream = media_stream_create(pc->options.audio_codec, pc->options.audio_outgoing_pipeline, pc->options.audio_incoming_pipeline);
+#ifdef HAVE_GST
+    pc->audio_stream = media_stream_create(pc->options.audio_codec,
+     pc->options.audio_outgoing_pipeline, pc->options.audio_incoming_pipeline);
+    pc->audio_stream->outgoing_rb = pc->audio_rb;
+#else
+    rtp_packetizer_init(&pc->audio_packetizer, pc->options.audio_codec,
+     peer_connection_on_rtp_packet, pc->audio_rb);
+#endif
   }
 
   if (pc->options.video_codec) {
-    pc->video_stream = media_stream_create(pc->options.video_codec, pc->options.video_outgoing_pipeline, pc->options.video_incoming_pipeline);
-  }
+#ifdef HAVE_GST
+    pc->video_stream = media_stream_create(pc->options.video_codec,
+     pc->options.video_outgoing_pipeline, pc->options.video_incoming_pipeline);
+    pc->video_stream->outgoing_rb = pc->video_rb;
 #else
-
-  if (pc->options.audio_codec) {
-
-    rtp_packetizer_init(&pc->audio_packetizer, pc->options.audio_codec, peer_connection_on_rtp_packet, pc);
-  }
+    rtp_packetizer_init(&pc->video_packetizer, pc->options.video_codec,
+     peer_connection_on_rtp_packet, pc->video_rb);
 #endif
+  }
+
 }
 
 int peer_connection_send_audio(PeerConnection *pc, const uint8_t *buf, size_t len) {
 #ifndef HAVE_GST
-  if (pc->dtls_srtp.state == DTLS_SRTP_STATE_CONNECTED)
+  if (pc->dtls_srtp.state == DTLS_SRTP_STATE_CONNECTED) {
     rtp_packetizer_encode(&pc->audio_packetizer, (uint8_t*)buf, len);
+  }
 #endif
   return 0;
 }
 
 int peer_connection_send_video(PeerConnection *pc, const uint8_t *buf, size_t len) {
 #ifndef HAVE_GST
-  rtp_packetizer_encode(&pc->video_packetizer, (uint8_t*)buf, len);
+  if (pc->dtls_srtp.state == DTLS_SRTP_STATE_CONNECTED) {
+    rtp_packetizer_encode(&pc->video_packetizer, (uint8_t*)buf, len);
+  }
 #endif
   return 0;
 }
 
 int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len) {
-#ifdef HAVE_SCTP
+#ifdef HAVE_USRSCTP
   if(sctp_is_connected(&pc->sctp))
     return sctp_outgoing_data(&pc->sctp, message, len);
 #endif
   return -1;
 }
 
-
-int peer_connection_loop(PeerConnection *pc) {
-
-  uint8_t data[PEER_MTU];
-
-  uint8_t dtls_data[CONFIG_MTU];
-
-  memset(pc->agent_buf, 0, sizeof(pc->agent_buf));
-  pc->agent_ret = -1;
-  size_t size = sizeof(data);
-
-  int len;
-
-  size_t packet_size;
-
-  switch (pc->state) {
-
-    case PEER_CONNECTION_NEW:
-
-      break;
-
-    case PEER_CONNECTION_CHECKING:
-
-      agent_select_candidate_pair(&pc->agent);
-
-      if (agent_connectivity_check(&pc->agent)) {
-
-        LOGD("Connectivity check success. pair: %p", pc->agent.nominated_pair);
-
-        NOTIFY_STATE_CHANGE(pc, PEER_CONNECTION_CONNECTED);
-        pc->agent.selected_pair = pc->agent.nominated_pair;
-      }
-
-      agent_recv(&pc->agent, pc->agent_buf, sizeof(pc->agent_buf));
-
-      break;
-
-    case PEER_CONNECTION_CONNECTED:
-
-      if (pc->dtls_srtp.state == DTLS_SRTP_STATE_INIT) {
-
-        if (dtls_srtp_handshake(&pc->dtls_srtp, NULL) == 0) {
-
-          LOGD("DTLS-SRTP handshake done");
-
-#ifdef HAVE_GST
-          if (pc->audio_stream) {
-            media_stream_play(pc->audio_stream);
-          }
-
-          if (pc->video_stream) {
-            media_stream_play(pc->video_stream);
-          }
-#endif
-
-#ifdef HAVE_SCTP
-          if (pc->options.b_datachannel) {
-            LOGI("SCTP create socket");
-            sctp_create_socket(&pc->sctp, &pc->dtls_srtp);
-          }
-#endif
-
-        }
-      } else if (pc->dtls_srtp.state == DTLS_SRTP_STATE_CONNECTED) {
-#ifdef HAVE_GST
-        if (pc->video_stream && (utils_buffer_pop(pc->video_stream->outgoing_rb, pc->agent_buf, size) == size)) {
-          memcpy(&packet_size, pc->agent_buf, sizeof(size_t));
-          peer_connection_send_rtp_packet(pc, pc->agent_buf + sizeof(size_t), packet_size);
-        }
-        if (pc->audio_stream && (utils_buffer_pop(pc->audio_stream->outgoing_rb, pc->agent_buf, size) == size)) {
-          memcpy(&packet_size, pc->agent_buf, sizeof(size_t));
-          peer_connection_send_rtp_packet(pc, pc->agent_buf + sizeof(size_t), packet_size);
-        }
-#else
-        packet_size = 92;
-        if (utils_buffer_pop(pc->outgoing_rtp_rb, pc->agent_buf, packet_size) == packet_size) {
-
-            peer_connection_send_rtp_packet(pc, pc->agent_buf, packet_size);
-	  }
-#endif
-
-        memset(pc->agent_buf, 0, sizeof(pc->agent_buf));
-
-        if ((pc->agent_ret = agent_recv(&pc->agent, pc->agent_buf, sizeof(pc->agent_buf))) > 0) {
-          LOGD("agent_recv %d", pc->agent_ret);
-
-          if (rtcp_packet_validate(pc->agent_buf, pc->agent_ret)) {
-            LOGD("RTCP packet");
-            dtls_srtp_decrypt_rtcp_packet(&pc->dtls_srtp, pc->agent_buf, &len);
-            peer_connection_incoming_rtcp(pc, pc->agent_buf, len);
-
-          } else if (dtls_srtp_validate(pc->agent_buf)) {
-
-            int ret = dtls_srtp_read(&pc->dtls_srtp, dtls_data, sizeof(dtls_data));
-            LOGD("DTLS-SRTP read %d", ret);
-#ifdef HAVE_SCTP
-            sctp_incoming_data(&pc->sctp, dtls_data, ret);
-#endif
-          } else if (rtp_packet_validate(pc->agent_buf, pc->agent_ret)) {
-
-            LOGD("RTP packet");
-          }
-
-        }
-      }
-      break;
-    case PEER_CONNECTION_COMPLETED:
-      break;
-    case PEER_CONNECTION_FAILED:
-      break;
-    case PEER_CONNECTION_DISCONNECTED:
-      break;
-    case PEER_CONNECTION_CLOSED:
-      break;
-    default:
-      break;
-  }
-
-  return 0;
-}
-
-void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp_text) {
-
-  agent_set_remote_description(&pc->agent, (char*)sdp_text);
-  pc->state = PEER_CONNECTION_CHECKING;
-}
-
-const char* peer_connection_create_offer(PeerConnection *pc) {
-
-  char description[512];
+static void peer_connection_state_new(PeerConnection *pc) {
 
   int b_video = pc->options.video_codec != CODEC_NONE;
   int b_audio = pc->options.audio_codec != CODEC_NONE;
   int b_datachannel = pc->options.b_datachannel;
-
-  NOTIFY_STATE_CHANGE(pc, PEER_CONNECTION_NEW);
+  char description[512];
 
   memset(description, 0, sizeof(description));
+
+  agent_reset(&pc->agent);
+
+  dtls_srtp_reset_ssl(&pc->dtls_srtp);
 
   agent_gather_candidates(&pc->agent);
 
   agent_get_local_description(&pc->agent, description, sizeof(description));
 
+  memset(&pc->local_sdp, 0, sizeof(pc->local_sdp));
   // TODO: check if we have video or audio codecs
   sdp_create(&pc->local_sdp, b_video, b_audio, b_datachannel);
 
@@ -298,7 +199,131 @@ const char* peer_connection_create_offer(PeerConnection *pc) {
     strcat(pc->local_sdp.content, description);
   }
 
-  return pc->local_sdp.content;
+  pc->b_offer_created = 1;
+
+  if (pc->onicecandidate) {
+    pc->onicecandidate(pc->local_sdp.content, pc->user_data);
+  }
+}
+
+int peer_connection_loop(PeerConnection *pc) {
+
+  memset(pc->agent_buf, 0, sizeof(pc->agent_buf));
+  pc->agent_ret = -1;
+
+  switch (pc->state) {
+    case PEER_CONNECTION_NEW:
+
+      if (!pc->b_offer_created) {
+        peer_connection_state_new(pc);
+      }
+      break;
+
+    case PEER_CONNECTION_CHECKING:
+
+      agent_select_candidate_pair(&pc->agent);
+
+      if (agent_connectivity_check(&pc->agent)) {
+
+        LOGD("Connectivity check success. pair: %p", pc->agent.nominated_pair);
+
+        STATE_CHANGED(pc, PEER_CONNECTION_CONNECTED);
+        pc->agent.selected_pair = pc->agent.nominated_pair;
+      }
+
+      agent_recv(&pc->agent, pc->agent_buf, sizeof(pc->agent_buf));
+
+      break;
+
+    case PEER_CONNECTION_CONNECTED:
+      if (pc->dtls_srtp.state == DTLS_SRTP_STATE_INIT) {
+
+        if (dtls_srtp_handshake(&pc->dtls_srtp, NULL) == 0) {
+
+          LOGD("DTLS-SRTP handshake done");
+
+#ifdef HAVE_GST
+          if (pc->audio_stream) {
+            media_stream_play(pc->audio_stream);
+          }
+
+          if (pc->video_stream) {
+            media_stream_play(pc->video_stream);
+          }
+#endif
+
+#ifdef HAVE_USRSCTP
+          if (pc->options.b_datachannel) {
+            LOGI("SCTP create socket");
+            sctp_create_socket(&pc->sctp, &pc->dtls_srtp);
+          }
+#endif
+
+        }
+      } else if (pc->dtls_srtp.state == DTLS_SRTP_STATE_CONNECTED) {
+
+        uint16_t bytes;
+        if (utils_buffer_pop(pc->audio_rb[0], (uint8_t*)&bytes, sizeof(bytes)) > 0) {
+          if (utils_buffer_pop(pc->audio_rb[1], pc->agent_buf, bytes) > 0) {
+            peer_connection_send_rtp_packet(pc, pc->agent_buf, bytes);
+          }
+        }
+ 
+        if (utils_buffer_pop(pc->video_rb[0], (uint8_t*)&bytes, sizeof(bytes)) > 0) {
+          if (utils_buffer_pop(pc->video_rb[1], pc->agent_buf, bytes) > 0) {
+            peer_connection_send_rtp_packet(pc, pc->agent_buf, bytes);
+	  }
+        }
+
+        if ((pc->agent_ret = agent_recv(&pc->agent, pc->agent_buf, sizeof(pc->agent_buf))) > 0) {
+          LOGD("agent_recv %d", pc->agent_ret);
+
+          if (rtcp_packet_validate(pc->agent_buf, pc->agent_ret)) {
+            LOGD("Got RTCP packet");
+            dtls_srtp_decrypt_rtcp_packet(&pc->dtls_srtp, pc->agent_buf, &pc->agent_ret);
+            peer_connection_incoming_rtcp(pc, pc->agent_buf, pc->agent_ret);
+
+          } else if (dtls_srtp_validate(pc->agent_buf)) {
+
+            uint8_t dtls_data[CONFIG_MTU];
+            int ret = dtls_srtp_read(&pc->dtls_srtp, dtls_data, sizeof(dtls_data));
+            LOGD("Got DTLS data %d", ret);
+#ifdef HAVE_USRSCTP
+            sctp_incoming_data(&pc->sctp, dtls_data, ret);
+#endif
+          } else if (rtp_packet_validate(pc->agent_buf, pc->agent_ret)) {
+            LOGD("Got RTP packet");
+
+          }
+
+        }
+      }
+      break;
+    case PEER_CONNECTION_COMPLETED:
+      break;
+    case PEER_CONNECTION_FAILED:
+      break;
+    case PEER_CONNECTION_DISCONNECTED:
+      break;
+    case PEER_CONNECTION_CLOSED:
+      break;
+    default:
+      break;
+  }
+
+  return 0;
+}
+
+void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp_text) {
+
+  agent_set_remote_description(&pc->agent, (char*)sdp_text);
+  STATE_CHANGED(pc, PEER_CONNECTION_CHECKING);
+}
+
+const char* peer_connection_create_offer(PeerConnection *pc) {
+
+  STATE_CHANGED(pc, PEER_CONNECTION_NEW);
+  pc->b_offer_created = 0;
 }
 
 int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes) {

@@ -31,22 +31,19 @@ int media_stream_new_sample(GstElement *sink, void *userdata) {
   GstMapInfo info;
   MediaStream *ms = (MediaStream*)userdata;
 
-  char rtp_chunk[1500];
-
+  uint16_t size = 0;
   g_signal_emit_by_name(sink, "pull-sample", &sample);
 
   if (sample) {
 
     buffer = gst_sample_get_buffer(sample);
     gst_buffer_map(buffer, &info, GST_MAP_READ);
+    size = info.size;
 
-    memset(rtp_chunk, 0, sizeof(rtp_chunk));
-    memcpy(rtp_chunk, &info.size, sizeof(size_t));
-    memcpy(rtp_chunk + sizeof(size_t), info.data, info.size);
+    if (utils_buffer_push(ms->outgoing_rb[1], info.data, size) == size) {
 
-    utils_buffer_push(ms->outgoing_rb, (uint8_t*)rtp_chunk, sizeof(rtp_chunk));
-    //utils_buffer_push(ms->outgoing_rb, (uint8_t*)&info.size, sizeof(size_t));
-    //utils_buffer_push(ms->outgoing_rb, info.data, info.size);
+      utils_buffer_push(ms->outgoing_rb[0], (uint8_t*)&size, sizeof(size));
+    }
 
     gst_buffer_unmap(buffer, &info);
     gst_sample_unref(sample);
@@ -229,8 +226,6 @@ MediaStream* media_stream_create(MediaCodec codec,
         break;
     }
 
-    media_stream->outgoing_rb = utils_buffer_new(1404*256);
-
     LOGD("outgoing pipeline: %s", media_stream->outgoing_pipeline_text);
     media_stream->outgoing_pipeline = gst_parse_launch(media_stream->outgoing_pipeline_text, NULL);
     media_stream->sink = gst_bin_get_by_name(GST_BIN(media_stream->outgoing_pipeline), "sink");
@@ -286,8 +281,6 @@ MediaStream* media_stream_create(MediaCodec codec,
     }
 
     LOGD("incoming pipeline: %s", media_stream->incoming_pipeline_text);
-
-    media_stream->incoming_rb = utils_buffer_new(64*1404); 
 
     media_stream->incoming_pipeline = gst_parse_launch(media_stream->incoming_pipeline_text, NULL);
     media_stream->src = gst_bin_get_by_name(GST_BIN(media_stream->incoming_pipeline), "src");

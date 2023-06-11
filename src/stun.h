@@ -49,7 +49,9 @@ typedef enum StunAttrType {
   STUN_ATTR_TYPE_USE_CANDIDATE = 0x0025,
   STUN_ATTR_TYPE_FINGERPRINT = 0x8028,
   STUN_ATTR_TYPE_ICE_CONTROLLED = 0x8029,
-  STUN_ATTR_TYPE_ICE_CONTROLLING = 0x802a
+  STUN_ATTR_TYPE_ICE_CONTROLLING = 0x802a,
+  // https://datatracker.ietf.org/doc/html/draft-thatcher-ice-network-cost-00
+  STUN_ATTR_TYPE_NETWORK_COST = 0xc057,
 } StunAttrType;
 
 struct StunHeader {

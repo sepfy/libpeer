@@ -25,12 +25,9 @@
 
 typedef enum AgentState {
 
-  AGENT_STATE_NEW = 0,
-  AGENT_STATE_GATHERING,
-  AGENT_STATE_READY,
-  AGENT_STATE_FINISHED,
-  AGENT_STATE_CONNECTED,
-  AGENT_STATE_FAILED
+  AGENT_STATE_GATHERING_ENDED = 0,
+  AGENT_STATE_GATHERING_STARTED,
+  AGENT_STATE_GATHERING_COMPLETED,
 
 } AgentState;
 
@@ -78,9 +75,6 @@ struct Agent {
   int use_candidate;
 
   uint32_t transaction_id[3];
-
-  void (*state_changed_cb)(AgentState state, void *user_data);
-  void (*data_recv_cb)(char *buf, int len, void *user_data);
 };
 
 void agent_gather_candidates(Agent *agent);
@@ -104,6 +98,8 @@ void agent_attach_recv_cb(Agent *agent, void (*data_recv_cb)(char *buf, int len,
 void agent_set_host_address(Agent *agent, Address *addr);
 
 int agent_connectivity_check(Agent *agent);
+
+void agent_reset(Agent *agent);
 
 #endif // AGENT_H_
 

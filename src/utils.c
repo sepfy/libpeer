@@ -64,6 +64,12 @@ Buffer* utils_buffer_new(int size) {
   return rb;
 }
 
+void utils_buffer_clear(Buffer *rb) {
+
+  rb->head = 0;
+  rb->tail = 0;
+}
+
 void utils_buffer_free(Buffer *rb) {
 
   if (rb) {
@@ -74,7 +80,7 @@ void utils_buffer_free(Buffer *rb) {
   }
 }
 
-int utils_buffer_push(Buffer *rb, uint8_t *data, int size) {
+int utils_buffer_push(Buffer *rb, const uint8_t *data, int size) {
 
   int free_space = (rb->size + rb->head - rb->tail - 1) % rb->size;
   if (size > free_space) {

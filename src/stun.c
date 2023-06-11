@@ -171,8 +171,9 @@ void stun_parse_msg_buf(StunMessage *msg) {
         //LOGD("Fingerprint: 0x%.4x", msg->fingerprint);
         break;
       case STUN_ATTR_TYPE_ICE_CONTROLLED:
-        break;
       case STUN_ATTR_TYPE_ICE_CONTROLLING:
+      case STUN_ATTR_TYPE_NETWORK_COST:
+        // Do nothing
         break;
       default:
         LOGE("Unknown Attribute Type: 0x%04x", ntohs(attr->type));

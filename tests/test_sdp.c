@@ -54,13 +54,7 @@ int main(int argc, char *argv[]) {
 
   agent.mode = AGENT_MODE_CONTROLLING;
   //agent.mode = AGENT_MODE_CONTROLLED;
-  agent.state_changed_cb = on_agent_state_changed;
   agent_set_remote_description(&agent, remote_description);
-
-  while (1) {
-
-    agent_loop(&agent);
-  }
 
   return 0;
 }

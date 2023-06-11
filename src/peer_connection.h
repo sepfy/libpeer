@@ -14,7 +14,6 @@ extern "C" {
 #include "dtls_srtp.h"
 #include "sdp.h"
 #include "codec.h"
-#include "task.h"
 #include "config.h"
 #include "rtp.h"
 #include "rtcp_packet.h"
@@ -74,8 +73,10 @@ struct PeerConnection {
 
   uint8_t agent_buf[CONFIG_MTU];
   int agent_ret;
+  int b_offer_created;
 
-  Buffer *outgoing_rtp_rb;
+  Buffer *audio_rb[2];
+  Buffer *video_rb[2];
 
 #ifdef HAVE_GST
   MediaStream *audio_stream;
