@@ -79,6 +79,8 @@ int dtls_srtp_create_cert(DtlsSrtp *dtls_srtp);
 
 int dtls_srtp_handshake(DtlsSrtp *dtls_srtp, Address *addr);
 
+void dtls_srtp_reset_ssl(DtlsSrtp *dtls_srtp);
+
 int dtls_srtp_write(DtlsSrtp *dtls_srtp, const uint8_t *buf, size_t len);
   
 int dtls_srtp_read(DtlsSrtp *dtls_srtp, uint8_t *buf, size_t len);

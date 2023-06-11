@@ -28,8 +28,8 @@ typedef struct MediaStream {
   GstElement *src;
   GstElement *rtp;
 
-  Buffer *outgoing_rb;
-  Buffer *incoming_rb;
+  Buffer **outgoing_rb;
+  Buffer **incoming_rb;
 
 #ifdef SPEEX_AEC
   GstElement *aec_far;

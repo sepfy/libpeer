@@ -417,6 +417,12 @@ int dtls_srtp_handshake(DtlsSrtp *dtls_srtp, Address *addr) {
   return ret;
 }
 
+void dtls_srtp_reset_ssl(DtlsSrtp *dtls_srtp) {
+
+  mbedtls_ssl_session_reset(&dtls_srtp->ssl);
+  dtls_srtp->state = DTLS_SRTP_STATE_INIT;
+}
+
 int dtls_srtp_write(DtlsSrtp *dtls_srtp, const unsigned char *buf, size_t len) {
 
   int ret;

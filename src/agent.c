@@ -48,6 +48,13 @@ static void agent_get_stun_candidates(Agent *agent) {
 
 }
 
+void agent_reset(Agent *agent) {
+
+  memset(agent, 0, sizeof(Agent));
+  agent->state = AGENT_STATE_GATHERING_ENDED;
+  udp_socket_close(&agent->udp_socket);
+}
+
 void agent_set_host_address(Agent *agent, Address *addr) {
 
   memcpy(&agent->host_addr, addr, sizeof(agent->host_addr));
@@ -57,6 +64,8 @@ void agent_set_host_address(Agent *agent, Address *addr) {
 void agent_gather_candidates(Agent *agent) {
 
   int ret, i;
+
+  agent->state = AGENT_STATE_GATHERING_STARTED;
 
   memset(agent->local_candidates, 0, sizeof(agent->local_candidates));
 
@@ -69,6 +78,8 @@ void agent_gather_candidates(Agent *agent) {
   for (i = 0; i < ret; i++) {
     agent->local_candidates[i].addr.port = agent->local_candidates[agent->local_candidates_count-1].addr.port;
   }
+
+  agent->state = AGENT_STATE_GATHERING_COMPLETED;
 }
 
 void agent_get_local_description(Agent *agent, char *description, int length) {
@@ -228,8 +239,6 @@ a=candidate:1 1 UDP 1 36.231.28.50 38143 typ srflx
       agent->candidate_pairs_num++;
     }
   }
-
-  agent->state = AGENT_STATE_READY;
 }
 
 int agent_connectivity_check(Agent *agent) {
@@ -287,13 +296,7 @@ void agent_select_candidate_pair(Agent *agent) {
 
   int i;
 
-  static time_t t1 = 0;
-  if (t1 == 0) {
-    t1 = time(NULL);
-  }
-
   time_t t2 = time(NULL);
-
 
   //LOGD("Mode: %d", agent->mode);
 
@@ -304,12 +307,14 @@ void agent_select_candidate_pair(Agent *agent) {
       // nominate this pair
       agent->nominated_pair = &agent->candidate_pairs[i];
       agent->nominated_pair->state = ICE_CANDIDATE_STATE_WAITING;
+      agent->candidate_pairs[i].nominated_time = time(NULL);
       break;
 
-    } else if (agent->candidate_pairs[i].state == ICE_CANDIDATE_STATE_INPROGRESS && (t2 - t1) > 2) {
+    } else if (agent->candidate_pairs[i].state == ICE_CANDIDATE_STATE_INPROGRESS
+     && (t2 - agent->candidate_pairs[i].nominated_time) > 2) {
+
       LOGD("timeout for nominate (pair %d)", i);
       agent->nominated_pair->state = ICE_CANDIDATE_STATE_FAILED;
-      t1 = t2;
 
     } else if (agent->candidate_pairs[i].state == ICE_CANDIDATE_STATE_FAILED) {
 
@@ -324,24 +329,3 @@ void agent_select_candidate_pair(Agent *agent) {
   //LOGD("nominated_pair: %p", agent->nominated_pair);
 }
 
-int agent_loop(Agent *agent) {
-
-  uint8_t buf[1024];
-  // try to connect to remote
-
-  if (agent->state < AGENT_STATE_CONNECTED && agent->selected_pair == NULL) {
-
-    agent_select_candidate_pair(agent);
-
-    if (agent_connectivity_check(agent)) {
-
-      LOGD("Connectivity check success. pair: %p", agent->nominated_pair);
-
-      agent->state = AGENT_STATE_CONNECTED;
-      agent->selected_pair = agent->nominated_pair;
-    }
-  }
-
-  agent_recv(agent, buf, sizeof(buf));
-  return 0;
-}

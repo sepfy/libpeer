@@ -20,7 +20,7 @@ void signaling_set_local_description(const char *description) {
 
   char topic[128];
 
-  char description_base64[2048];
+  char description_base64[4096];
 
   memset(description_base64, 0, sizeof(description_base64));
 
