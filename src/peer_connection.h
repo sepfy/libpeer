@@ -77,6 +77,7 @@ struct PeerConnection {
 
   Buffer *audio_rb[2];
   Buffer *video_rb[2];
+  Buffer *data_rb[2];
 
 #ifdef HAVE_GST
   MediaStream *audio_stream;
