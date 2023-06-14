@@ -34,7 +34,9 @@ void onmessasge(char *msg, size_t len, void *userdata) {
 
 void onopen(void *userdata) {
 
+  char msg[] = "hello datachannel";
   printf("on open\n");
+  peer_connection_datachannel_send(&g_pc, msg, strlen(msg));
 }
 
 void onclose(void *userdata) {

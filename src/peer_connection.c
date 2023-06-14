@@ -29,7 +29,7 @@ static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t 
   DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx; 
   PeerConnection *pc = (PeerConnection *) dtls_srtp->user_data;
 
-  if (pc->agent_ret > 0 && len < pc->agent_ret) {
+  if (pc->agent_ret > 0 && pc->agent_ret < len) {
 
     memcpy(buf, pc->agent_buf, pc->agent_ret);
     return pc->agent_ret;
@@ -104,6 +104,8 @@ void peer_connection_init(PeerConnection *pc) {
   pc->video_rb[1] = utils_buffer_new(VIDEO_RB_DATA_LENGTH);
   pc->audio_rb[0] = utils_buffer_new(AUDIO_RB_SIZE_LENGTH);
   pc->audio_rb[1] = utils_buffer_new(AUDIO_RB_DATA_LENGTH);
+  pc->data_rb[0] = utils_buffer_new(DATA_RB_SIZE_LENGTH);
+  pc->data_rb[1] = utils_buffer_new(DATA_RB_DATA_LENGTH);
 
   if (pc->options.audio_codec) {
 #ifdef HAVE_GST
@@ -148,11 +150,38 @@ int peer_connection_send_video(PeerConnection *pc, const uint8_t *buf, size_t le
 }
 
 int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len) {
-#ifdef HAVE_USRSCTP
-  if(sctp_is_connected(&pc->sctp))
-    return sctp_outgoing_data(&pc->sctp, message, len);
-#endif
-  return -1;
+
+  if(!sctp_is_connected(&pc->sctp)) {
+    LOGE("sctp not connected");
+    return -1;
+  }
+
+  size_t pos = 0;
+  const char *packet = (const char*)message;
+  uint16_t bytes = (SCTP_MTU - 100);
+
+  if (!pc->data_rb) {
+    return -1;
+  }
+
+  while (len > bytes) {
+
+    if (utils_buffer_push(pc->data_rb[1], packet + pos, bytes) == bytes) {
+      utils_buffer_push(pc->data_rb[0], (uint8_t*)&bytes, sizeof(bytes));
+    }
+
+    pos += bytes;
+    len -= bytes;
+  }
+
+  bytes = len;
+  if (bytes > 0) {
+    if (utils_buffer_push(pc->data_rb[1], packet + pos, bytes)== bytes) {
+      utils_buffer_push(pc->data_rb[0], (uint8_t*)&bytes, sizeof(bytes));
+    }
+  }
+
+  return 0;
 }
 
 static void peer_connection_state_new(PeerConnection *pc) {
@@ -252,17 +281,16 @@ int peer_connection_loop(PeerConnection *pc) {
           }
 #endif
 
-#ifdef HAVE_USRSCTP
           if (pc->options.b_datachannel) {
             LOGI("SCTP create socket");
             sctp_create_socket(&pc->sctp, &pc->dtls_srtp);
           }
-#endif
 
         }
       } else if (pc->dtls_srtp.state == DTLS_SRTP_STATE_CONNECTED) {
 
         uint16_t bytes;
+
         if (utils_buffer_pop(pc->audio_rb[0], (uint8_t*)&bytes, sizeof(bytes)) > 0) {
           if (utils_buffer_pop(pc->audio_rb[1], pc->agent_buf, bytes) > 0) {
             peer_connection_send_rtp_packet(pc, pc->agent_buf, bytes);
@@ -272,6 +300,12 @@ int peer_connection_loop(PeerConnection *pc) {
         if (utils_buffer_pop(pc->video_rb[0], (uint8_t*)&bytes, sizeof(bytes)) > 0) {
           if (utils_buffer_pop(pc->video_rb[1], pc->agent_buf, bytes) > 0) {
             peer_connection_send_rtp_packet(pc, pc->agent_buf, bytes);
+	  }
+        }
+
+        if (utils_buffer_pop(pc->data_rb[0], (uint8_t*)&bytes, sizeof(bytes)) > 0) {
+          if (utils_buffer_pop(pc->data_rb[1], pc->agent_buf, bytes) > 0) {
+            sctp_outgoing_data(&pc->sctp, pc->agent_buf, bytes);
 	  }
         }
 
@@ -288,9 +322,9 @@ int peer_connection_loop(PeerConnection *pc) {
             uint8_t dtls_data[CONFIG_MTU];
             int ret = dtls_srtp_read(&pc->dtls_srtp, dtls_data, sizeof(dtls_data));
             LOGD("Got DTLS data %d", ret);
-#ifdef HAVE_USRSCTP
+
             sctp_incoming_data(&pc->sctp, dtls_data, ret);
-#endif
+
           } else if (rtp_packet_validate(pc->agent_buf, pc->agent_ret)) {
             LOGD("Got RTP packet");
 

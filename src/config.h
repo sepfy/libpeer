@@ -1,6 +1,7 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
+#define SCTP_MTU (1200)
 #define CONFIG_MTU (1500)
 
 #ifndef FREERTOS
@@ -11,5 +12,6 @@
 #define AUDIO_RB_SIZE_LENGTH 256
 #define VIDEO_RB_DATA_LENGTH (CONFIG_MTU * 64)
 #define AUDIO_RB_DATA_LENGTH (CONFIG_MTU * 64)
-
+#define DATA_RB_SIZE_LENGTH 256
+#define DATA_RB_DATA_LENGTH (SCTP_MTU * 64)
 #endif // CONFIG_H_
