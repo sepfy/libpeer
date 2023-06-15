@@ -160,6 +160,7 @@ void peer_connection_ondatachannel(PeerConnection *pc,
  * @param[in] length of message
  */
 int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len);
+int peer_connection_datachannel_send_binary(PeerConnection *pc, char *message, size_t len);
 
 int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);
 

@@ -99,7 +99,26 @@ static uint32_t sctp_get_checksum(Sctp *sctp, char *buf, size_t len) {
   return crc;
 }
 
-int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len) {
+static int sctp_outgoing_data_cb(void *userdata, void *buf, size_t len, uint8_t tos, uint8_t set_df) {
+
+  Sctp *sctp = (Sctp*)userdata;
+#if 0
+printf("send:");
+for(int i = 0; i < 32; i++) {
+printf("%02x ", ((uint8_t*)buf)[i]);
+}
+printf("\n");
+#endif
+
+  if (utils_buffer_push(sctp->data_rb[1], (const uint8_t*)buf, len) == len) {
+    uint16_t bytes = len;
+    utils_buffer_push(sctp->data_rb[0], (uint8_t*)&bytes, sizeof(bytes));
+  }
+
+  return 0;
+}
+
+int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid) {
 
 #ifdef HAVE_USRSCTP
   struct sctp_sendv_spa spa = {0};
@@ -108,21 +127,19 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len) {
 
   spa.sendv_sndinfo.snd_sid = 0;
   spa.sendv_sndinfo.snd_flags = SCTP_EOR;
-
-  // check ACSII
-  if ((buf[0] & 0x80) || (buf[1] & 0x80)) {
-    spa.sendv_sndinfo.snd_ppid = htonl(53);
-  } else {
-    spa.sendv_sndinfo.snd_ppid = htonl(51);
-  }
+  spa.sendv_sndinfo.snd_ppid = htonl(ppid);
 
   if(usrsctp_sendv(sctp->sock, buf, len, NULL, 0, &spa, sizeof(spa), SCTP_SENDV_SPA, 0) < 0) {
     LOGE("sctp sendv error");
     return -1;
   }
 #else
-
   static uint32_t tsn = 0;
+  size_t padding_len = 0;
+  size_t payload_max = SCTP_MTU - sizeof(SctpPacket) - sizeof(SctpDataChunk);
+  size_t pos = 0;
+  static uint16_t sqn = 0;
+
   SctpPacket *packet = (SctpPacket*)(sctp->buf);
   SctpDataChunk *chunk = (SctpDataChunk*)(packet->chunks);
 
@@ -131,29 +148,41 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len) {
   packet->header.verification_tag = sctp->verification_tag;
 
   chunk->type = SCTP_DATA;
-  chunk->iube = 0x03;
-  chunk->length = htons(len + sizeof(SctpDataChunk));
-  chunk->tsn = htonl(sctp->tsn++);
+  chunk->iube = 0x02;
   chunk->si = htons(0);
-  chunk->sqn = htons(0);
-  chunk->ppid = htonl(DATA_CHANNEL_PPID_DOMSTRING);
-  memcpy(chunk->data, buf, len);
-  packet->header.checksum = 0;
+  chunk->sqn = htons(sqn++);
+  chunk->ppid = htonl(ppid);
 
-  len = 4 * ((len + sizeof(SctpDataChunk) + sizeof(SctpPacket) + 3) / 4);
-  packet->header.checksum = sctp_get_checksum(sctp, sctp->buf, len);
-  dtls_srtp_write(sctp->dtls_srtp, sctp->buf, len);
+  while (len > payload_max) {
 
+    chunk->length = htons(payload_max + sizeof(SctpDataChunk));
+    chunk->tsn = htonl(tsn++);
+    memcpy(chunk->data, buf + pos, payload_max);
+    packet->header.checksum = 0;
+
+    packet->header.checksum = sctp_get_checksum(sctp, sctp->buf, SCTP_MTU);
+    sctp_outgoing_data_cb(sctp, sctp->buf, SCTP_MTU, 0, 0);
+
+    chunk->iube = 0x00;
+    len -= payload_max;
+    pos += payload_max;
+  }
+
+  if (len > 0) {
+
+    chunk->length = htons(len + sizeof(SctpDataChunk));
+    chunk->iube++;
+    chunk->tsn = htonl(tsn++);
+    memset(chunk->data, 0, payload_max);
+    memcpy(chunk->data, buf + pos, len);
+    packet->header.checksum = 0;
+    
+    padding_len = 4 * ((len + sizeof(SctpDataChunk) + sizeof(SctpPacket) + 3) / 4);
+    packet->header.checksum = sctp_get_checksum(sctp, sctp->buf, padding_len);
+    sctp_outgoing_data_cb(sctp, sctp->buf, padding_len, 0, 0);
+  }
 #endif
   return len;
-}
-
-static int sctp_outgoing_data_cb(void *userdata, void *buf, size_t len, uint8_t tos, uint8_t set_df) {
-
-  Sctp *sctp = (Sctp*)userdata;
-
-  dtls_srtp_write(sctp->dtls_srtp, (const unsigned char*)buf, len);
-  return 0;
 }
 
 void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
@@ -204,7 +233,6 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
         data_chunk = (SctpDataChunk*)in_packet->chunks;
 
         if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_CONTROL && data_chunk->data[0] == 0x03) {
-
           sack = (SctpSackChunk*)out_packet->chunks;
           sack->common.type = SCTP_SACK;
           sack->common.flags = 0x00;
@@ -212,9 +240,12 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
           sack->cumulative_tsn_ack = data_chunk->tsn;
           sack->a_rwnd = htonl(0x02);
           length = ntohs(sack->common.length) + sizeof(SctpHeader);
-          sctp->connected = 1;
-          if(sctp->onopen) {
-            sctp->onopen(sctp->userdata);
+
+          if (!sctp->connected) {
+            sctp->connected = 1;
+            if(sctp->onopen) {
+              sctp->onopen(sctp->userdata);
+            }
           }
         }
         break;
@@ -263,7 +294,7 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
       // padding 4
       length = (4*((length + 3)/4));
       out_packet->header.checksum = sctp_get_checksum(sctp, sctp->buf, length);
-      dtls_srtp_write(sctp->dtls_srtp, sctp->buf, length);
+      sctp_outgoing_data_cb(sctp, sctp->buf, length, 0, 0);
     }
     pos += ntohs(chunk_common->length);
   }

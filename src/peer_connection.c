@@ -156,32 +156,17 @@ int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t l
     return -1;
   }
 
-  size_t pos = 0;
-  const char *packet = (const char*)message;
-  uint16_t bytes = (SCTP_MTU - 100);
+  return sctp_outgoing_data(&pc->sctp, message, len, PPID_STRING);
+}
 
-  if (!pc->data_rb) {
+int peer_connection_datachannel_send_binary(PeerConnection *pc, char *message, size_t len) {
+
+  if(!sctp_is_connected(&pc->sctp)) {
+    LOGE("sctp not connected");
     return -1;
   }
 
-  while (len > bytes) {
-
-    if (utils_buffer_push(pc->data_rb[1], packet + pos, bytes) == bytes) {
-      utils_buffer_push(pc->data_rb[0], (uint8_t*)&bytes, sizeof(bytes));
-    }
-
-    pos += bytes;
-    len -= bytes;
-  }
-
-  bytes = len;
-  if (bytes > 0) {
-    if (utils_buffer_push(pc->data_rb[1], packet + pos, bytes)== bytes) {
-      utils_buffer_push(pc->data_rb[0], (uint8_t*)&bytes, sizeof(bytes));
-    }
-  }
-
-  return 0;
+  return sctp_outgoing_data(&pc->sctp, message, len, PPID_BINARY);
 }
 
 static void peer_connection_state_new(PeerConnection *pc) {
@@ -283,6 +268,7 @@ int peer_connection_loop(PeerConnection *pc) {
 
           if (pc->options.b_datachannel) {
             LOGI("SCTP create socket");
+            pc->sctp.data_rb = pc->data_rb;
             sctp_create_socket(&pc->sctp, &pc->dtls_srtp);
           }
 
@@ -305,7 +291,7 @@ int peer_connection_loop(PeerConnection *pc) {
 
         if (utils_buffer_pop(pc->data_rb[0], (uint8_t*)&bytes, sizeof(bytes)) > 0) {
           if (utils_buffer_pop(pc->data_rb[1], pc->agent_buf, bytes) > 0) {
-            sctp_outgoing_data(&pc->sctp, pc->agent_buf, bytes);
+            dtls_srtp_write(&pc->dtls_srtp, pc->agent_buf, bytes);
 	  }
         }
 

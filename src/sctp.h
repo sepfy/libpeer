@@ -3,6 +3,7 @@
 
 #include "config.h"
 #include "dtls_srtp.h"
+#include "utils.h"
 
 #ifndef HAVE_USRSCTP
 
@@ -112,6 +113,16 @@ typedef struct SctpInitChunk {
 
 #endif
 
+typedef enum SctpDataPpid {
+
+  PPID_CONTROL = 50,
+  PPID_STRING = 51,
+  PPID_BINARY = 53,
+  PPID_STRING_EMPTY = 56,
+  PPID_BINARY_EMPTY = 57
+
+} SctpDataPpid;
+
 typedef struct Sctp Sctp;
 
 typedef struct Sctp {
@@ -124,7 +135,7 @@ typedef struct Sctp {
   uint32_t verification_tag;
   uint32_t tsn;
   DtlsSrtp *dtls_srtp;
-
+  Buffer **data_rb;
   /* datachannel */
   void (*onmessasge)(char *msg, size_t len, void *userdata);
   void (*onopen)(void *userdata);
@@ -146,7 +157,7 @@ int sctp_is_connected(Sctp *sctp);
 
 void sctp_incoming_data(Sctp *sctp, char *buf, size_t len);
 
-int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len);
+int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid);
 
 void sctp_onmessage(Sctp *sctp, void (*onmessasge)(char *msg, size_t len, void *userdata));
 
