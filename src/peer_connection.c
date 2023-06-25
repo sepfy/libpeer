@@ -2,11 +2,14 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "ports.h"
 #include "peer_connection.h"
 
 #define PEER_MTU 1500
 
 #define STATE_CHANGED(pc, curr_state) if(pc->oniceconnectionstatechange && pc->state != curr_state) { pc->oniceconnectionstatechange(curr_state, pc->user_data); pc->state = curr_state; }
+
+uint8_t dtls_data[CONFIG_MTU];
 
 static void peer_connection_on_rtp_packet(const uint8_t *packet, size_t bytes, void *user_data) {
 
@@ -23,7 +26,7 @@ static void peer_connection_on_rtp_packet(const uint8_t *packet, size_t bytes, v
 
 static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t len) {
 
-  static const int MAX_RECV = 100;
+  static const int MAX_RECV = 10000;
   int recv_max = 0; 
   int ret; 
   DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx; 
@@ -42,7 +45,7 @@ static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t 
     if (ret > 0) {
       break;
     }
-    usleep(10*1000);
+    usleep(1*1000);
     recv_max++;
 
   }
@@ -95,6 +98,7 @@ void peer_connection_init(PeerConnection *pc) {
 
   pc->agent.mode = AGENT_MODE_CONTROLLED;
 
+  memset(&pc->sctp, 0, sizeof(pc->sctp));
   dtls_srtp_init(&pc->dtls_srtp, DTLS_SRTP_ROLE_SERVER, pc);
 
   pc->dtls_srtp.udp_recv = peer_connection_dtls_srtp_recv;
@@ -292,7 +296,7 @@ int peer_connection_loop(PeerConnection *pc) {
         if (utils_buffer_pop(pc->data_rb[0], (uint8_t*)&bytes, sizeof(bytes)) > 0) {
           if (utils_buffer_pop(pc->data_rb[1], pc->agent_buf, bytes) > 0) {
             dtls_srtp_write(&pc->dtls_srtp, pc->agent_buf, bytes);
-	  }
+         }
         }
 
         if ((pc->agent_ret = agent_recv(&pc->agent, pc->agent_buf, sizeof(pc->agent_buf))) > 0) {
@@ -305,11 +309,12 @@ int peer_connection_loop(PeerConnection *pc) {
 
           } else if (dtls_srtp_validate(pc->agent_buf)) {
 
-            uint8_t dtls_data[CONFIG_MTU];
             int ret = dtls_srtp_read(&pc->dtls_srtp, dtls_data, sizeof(dtls_data));
             LOGD("Got DTLS data %d", ret);
 
-            sctp_incoming_data(&pc->sctp, dtls_data, ret);
+            if (ret > 0) {
+              sctp_incoming_data(&pc->sctp, (char*)dtls_data, ret);
+            }
 
           } else if (rtp_packet_validate(pc->agent_buf, pc->agent_ret)) {
             LOGD("Got RTP packet");
@@ -340,7 +345,7 @@ void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp_
   STATE_CHANGED(pc, PEER_CONNECTION_CHECKING);
 }
 
-const char* peer_connection_create_offer(PeerConnection *pc) {
+void peer_connection_create_offer(PeerConnection *pc) {
 
   STATE_CHANGED(pc, PEER_CONNECTION_NEW);
   pc->b_offer_created = 0;
@@ -365,14 +370,6 @@ int peer_connection_send_rtcp_pil(PeerConnection *pc, uint32_t ssrc) {
   //ret = nice_agent_send(pc->nice_agent, pc->stream_id, pc->component_id, size, (gchar*)plibuf);
 
   return ret;
-}
-
-void peer_connection_set_host_address(PeerConnection *pc, const char *host) {
-
-  Address addr;
-  addr.family = AF_INET;
-  inet_pton(AF_INET, host, addr.ipv4);
-  agent_set_host_address(&pc->agent, &addr);
 }
 
 // callbacks
@@ -408,7 +405,7 @@ void peer_connection_ondatachannel(PeerConnection *pc,
  void (*onopen)(void *userdata),
  void (*onclose)(void *userdata)) {
 
-  if(pc) {
+  if (pc) {
 
     sctp_onopen(&pc->sctp, onopen);
     sctp_onclose(&pc->sctp, onclose);
@@ -416,3 +413,7 @@ void peer_connection_ondatachannel(PeerConnection *pc,
   }
 }
 
+void peer_connection_set_current_ip(const char *ip) {
+
+  ports_set_current_ip(ip);
+}

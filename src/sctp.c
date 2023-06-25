@@ -93,7 +93,7 @@ uint32_t crc32c(uint32_t crc, const uint8_t *data, unsigned int length)
 }
 
 
-static uint32_t sctp_get_checksum(Sctp *sctp, char *buf, size_t len) {
+static uint32_t sctp_get_checksum(Sctp *sctp, const uint8_t *buf, size_t len) {
 
   uint32_t crc = crc32c(0xffffffff, buf, len);
   return crc;
@@ -102,17 +102,12 @@ static uint32_t sctp_get_checksum(Sctp *sctp, char *buf, size_t len) {
 static int sctp_outgoing_data_cb(void *userdata, void *buf, size_t len, uint8_t tos, uint8_t set_df) {
 
   Sctp *sctp = (Sctp*)userdata;
-#if 0
-printf("send:");
-for(int i = 0; i < 32; i++) {
-printf("%02x ", ((uint8_t*)buf)[i]);
-}
-printf("\n");
-#endif
 
   if (utils_buffer_push(sctp->data_rb[1], (const uint8_t*)buf, len) == len) {
     uint16_t bytes = len;
     utils_buffer_push(sctp->data_rb[0], (uint8_t*)&bytes, sizeof(bytes));
+  } else {
+    LOGE("sctp outgoing data cb error");
   }
 
   return 0;
@@ -134,7 +129,6 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid) {
     return -1;
   }
 #else
-  static uint32_t tsn = 0;
   size_t padding_len = 0;
   size_t payload_max = SCTP_MTU - sizeof(SctpPacket) - sizeof(SctpDataChunk);
   size_t pos = 0;
@@ -156,11 +150,12 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid) {
   while (len > payload_max) {
 
     chunk->length = htons(payload_max + sizeof(SctpDataChunk));
-    chunk->tsn = htonl(tsn++);
+    chunk->tsn = htonl(sctp->tsn++);
     memcpy(chunk->data, buf + pos, payload_max);
     packet->header.checksum = 0;
 
-    packet->header.checksum = sctp_get_checksum(sctp, sctp->buf, SCTP_MTU);
+    packet->header.checksum = sctp_get_checksum(sctp, (const uint8_t*)sctp->buf, SCTP_MTU);
+
     sctp_outgoing_data_cb(sctp, sctp->buf, SCTP_MTU, 0, 0);
 
     chunk->iube = 0x00;
@@ -172,14 +167,16 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid) {
 
     chunk->length = htons(len + sizeof(SctpDataChunk));
     chunk->iube++;
-    chunk->tsn = htonl(tsn++);
+    chunk->tsn = htonl(sctp->tsn++);
     memset(chunk->data, 0, payload_max);
     memcpy(chunk->data, buf + pos, len);
     packet->header.checksum = 0;
     
     padding_len = 4 * ((len + sizeof(SctpDataChunk) + sizeof(SctpPacket) + 3) / 4);
-    packet->header.checksum = sctp_get_checksum(sctp, sctp->buf, padding_len);
-    sctp_outgoing_data_cb(sctp, sctp->buf, padding_len, 0, 0);
+
+    packet->header.checksum = sctp_get_checksum(sctp, (const uint8_t*)sctp->buf, padding_len);
+
+    sctp_outgoing_data_cb(sctp, sctp->buf, SCTP_MTU, 0, 0);
   }
 #endif
   return len;
@@ -195,9 +192,7 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
 #else
 
   size_t length = 0;
-  int i;
   size_t pos = sizeof(SctpHeader);
-  SctpChunkCommon *common_chunk;
   SctpChunkCommon *chunk_common;
   SctpDataChunk *data_chunk;
   SctpSackChunk *sack;
@@ -205,16 +200,17 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
   SctpPacket *out_packet = (SctpPacket*)sctp->buf;
 
   // Header
+#if 0
   LOGD("source_port %d", ntohs(in_packet->header.source_port));
   LOGD("destination_port %d", ntohs(in_packet->header.destination_port));
-  LOGD("verification_tag %d", ntohl(in_packet->header.verification_tag));
+  LOGD("verification_tag %ld", ntohl(in_packet->header.verification_tag));
   LOGD("checksum %d", ntohs(in_packet->header.checksum));
-
+#endif
   uint32_t crc32c = in_packet->header.checksum;
 
   in_packet->header.checksum = 0;
 
-  if (crc32c != sctp_get_checksum(sctp, buf, len)) {
+  if (crc32c != sctp_get_checksum(sctp, (const uint8_t*)buf, len)) {
     LOGE("checksum error");
     return;
   }
@@ -229,7 +225,7 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
     switch (chunk_common->type) {
 
       case SCTP_DATA:
-
+        LOGD("SCTP_DATA");
         data_chunk = (SctpDataChunk*)in_packet->chunks;
 
         if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_CONTROL && data_chunk->data[0] == 0x03) {
@@ -264,7 +260,7 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
         init_ack->a_rwnd = htonl(0x100000);
         init_ack->number_of_outbound_streams = 0xffff;
         init_ack->number_of_inbound_streams = 0xffff;
-        init_ack->initial_tsn = htonl(sctp->tsn++);
+        init_ack->initial_tsn = htonl(0);
 
         SctpChunkParam *param = init_ack->param;
 
@@ -274,6 +270,19 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
         memcpy(&param->value, &value, 4);
         length = ntohs(init_ack->common.length) + sizeof(SctpHeader);
         break;
+      case SCTP_SACK:
+
+        LOGD("SCTP_SACK");
+        sack = (SctpSackChunk*)in_packet->chunks;
+        LOGD("cumulative_tsn_ack %ld", ntohl(sack->cumulative_tsn_ack));
+        LOGD("a_rwnd %ld", ntohl(sack->a_rwnd));
+        LOGD("number_of_gap_ack_blocks %d", sack->number_of_gap_ack_blocks);
+        LOGD("number_of_dup_tsns %d", sack->number_of_dup_tsns);
+
+        if (sack->number_of_gap_ack_blocks > 0) {
+         // sctp->tsn = ntohl(sack->cumulative_tsn_ack) + 1;
+        }
+        break;
       case SCTP_COOKIE_ECHO:
         LOGD("SCTP_COOKIE_ECHO");
         SctpChunkCommon *common = (SctpChunkCommon*)out_packet->chunks;
@@ -282,6 +291,7 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
         length = ntohs(common->length) + sizeof(SctpHeader);
         break;
       default:
+        length = 0;
         break;
     }
 
@@ -294,10 +304,12 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
       // padding 4
       length = (4*((length + 3)/4));
       out_packet->header.checksum = sctp_get_checksum(sctp, sctp->buf, length);
-      sctp_outgoing_data_cb(sctp, sctp->buf, length, 0, 0);
+      dtls_srtp_write(sctp->dtls_srtp, sctp->buf, length);
+      //sctp_outgoing_data_cb(sctp, sctp->buf, SCTP_MTU, 0, 0);
     }
     pos += ntohs(chunk_common->length);
   }
+
 #endif
 
 }
@@ -363,12 +375,12 @@ static int sctp_incoming_data_cb(struct socket *sock, union sctp_sockstore addr,
 
 int sctp_create_socket(Sctp *sctp, DtlsSrtp *dtls_srtp) {
 
-  int ret = -1;
   sctp->dtls_srtp = dtls_srtp;
   sctp->local_port = 5000;
   sctp->remote_port = 5000;
 
 #ifdef HAVE_USRSCTP
+  int ret = -1;
   usrsctp_init(0, sctp_outgoing_data_cb, NULL);
   usrsctp_sysctl_set_sctp_ecn_enable(0);
   usrsctp_register_address(sctp);

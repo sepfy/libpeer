@@ -333,7 +333,7 @@ static int dtls_srtp_handshake_server(DtlsSrtp *dtls_srtp) {
 
     } else if (ret != 0) {
 
-      LOGD("failed! mbedtls_ssl_handshake returned -0x%x\n\n", (unsigned int) -ret);
+      LOGE("failed! mbedtls_ssl_handshake returned -0x%.4x\n\n", (unsigned int) -ret);
 
       break;
 
@@ -356,7 +356,7 @@ static int dtls_srtp_handshake_client(DtlsSrtp *dtls_srtp) {
 
   if (ret != 0) {
 
-    LOGD("failed! mbedtls_ssl_handshake returned -0x%x\n\n", (unsigned int) -ret);
+    LOGE("failed! mbedtls_ssl_handshake returned -0x%.4x\n\n", (unsigned int) -ret);
   }
 
   int flags;

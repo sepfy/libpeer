@@ -12,6 +12,7 @@
 #include "ice.h"
 #include "base64.h"
 #include "agent.h"
+#include "ports.h"
 
 static int agent_get_host_candidates(Agent *agent) {
 
@@ -19,16 +20,7 @@ static int agent_get_host_candidates(Agent *agent) {
 
   Address addr[AGENT_MAX_CANDIDATES];
 
-  if (agent->b_host_addr) {
-
-    memcpy(&addr[0], &agent->host_addr, sizeof(agent->host_addr));
-
-    ret = 1;
-
-  } else {
-
-    ret = udp_socket_get_host_address(&agent->udp_socket, addr);
-  }
+  ret = ports_get_current_ip(&agent->udp_socket, addr);
 
   for (i = 0; i < ret; i++) {
 
@@ -53,12 +45,6 @@ void agent_reset(Agent *agent) {
   memset(agent, 0, sizeof(Agent));
   agent->state = AGENT_STATE_GATHERING_ENDED;
   udp_socket_close(&agent->udp_socket);
-}
-
-void agent_set_host_address(Agent *agent, Address *addr) {
-
-  memcpy(&agent->host_addr, addr, sizeof(agent->host_addr));
-  agent->b_host_addr = 1;
 }
 
 void agent_gather_candidates(Agent *agent) {

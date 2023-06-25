@@ -7,7 +7,7 @@
 #include "codec.h"
 #include "config.h"
 
-#ifdef FREERTOS
+#ifdef ESP32
 #define __BYTE_ORDER __LITTLE_ENDIAN
 #endif
 

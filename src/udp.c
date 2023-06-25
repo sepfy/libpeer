@@ -5,15 +5,11 @@
 #include <fcntl.h>
 #include <string.h>
 #include <sys/types.h>
-
-#ifndef FREERTOS
-#include <netdb.h>
-#include <ifaddrs.h>
-#endif
-
+#include <errno.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
-#include <errno.h>
+#include <netdb.h>
+
 
 #include "utils.h"
 #include "udp.h"
@@ -110,7 +106,7 @@ int udp_socket_sendto(UdpSocket *udp_socket, Address *addr, const uint8_t *buf, 
   int ret = sendto(udp_socket->fd, buf, len, 0, (struct sockaddr *)&sin, sizeof(sin));
 
   if (ret < 0) {
-    LOGE("Failed to sendto");
+    LOGE("Failed to sendto: %s", strerror(errno));
     return -1;
   }
 
@@ -165,7 +161,7 @@ int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, uint8_t *buf, int 
 
     } else  {
 
-      LOGE("recvfrom() failed %d", ret);
+      LOGE("recvfrom() failed: %s", strerror(errno));
     }
     return -1;
   }
@@ -173,87 +169,4 @@ int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, uint8_t *buf, int 
   return ret;
   
 }
-
-int udp_socket_get_host_address(UdpSocket *udp_socket, Address *addr) {
-
-  int ret = 0;
-
-#ifndef FREERTOS
-  struct ifaddrs *addrs,*tmp;
-
-  struct ifreq ifr;
-
-  if (udp_socket->fd < 0) {
-
-    LOGE("get_host_address before socket init");
-    return -1;
-  }
-
-  getifaddrs(&addrs);
-
-  tmp = addrs;
-
-  while (tmp) {
-
-    if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_PACKET) {
-
-      strncpy(ifr.ifr_name, tmp->ifa_name, IFNAMSIZ); 
-
-      if (ioctl(udp_socket->fd, SIOCGIFADDR, &ifr) == 0) {
-
-        LOGD("interface: %s, address: %s", ifr.ifr_name, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
-
-        addr[ret].family = AF_INET;
-        memcpy(addr[ret].ipv4, &((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr, 4);
-        ret++;
-      }
-
-
-    }
-
-    tmp = tmp->ifa_next;
-  }
-
-  freeifaddrs(addrs);
-#endif
-  return ret;
-}
-
-
-int udp_resolve_mdns_host(const char *host, Address *addr) {
-
-  int ret = -1;
-#ifndef FREERTOS
-  struct addrinfo hints, *res, *p;
-  int status;
-  char ipstr[INET6_ADDRSTRLEN];
-
-  memset(&hints, 0, sizeof(hints));
-  hints.ai_family = AF_UNSPEC;
-  hints.ai_socktype = SOCK_STREAM;
-
-  if ((status = getaddrinfo(host, NULL, &hints, &res)) != 0) {
-    LOGE("getaddrinfo error: %s\n", gai_strerror(status));
-    return ret;
-  }
-
- for (p = res; p != NULL; p = p->ai_next) {
-
-    if (p->ai_family == AF_INET) {
-      struct sockaddr_in *ipv4 = (struct sockaddr_in *)p->ai_addr;
-      ret = 0;
-      memcpy(addr->ipv4, &ipv4->sin_addr.s_addr, 4);
-    }
-  }
-
-  freeaddrinfo(res); 
-#else // FreeRTOS not support getaddrinfo
-  addr->ipv4[0] = 192;
-  addr->ipv4[1] = 168;
-  addr->ipv4[2] = 1;
-  addr->ipv4[3] = 110;
-#endif
-  return ret;
-}
-
 

@@ -16,7 +16,7 @@
 #define DEBUG_TAG "DEBUG"
 
 #ifndef LOG_LEVEL
-#define LOG_LEVEL LEVEL_INFO
+#define LOG_LEVEL LEVEL_DEBUG
 #endif
 
 #define LOG_PRINT(level_tag, fmt, ...) \
