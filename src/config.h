@@ -4,7 +4,7 @@
 #define SCTP_MTU (1200)
 #define CONFIG_MTU (1500)
 
-#ifndef FREERTOS
+#ifndef ESP32
 #define HAVE_USRSCTP
 #endif
 

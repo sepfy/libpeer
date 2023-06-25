@@ -95,7 +95,7 @@ void peer_connection_init(PeerConnection *pc);
 
 void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp);
 
-const char* peer_connection_create_offer(PeerConnection *pc);
+void peer_connection_create_offer(PeerConnection *pc);
 
 int peer_connection_loop(PeerConnection *pc);
 
@@ -169,6 +169,8 @@ void peer_connection_set_host_address(PeerConnection *pc, const char *host);
 int peer_connection_send_audio(PeerConnection *pc, const uint8_t *packet, size_t bytes);
 
 int peer_connection_send_video(PeerConnection *pc, const uint8_t *packet, size_t bytes);
+
+void peer_connection_set_current_ip(const char *ip);
 
 #ifdef __cplusplus
 }

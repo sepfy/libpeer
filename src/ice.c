@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 
+#include "ports.h"
 #include "udp.h"
 #include "utils.h"
 #include "ice.h"
@@ -99,7 +100,7 @@ int ice_candidate_from_description(IceCandidate *candidate, char *description) {
      mdns,
      &candidate->addr.port, type);
 
-    udp_resolve_mdns_host(mdns, &candidate->addr);
+    ports_resolve_mdns_host(mdns, &candidate->addr);
     LOGD("mDNS host: %s, ip: %d.%d.%d.%d", mdns, candidate->addr.ipv4[0], candidate->addr.ipv4[1], candidate->addr.ipv4[2], candidate->addr.ipv4[3]);
 
   } else if (strstr(description, "UDP") == 0 && strstr(description, "udp") == 0) {

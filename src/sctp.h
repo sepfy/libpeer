@@ -48,7 +48,7 @@ typedef enum SctpHeaderType {
   SCTP_AUTH = 15, 
   SCTP_ASCONF_ACK = 128,
   SCTP_ASCONF = 130,
-  SCTP_FORWARD_CUM_TSN = 192
+  SCTP_FORWARD_TSN = 192
 
 } SctpHeaderType;
 
@@ -59,6 +59,17 @@ typedef struct SctpChunkCommon {
   uint16_t length;
 
 } SctpChunkCommon;
+
+typedef struct SctpForwardTsnChunk {
+
+  SctpChunkCommon common;
+  uint32_t new_cumulative_tsn;
+  uint16_t stream_number;
+  uint16_t stream_sequence_number;
+
+} SctpForwardTsnChunk;
+
+
 
 typedef struct SctpHeader {
 
