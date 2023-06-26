@@ -292,9 +292,16 @@ int peer_connection_loop(PeerConnection *pc) {
             peer_connection_send_rtp_packet(pc, pc->agent_buf, bytes);
 	  }
         }
-
         if (utils_buffer_pop(pc->data_rb[0], (uint8_t*)&bytes, sizeof(bytes)) > 0) {
           if (utils_buffer_pop(pc->data_rb[1], pc->agent_buf, bytes) > 0) {
+#if 0
+  printf("send data: %d\t", bytes);
+  for (int i = 0; i < 24; ++i) {
+    printf("%02x ", pc->agent_buf[i]);
+  }
+  printf("\n");
+#endif
+
             dtls_srtp_write(&pc->dtls_srtp, pc->agent_buf, bytes);
          }
         }

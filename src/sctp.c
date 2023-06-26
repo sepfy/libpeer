@@ -176,7 +176,7 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid) {
 
     packet->header.checksum = sctp_get_checksum(sctp, (const uint8_t*)sctp->buf, padding_len);
 
-    sctp_outgoing_data_cb(sctp, sctp->buf, SCTP_MTU, 0, 0);
+    sctp_outgoing_data_cb(sctp, sctp->buf, padding_len, 0, 0);
   }
 #endif
   return len;
