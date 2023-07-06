@@ -39,7 +39,7 @@ void sdp_append_h264(Sdp *sdp) {
   sdp_append(sdp, "a=ssrc:1 cname:webrtc-h264");
   sdp_append(sdp, "a=sendrecv");
   sdp_append(sdp, "a=mid:video");
-  sdp_append(sdp, "a=IN IP4 0.0.0.0");
+  sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtcp-mux");
 }
 
@@ -50,7 +50,7 @@ void sdp_append_pcma(Sdp *sdp) {
   sdp_append(sdp, "a=ssrc:4 cname:webrtc-pcma");
   sdp_append(sdp, "a=sendrecv");
   sdp_append(sdp, "a=mid:audio");
-  sdp_append(sdp, "a=IN IP4 0.0.0.0");
+  sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtcp-mux");
 }
 
@@ -61,7 +61,7 @@ void sdp_append_pcmu(Sdp *sdp) {
   sdp_append(sdp, "a=ssrc:5 cname:webrtc-pcmu");
   sdp_append(sdp, "a=sendrecv");
   sdp_append(sdp, "a=mid:audio");
-  sdp_append(sdp, "a=IN IP4 0.0.0.0");
+  sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtcp-mux");
 }
 
@@ -70,6 +70,7 @@ void sdp_append_datachannel(Sdp *sdp) {
   sdp_append(sdp, "m=application 50712 UDP/DTLS/SCTP webrtc-datachannel");
   sdp_append(sdp, "a=mid:datachannel");
   sdp_append(sdp, "a=sctp-port:5000");
+  sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=max-message-size:262144");
 }
 
