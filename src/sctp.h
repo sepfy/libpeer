@@ -94,6 +94,7 @@ typedef struct SctpSackChunk {
   uint32_t a_rwnd;
   uint16_t number_of_gap_ack_blocks;
   uint16_t number_of_dup_tsns;
+  uint8_t blocks[0];
 
 } SctpSackChunk;
 
