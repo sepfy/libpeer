@@ -142,7 +142,7 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid) {
   packet->header.verification_tag = sctp->verification_tag;
 
   chunk->type = SCTP_DATA;
-  chunk->iube = 0x02;
+  chunk->iube = 0x06;
   chunk->si = htons(0);
   chunk->sqn = htons(sqn++);
   chunk->ppid = htonl(ppid);
@@ -157,8 +157,7 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid) {
     packet->header.checksum = sctp_get_checksum(sctp, (const uint8_t*)sctp->buf, SCTP_MTU);
 
     sctp_outgoing_data_cb(sctp, sctp->buf, SCTP_MTU, 0, 0);
-
-    chunk->iube = 0x00;
+    chunk->iube = 0x04;
     len -= payload_max;
     pos += payload_max;
   }
@@ -260,7 +259,7 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
         init_ack->a_rwnd = htonl(0x100000);
         init_ack->number_of_outbound_streams = 0xffff;
         init_ack->number_of_inbound_streams = 0xffff;
-        init_ack->initial_tsn = htonl(0);
+        init_ack->initial_tsn = htonl(sctp->tsn);
 
         SctpChunkParam *param = init_ack->param;
 
@@ -279,9 +278,29 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
         LOGD("number_of_gap_ack_blocks %d", sack->number_of_gap_ack_blocks);
         LOGD("number_of_dup_tsns %d", sack->number_of_dup_tsns);
 
+// XXX: unordered sequence
+#if 0
         if (sack->number_of_gap_ack_blocks > 0) {
-         // sctp->tsn = ntohl(sack->cumulative_tsn_ack) + 1;
+
+          int blocks = ntohs(sack->number_of_gap_ack_blocks);
+          LOGW("cumulative_tsn_ack: %ld, number_of_gap_ack_blocks: %d",
+           ntohl(sack->cumulative_tsn_ack), blocks);
+
+          for (int i = 0; i < blocks; i++) {
+
+            uint16_t *start = (uint16_t*)sack->blocks + i*2;
+            uint16_t *end = (uint16_t*)sack->blocks + i*2 + 1;
+            LOGW("start: %d, end: %d", ntohs(*start), ntohs(*end));
+            sctp->tsn = ntohl(sack->cumulative_tsn_ack) + 1;// + (*start) - 1;
+          }
+        } else if (sack->number_of_dup_tsns > 0) {
+
+          LOGW("cumulative_tsn_ack: %ld, number_of_dup_tsns: %d",
+           ntohl(sack->cumulative_tsn_ack),
+           ntohs(sack->number_of_dup_tsns));
         }
+#endif
+
         break;
       case SCTP_COOKIE_ECHO:
         LOGD("SCTP_COOKIE_ECHO");
@@ -291,6 +310,7 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
         length = ntohs(common->length) + sizeof(SctpHeader);
         break;
       default:
+        LOGI("Unknown chunk type %d", chunk_common->type);
         length = 0;
         break;
     }
@@ -378,7 +398,7 @@ int sctp_create_socket(Sctp *sctp, DtlsSrtp *dtls_srtp) {
   sctp->dtls_srtp = dtls_srtp;
   sctp->local_port = 5000;
   sctp->remote_port = 5000;
-
+  sctp->tsn = 1234;
 #ifdef HAVE_USRSCTP
   int ret = -1;
   usrsctp_init(0, sctp_outgoing_data_cb, NULL);
