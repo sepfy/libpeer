@@ -7,9 +7,8 @@
 #include "dtls_srtp.h"
 #include "address.h"
 #include "udp.h"
+#include "config.h"
 #include "utils.h"
-
-#define CERT_BUF_SIZE 1024 
 
 int dtls_srtp_udp_send(void *ctx, const uint8_t *buf, size_t len) {
 
@@ -28,7 +27,12 @@ int dtls_srtp_udp_recv(void *ctx, uint8_t *buf, size_t len) {
   DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx;
   UdpSocket *udp_socket = (UdpSocket*)dtls_srtp->user_data;
 
-  int ret = udp_socket_recvfrom(udp_socket, &udp_socket->bind_addr, buf, len);
+  int ret;
+
+  while ((ret = udp_socket_recvfrom(udp_socket, &udp_socket->bind_addr, buf, len)) <= 0) {
+
+    usleep(1000);
+  }
 
   LOGD("dtls_srtp_udp_recv (%d)", ret);
 
@@ -71,7 +75,7 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp *dtls_srtp) {
 
   mbedtls_mpi serial;
 
-  unsigned char cert_buf[CERT_BUF_SIZE];
+  unsigned char *cert_buf = (unsigned char *) malloc(RSA_KEY_LENGTH * 2);
 
   const char *pers = "dtls_srtp";
 
@@ -79,7 +83,7 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp *dtls_srtp) {
 
   mbedtls_pk_setup(&dtls_srtp->pkey, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
  
-  mbedtls_rsa_gen_key(mbedtls_pk_rsa(dtls_srtp->pkey), mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg, 512, 65537);
+  mbedtls_rsa_gen_key(mbedtls_pk_rsa(dtls_srtp->pkey), mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg, RSA_KEY_LENGTH, 65537);
 
   mbedtls_x509write_crt_init(&crt);
 
@@ -105,20 +109,22 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp *dtls_srtp) {
 
   mbedtls_x509write_crt_set_validity(&crt, "20180101000000", "20280101000000");
 
-  ret = mbedtls_x509write_crt_pem(&crt, cert_buf, CERT_BUF_SIZE, mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
+  ret = mbedtls_x509write_crt_pem(&crt, cert_buf, 2*RSA_KEY_LENGTH, mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
 
   if (ret < 0) {
 
     printf("mbedtls_x509write_crt_pem failed\n");
-    return -1;
   }
 
-  mbedtls_x509_crt_parse(&dtls_srtp->cert, cert_buf, CERT_BUF_SIZE);
+  mbedtls_x509_crt_parse(&dtls_srtp->cert, cert_buf, 2*RSA_KEY_LENGTH);
 
   mbedtls_x509write_crt_free(&crt);
 
-  return 0;
+  mbedtls_mpi_free(&serial);
 
+  free(cert_buf);
+
+  return ret;
 }
 
 int dtls_srtp_init(DtlsSrtp *dtls_srtp, DtlsSrtpRole role, void *user_data) {
@@ -196,6 +202,30 @@ int dtls_srtp_init(DtlsSrtp *dtls_srtp, DtlsSrtpRole role, void *user_data) {
   }
 
   return 0;
+}
+
+void dtls_srtp_deinit(DtlsSrtp *dtls_srtp) {
+
+  mbedtls_ssl_free(&dtls_srtp->ssl);
+  mbedtls_ssl_config_free(&dtls_srtp->conf);
+
+  mbedtls_x509_crt_free(&dtls_srtp->cert);
+  mbedtls_pk_free(&dtls_srtp->pkey);
+  mbedtls_entropy_free(&dtls_srtp->entropy);
+  mbedtls_ctr_drbg_free(&dtls_srtp->ctr_drbg);
+
+  if (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) {
+
+    mbedtls_ssl_cookie_free(&dtls_srtp->cookie_ctx);
+  }
+
+  if (dtls_srtp->state == DTLS_SRTP_STATE_CONNECTED) {
+
+    srtp_dealloc(dtls_srtp->srtp_in);
+    srtp_dealloc(dtls_srtp->srtp_out);
+  }
+
+  srtp_shutdown();
 }
 
 static void dtls_srtp_key_derivation(void *context, mbedtls_ssl_key_export_type secret_type,
@@ -417,9 +447,15 @@ int dtls_srtp_handshake(DtlsSrtp *dtls_srtp, Address *addr) {
   return ret;
 }
 
-void dtls_srtp_reset_ssl(DtlsSrtp *dtls_srtp) {
+void dtls_srtp_reset_session(DtlsSrtp *dtls_srtp) {
 
-  mbedtls_ssl_session_reset(&dtls_srtp->ssl);
+  if (dtls_srtp->state == DTLS_SRTP_STATE_CONNECTED) {
+
+    srtp_dealloc(dtls_srtp->srtp_in);
+    srtp_dealloc(dtls_srtp->srtp_out);
+    mbedtls_ssl_session_reset(&dtls_srtp->ssl);
+  }
+
   dtls_srtp->state = DTLS_SRTP_STATE_INIT;
 }
 

@@ -14,19 +14,13 @@
 
 Signaling g_signaling;
 
-void signaling_set_local_description(const char *description) {
+void signaling_response(const char *result) {
 
   int rc;
 
   char topic[128];
 
-  char description_base64[4096];
-
-  memset(description_base64, 0, sizeof(description_base64));
-
-  memset(topic, 0, sizeof(topic));
-
-  base64_encode(description, strlen(description), description_base64, sizeof(description_base64));
+  char *payload;
 
   snprintf(topic, sizeof(topic), "webrtc/%s/jsonrpc-reply", g_signaling.client_id);
 
@@ -34,18 +28,31 @@ void signaling_set_local_description(const char *description) {
 
   cJSON_AddStringToObject(json, "jsonrpc", "2.0");
 
-  cJSON_AddStringToObject(json, "result", description_base64);
+  cJSON_AddNumberToObject(json, "id", g_signaling.id);
 
-  cJSON_AddStringToObject(json, "id", "1");
+  if (result) {
+    cJSON_AddStringToObject(json, "result", result);
+  }
 
-  char *payload = cJSON_PrintUnformatted(json);
+  payload = cJSON_PrintUnformatted(json);
 
   rc = mosquitto_publish(g_signaling.mosq, NULL, topic, strlen(payload), payload, 0, false);
 
-  cJSON_Delete(json);
-
   free(payload);
 
+  cJSON_Delete(json);
+
+}
+
+void signaling_set_local_description(const char *description) {
+
+  char description_base64[4096];
+
+  memset(description_base64, 0, sizeof(description_base64));
+
+  base64_encode(description, strlen(description), description_base64, sizeof(description_base64));
+
+  signaling_response(description_base64);
 }
 
 void signaling_connect_callback(struct mosquitto *mosq, void *obj, int result) {
@@ -66,6 +73,16 @@ void signaling_message_callback(struct mosquitto *mosq, void *obj, const struct 
 
     cJSON *method = cJSON_GetObjectItem(json, "method");
 
+    cJSON *id = cJSON_GetObjectItem(json, "id");
+
+    if (!id && !cJSON_IsNumber(id)) {
+
+      LOGE("invalid id");
+      return;
+    }
+
+    g_signaling.id = id->valueint;
+
     if (method) {
 
       if (strcmp(method->valuestring, JSONRPC_METHOD_REQUEST_OFFER) == 0) {
@@ -84,8 +101,6 @@ void signaling_message_callback(struct mosquitto *mosq, void *obj, const struct 
           g_signaling.on_event(SIGNALING_EVENT_RESPONSE_ANSWER, description, strlen(description), g_signaling.user_data);
         }
       }
-
-
     }
   }
 

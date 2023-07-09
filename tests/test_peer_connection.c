@@ -27,7 +27,8 @@ int main(int argc, char *argv[]) {
   memset(local_description, 0, sizeof(local_description));
   memset(offer_base64, 0, sizeof(offer_base64));
 
-  sdp_text = peer_connection_create_offer(&pc);
+  peer_connection_create_offer(&pc);
+#if 0
   printf("sdp: \n%s\n", sdp_text);
 
   // create offer
@@ -60,7 +61,7 @@ int main(int argc, char *argv[]) {
 
   peer_connection_set_remote_description(&pc, answer_sdp);
   cJSON_Delete(answer);
-
+#endif
   while (1) {
     usleep(100*1000);
   }

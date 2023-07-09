@@ -5,7 +5,7 @@
 
 #include "dtls_srtp.h"
 
-int main(int argc, char *argv[]) {
+void test_handshake(int argc, char *argv[]) {
 
   DtlsSrtp dtls_srtp;
   UdpSocket udp_socket;
@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
   if (argc < 2) {
 
     printf("Usage: %s client/server\n", argv[0]);
-    return 0;
+    return;
   }
 
   local_addr.ipv4[0] = 192;
@@ -80,6 +80,21 @@ int main(int argc, char *argv[]) {
     dtls_srtp_write(&dtls_srtp, buf, sizeof(buf));
 
   }
+
+  dtls_srtp_deinit(&dtls_srtp);
+}
+
+void test_reset() {
+
+  DtlsSrtp dtls_srtp;
+  dtls_srtp_init(&dtls_srtp, DTLS_SRTP_ROLE_CLIENT, NULL);
+  dtls_srtp_deinit(&dtls_srtp);
+}
+
+int main(int argc, char *argv[]) {
+
+  test_reset();
+  test_handshake(argc, argv);
 
   return 0;
 }

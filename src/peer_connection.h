@@ -39,7 +39,7 @@ typedef struct PeerOptions {
 
   MediaCodec audio_codec;
   MediaCodec video_codec;
-  int b_datachannel;
+  int datachannel;
   
 #ifdef HAVE_GST
   const char *audio_outgoing_pipeline;
@@ -71,6 +71,7 @@ struct PeerConnection {
 
   void *user_data;
 
+  uint8_t temp_buf[CONFIG_MTU];
   uint8_t agent_buf[CONFIG_MTU];
   int agent_ret;
   int b_offer_created;

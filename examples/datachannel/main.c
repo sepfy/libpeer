@@ -6,6 +6,7 @@
 #include "signaling.h"
 
 static PeerConnection g_pc;
+int g_datachannel_opened = 0;
 
 void* peer_connection_thread(void *data) {
 
@@ -36,6 +37,7 @@ void onopen(void *userdata) {
 
   char msg[] = "hello datachannel";
   printf("on open\n");
+  g_datachannel_opened = 1;
   peer_connection_datachannel_send(&g_pc, msg, strlen(msg));
 }
 
@@ -76,11 +78,10 @@ int main(int argc, char *argv[]) {
   char device_id[128] = {0,};
 
   pthread_t thread;
-  PeerOptions options = {0};
+  PeerOptions options = { .datachannel = 1 };
 
   signal(SIGINT, signal_handler);
 
-  options.b_datachannel = 1;
   peer_connection_configure(&g_pc, &options);
   peer_connection_init(&g_pc);
   peer_connection_onicecandidate(&g_pc, on_icecandidate);
