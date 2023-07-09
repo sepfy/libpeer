@@ -5,11 +5,7 @@
 #include "ports.h"
 #include "peer_connection.h"
 
-#define PEER_MTU 1500
-
 #define STATE_CHANGED(pc, curr_state) if(pc->oniceconnectionstatechange && pc->state != curr_state) { pc->oniceconnectionstatechange(curr_state, pc->user_data); pc->state = curr_state; }
-
-uint8_t dtls_data[CONFIG_MTU];
 
 static void peer_connection_on_rtp_packet(const uint8_t *packet, size_t bytes, void *user_data) {
 
@@ -177,18 +173,20 @@ static void peer_connection_state_new(PeerConnection *pc) {
 
   int b_video = pc->options.video_codec != CODEC_NONE;
   int b_audio = pc->options.audio_codec != CODEC_NONE;
-  int b_datachannel = pc->options.b_datachannel;
-  char description[512];
+  int b_datachannel = pc->options.datachannel;
+  char *description = (char*)pc->temp_buf;
 
-  memset(description, 0, sizeof(description));
+  memset(pc->temp_buf, 0, sizeof(pc->temp_buf));
 
   agent_reset(&pc->agent);
 
-  dtls_srtp_reset_ssl(&pc->dtls_srtp);
+  dtls_srtp_reset_session(&pc->dtls_srtp);
+
+  pc->sctp.connected = 0;
 
   agent_gather_candidates(&pc->agent);
 
-  agent_get_local_description(&pc->agent, description, sizeof(description));
+  agent_get_local_description(&pc->agent, description, sizeof(pc->temp_buf));
 
   memset(&pc->local_sdp, 0, sizeof(pc->local_sdp));
   // TODO: check if we have video or audio codecs
@@ -210,7 +208,7 @@ static void peer_connection_state_new(PeerConnection *pc) {
     strcat(pc->local_sdp.content, description);
   }
 
-  if (pc->options.b_datachannel) {
+  if (pc->options.datachannel) {
     sdp_append_datachannel(&pc->local_sdp);
     sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
     sdp_append(&pc->local_sdp, "a=setup:actpass");
@@ -270,7 +268,7 @@ int peer_connection_loop(PeerConnection *pc) {
           }
 #endif
 
-          if (pc->options.b_datachannel) {
+          if (pc->options.datachannel) {
             LOGI("SCTP create socket");
             pc->sctp.data_rb = pc->data_rb;
             sctp_create_socket(&pc->sctp, &pc->dtls_srtp);
@@ -316,11 +314,11 @@ int peer_connection_loop(PeerConnection *pc) {
 
           } else if (dtls_srtp_validate(pc->agent_buf)) {
 
-            int ret = dtls_srtp_read(&pc->dtls_srtp, dtls_data, sizeof(dtls_data));
+            int ret = dtls_srtp_read(&pc->dtls_srtp, pc->temp_buf, sizeof(pc->temp_buf));
             LOGD("Got DTLS data %d", ret);
 
             if (ret > 0) {
-              sctp_incoming_data(&pc->sctp, (char*)dtls_data, ret);
+              sctp_incoming_data(&pc->sctp, (char*)pc->temp_buf, ret);
             }
 
           } else if (rtp_packet_validate(pc->agent_buf, pc->agent_ret)) {

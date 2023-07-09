@@ -75,11 +75,13 @@ typedef struct DtlsSrtp {
 
 int dtls_srtp_init(DtlsSrtp *dtls_srtp, DtlsSrtpRole role, void *user_data);
 
+void dtls_srtp_deinit(DtlsSrtp *dtls_srtp);
+
 int dtls_srtp_create_cert(DtlsSrtp *dtls_srtp);
 
 int dtls_srtp_handshake(DtlsSrtp *dtls_srtp, Address *addr);
 
-void dtls_srtp_reset_ssl(DtlsSrtp *dtls_srtp);
+void dtls_srtp_reset_session(DtlsSrtp *dtls_srtp);
 
 int dtls_srtp_write(DtlsSrtp *dtls_srtp, const uint8_t *buf, size_t len);
   

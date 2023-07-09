@@ -48,8 +48,6 @@ void ice_candidate_to_description(IceCandidate *candidate, char *description, in
 
   char typ_raddr[64];
 
-  memset(description, 0, length);
-
   memset(typ_raddr, 0, sizeof(typ_raddr));
 
   switch (candidate->type) {

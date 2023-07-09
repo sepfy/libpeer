@@ -18,6 +18,12 @@ int udp_socket_open(UdpSocket *udp_socket) {
 
   udp_socket->fd = socket(AF_INET, SOCK_DGRAM, 0);
 
+  if (udp_socket->fd < 0) {
+
+    LOGE("Failed to create socket");
+    return -1;
+  }
+
   int flags = fcntl(udp_socket->fd, F_GETFL, 0);
 
   fcntl(udp_socket->fd, F_SETFL, flags | O_NONBLOCK);
@@ -52,8 +58,9 @@ int udp_socket_bind(UdpSocket *udp_socket, Address *addr) {
 
 void udp_socket_close(UdpSocket *udp_socket) {
 
-  if (udp_socket->fd > 0)
+  if (udp_socket->fd > 0) {
     close(udp_socket->fd);
+  }
 }
 
 int udp_get_local_address(UdpSocket *udp_socket, Address *addr) {

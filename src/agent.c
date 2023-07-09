@@ -42,9 +42,9 @@ static void agent_get_stun_candidates(Agent *agent) {
 
 void agent_reset(Agent *agent) {
 
+  udp_socket_close(&agent->udp_socket);
   memset(agent, 0, sizeof(Agent));
   agent->state = AGENT_STATE_GATHERING_ENDED;
-  udp_socket_close(&agent->udp_socket);
 }
 
 void agent_gather_candidates(Agent *agent) {
@@ -70,8 +70,6 @@ void agent_gather_candidates(Agent *agent) {
 
 void agent_get_local_description(Agent *agent, char *description, int length) {
 
-  char buffer[1024];
-
   memset(description, 0, length);
 
   memset(agent->local_ufrag, 0, sizeof(agent->local_ufrag));
@@ -84,13 +82,9 @@ void agent_get_local_description(Agent *agent, char *description, int length) {
 
   for (int i = 0; i < agent->local_candidates_count; i++) {
 
-    memset(buffer, 0, sizeof(buffer));
-
     agent->local_candidates[i].foundation = i + 1;
 
-    ice_candidate_to_description(&agent->local_candidates[i], buffer, sizeof(buffer));
-
-    strncat(description, buffer, length - strlen(description) - 1);
+    ice_candidate_to_description(&agent->local_candidates[i], description + strlen(description), length - strlen(description));
   }
 
   // remove last \n

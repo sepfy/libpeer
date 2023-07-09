@@ -16,6 +16,7 @@ typedef struct Signaling {
 
   char client_id[24];
   int run;
+  int id;
   struct mosquitto *mosq;
   void (*on_event)(SignalingEvent event, const char *buf, size_t len, void *user_data);
   void *user_data;

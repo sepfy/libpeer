@@ -252,12 +252,13 @@ void stun_parse_binding_response(char *buf, size_t len, Address *addr) {
 
 int stun_get_local_address(const char *stun_server, int stun_port, Address *addr) {
 
+  int ret = -1;
+
   int sock = socket(AF_INET, SOCK_DGRAM, 0);
 
   if (sock == -1) {
     LOGE("Failed to create socket.");
-    return -1;
-
+    return ret;
   }
     
   struct sockaddr_in server_addr;
@@ -271,25 +272,28 @@ int stun_get_local_address(const char *stun_server, int stun_port, Address *addr
   stun_create_binding_request(&msg);
 
   LOGD("Sending STUN Binding Request.");
-  int n = sendto(sock, msg.buf, msg.size, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 
-  if (n == -1) {
-    LOGE("Failed to send STUN Binding Request.");
-    return -1;
-  }
+  do {
 
-  char buf[1024];
+    ret = sendto(sock, msg.buf, msg.size, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 
-  n = recvfrom(sock, buf, sizeof(buf), 0, NULL, NULL);
+    if (ret == -1) {
+      LOGE("Failed to send STUN Binding Request.");
+      break;
+    }
 
-  if (n == -1) {
-    LOGD("Failed to receive STUN Binding Response.");
-    return -1;
-  }
+    char buf[1024];
 
-  memcpy(msg.buf, buf, n);
-  stun_parse_msg_buf(&msg);
-  memcpy(addr, &msg.mapped_addr, sizeof(Address));
+    ret = recvfrom(sock, buf, sizeof(buf), 0, NULL, NULL);
+
+    if (ret == -1) {
+      LOGD("Failed to receive STUN Binding Response.");
+      break;
+    }
+
+    memcpy(msg.buf, buf, ret);
+    stun_parse_msg_buf(&msg);
+    memcpy(addr, &msg.mapped_addr, sizeof(Address));
 #if 0
   StunHeader *header = (StunHeader *)buf;
   switch(ntohs(header->type)) {
@@ -325,7 +329,11 @@ int stun_get_local_address(const char *stun_server, int stun_port, Address *addr
     return -1;
   }
 #endif
-  return 0;
+  } while(0);
+
+  close(sock);
+
+  return ret;
 }
 
 void stun_calculate_fingerprint(char *buf, size_t len, uint32_t *fingerprint) {
