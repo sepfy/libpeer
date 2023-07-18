@@ -351,8 +351,8 @@ static int sctp_handle_incoming_data(Sctp *sctp, char *data, size_t len, uint32_
       break;
     case DATA_CHANNEL_PPID_DOMSTRING:
 
-      LOGD("Got message %s (size = %ld)", msg, len);
       msg = strndup(data, len);
+      LOGD("Got message %s (size = %ld)", msg, len);
       if(msg && sctp->onmessasge) {
         sctp->onmessasge(msg, len, sctp->userdata);
         free(msg);

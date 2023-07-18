@@ -6,11 +6,12 @@
 #include "signaling.h"
 
 static PeerConnection g_pc;
-int g_datachannel_opened = 0;
+static int g_datachannel_opened = 0;
 
 void* peer_connection_thread(void *data) {
 
   while (1) {
+
     peer_connection_loop(&g_pc);
     usleep(1*1000); 
   }
@@ -29,16 +30,20 @@ static void on_iceconnectionstatechange(PeerConnectionState state, void *data) {
   printf("state is changed: %d\n", state);
 }
 
-void onmessasge(char *msg, size_t len, void *userdata) {
+static void onmessasge(char *msg, size_t len, void *userdata) {
 
+  printf("on message: %s", msg);
+
+  if (strncmp(msg, "ping", 4) == 0) {
+    printf(", send pong\n");
+    peer_connection_datachannel_send(&g_pc, "pong", 4);
+  }
 }
 
 void onopen(void *userdata) {
 
-  char msg[] = "hello datachannel";
   printf("on open\n");
   g_datachannel_opened = 1;
-  peer_connection_datachannel_send(&g_pc, msg, strlen(msg));
 }
 
 void onclose(void *userdata) {
@@ -78,6 +83,7 @@ int main(int argc, char *argv[]) {
   char device_id[128] = {0,};
 
   pthread_t thread;
+
   PeerOptions options = { .datachannel = 1 };
 
   signal(SIGINT, signal_handler);
@@ -90,9 +96,9 @@ int main(int argc, char *argv[]) {
 
   pthread_create(&thread, NULL, peer_connection_thread, NULL);
 
-  snprintf(device_id, sizeof(device_id), "test_666");//%d", getpid());
+  snprintf(device_id, sizeof(device_id), "test_%d", getpid());
 
-  printf("open http://127.0.0.1?deviceId=%s\n", device_id);
+  printf("open https://sepfy.github.io/webrtc?deviceId=%s\n", device_id);
 
   signaling_dispatch(device_id, on_signaling_event, NULL);
 
