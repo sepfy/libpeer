@@ -1,178 +1,86 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <pthread.h>
+#include <signal.h>
 
-#include "index_html.h"
 #include "signaling.h"
-#include "h264_packetizer.h"
-#include "h264_parser.h"
+#include "peer_connection.h"
 
-#define FILE_MAX_SIZE 5*1024*1024
-const char* FILE_NAME = "test.264";
+const char PIPE_LINE[] = "filesrc location=test.mp4 ! qtdemux ! h264parse ! queue min-threshold-time=10000000000";
 
-typedef struct VideoOnDemand {
+static PeerConnection g_pc;
 
-  GCond cond;
-  GMutex mutex;
+void* peer_connection_thread(void *data) {
 
-  PeerConnection *pc;
-  Signaling *signaling;
-
-  pthread_t thread;
-  gboolean sending_data;
-
-} VideoOnDemand;
-
-VideoOnDemand g_file_send;
-
-
-void* send_h264_thread(void *data) {
-
-  H264Packetizer *h264_packetizer;
-  h264_packetizer = h264_packetizer_create(g_file_send.pc);
-
-  uint8_t buf[FILE_MAX_SIZE] = {0};
-  FILE *fp = NULL;
-  size_t prev = 0;
-
-  fp = fopen(FILE_NAME, "rb");
-  if(fp == NULL) {
-    printf("Cannot open %s\n", FILE_NAME);
-    pthread_exit(NULL);
+  while (1) {
+    peer_connection_loop(&g_pc);
+    usleep(10*1000);
   }
-
-  fread(buf, 1, sizeof(buf), fp);
-  fclose(fp);
-  static unsigned long timestamp = 0;
-
-  H264Frame *sps_frame = NULL;
-  H264Frame *pps_frame = NULL;
-  H264Frame *h264_frame = NULL;
-
-  while(g_file_send.sending_data) {
-
-    h264_frame = h264_parser_get_next_frame(buf, sizeof(buf), &prev);
-    if(h264_frame == NULL) break;
-
-    if(h264_frame->buf[4] == 0x67) {
-
-      if(sps_frame)
-        h264_frame_free(sps_frame);
-      sps_frame = h264_frame;
-      continue;
-
-    }
-    else if(h264_frame->buf[4] == 0x68) {
-
-      if(pps_frame)
-        h264_frame_free(pps_frame);
-      pps_frame = h264_frame;
-      continue;
-
-    }
-    else if(h264_frame->buf[4] == 0x65) {
-      h264_packetizer_send(h264_packetizer, sps_frame->buf, sps_frame->size, timestamp);
-      h264_packetizer_send(h264_packetizer, pps_frame->buf, pps_frame->size, timestamp);
-    }
-
-    h264_packetizer_send(h264_packetizer, h264_frame->buf, h264_frame->size, timestamp);
-    timestamp += 33000;
-
-    h264_frame_free(h264_frame);
-    usleep(33000);
-  }
-
-  if(sps_frame)
-    h264_frame_free(sps_frame);
-
-  if(pps_frame)
-    h264_frame_free(pps_frame);
-
-  if(h264_packetizer)
-    h264_packetizer_destroy(h264_packetizer);
-
-  printf("End of send video thread\n");
 
   pthread_exit(NULL);
 }
 
+void on_icecandidate(char *sdp_text, void *data) {
 
-static void on_iceconnectionstatechange(IceConnectionState state, void *data) {
-
-  if(state == FAILED) {
-    printf("Disconnect with browser... Stop streaming");
-  }
+  printf("on_icecandidate : \n%s\n", sdp_text);
+  signaling_set_local_description(sdp_text);
 }
 
-static void on_icecandidate(char *sdp, void *data) {
+void on_iceconnectionstatechange(PeerConnectionState state, void *data) {
 
-  signaling_send_answer_to_call(g_file_send.signaling, sdp);
-  g_cond_signal(&g_file_send.cond);
+  printf("state is changed: %d\n", state);
 }
 
-static void on_connected(void *data) {
+void on_signaling_event(SignalingEvent event, const char *buf, size_t len, void *user_data) {
 
-  if(g_file_send.sending_data == FALSE) {
-    g_file_send.sending_data = TRUE;
-    pthread_create(&g_file_send.thread, NULL, send_h264_thread, NULL); 
+  switch (event) {
+  
+    case SIGNALING_EVENT_REQUEST_OFFER:
+
+      peer_connection_create_offer(&g_pc);
+
+      break;
+
+    case SIGNALING_EVENT_RESPONSE_ANSWER:
+
+      peer_connection_set_remote_description(&g_pc, buf);
+ 
+      break;
+
+    default:
+      break;
   }
-}
 
-void on_call_event(SignalingEvent signaling_event, char *msg, void *data) {
-
-  if(signaling_event == SIGNALING_EVENT_GET_OFFER) {
-
-    g_mutex_lock(&g_file_send.mutex);
-    g_file_send.sending_data = FALSE;
-    pthread_join(g_file_send.thread, NULL);
-
-    if(g_file_send.pc)
-      peer_connection_destroy(g_file_send.pc);
-    g_file_send.pc = peer_connection_create(NULL);
-
-    peer_connection_onicecandidate(g_file_send.pc, on_icecandidate);
-    peer_connection_oniceconnectionstatechange(g_file_send.pc, on_iceconnectionstatechange);
-    peer_connection_on_connected(g_file_send.pc, on_connected);
-    peer_connection_create_answer(g_file_send.pc);
-    peer_connection_set_remote_description(g_file_send.pc, msg);
-
-    g_cond_wait(&g_file_send.cond, &g_file_send.mutex);
-    g_mutex_unlock(&g_file_send.mutex);
-  }
 }
 
 void signal_handler(int signal) {
 
-  if(g_file_send.sending_data) {
-    g_file_send.sending_data = FALSE;
-    pthread_join(g_file_send.thread, NULL);
-  }
-
-  if(g_file_send.signaling)
-    signaling_destroy(g_file_send.signaling);
-
-  if(g_file_send.pc)
-    peer_connection_destroy(g_file_send.pc);
-
+  printf("catch interrupt. exit app\n");
   exit(0);
 }
 
-int main(int argv, char *argc[]) {
+int main(int argc, char *argv[]) {
+
+  char device_id[128] = {0};
+
+  static pthread_t thread;
+
+  PeerOptions options = { .video_codec = CODEC_H264, .video_outgoing_pipeline = PIPE_LINE };
+
+  peer_connection_configure(&g_pc, &options);
+  peer_connection_init(&g_pc);
+  peer_connection_onicecandidate(&g_pc, on_icecandidate);
+  peer_connection_oniceconnectionstatechange(&g_pc, on_iceconnectionstatechange);
+
+  pthread_create(&thread, NULL, peer_connection_thread, NULL);
+
+  snprintf(device_id, sizeof(device_id), "test_%d", getpid());
+
+  printf("open https://sepfy.github.io/webrtc/?deviceId=%s\n", device_id);
 
   signal(SIGINT, signal_handler);
 
-  SignalingOption signaling_option = {SIGNALING_PROTOCOL_HTTP, "0.0.0.0", "demo", 8000, index_html};
-
-  g_file_send.signaling = signaling_create(signaling_option);
-
-  if(!g_file_send.signaling) {
-    printf("Create signaling service failed\n");
-    return 0;
-  }
-
-  signaling_on_call_event(g_file_send.signaling, &on_call_event, NULL);
-  signaling_dispatch(g_file_send.signaling);
+  signaling_dispatch(device_id, on_signaling_event, NULL);
 
   return 0;
 }

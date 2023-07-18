@@ -3,7 +3,6 @@
 #include <unistd.h>
 #include <signal.h>
 
-#include "index_html.h"
 #include "signaling.h"
 #include "peer_connection.h"
 
@@ -38,7 +37,6 @@ void on_signaling_event(SignalingEvent event, const char *buf, size_t len, void 
   
     case SIGNALING_EVENT_REQUEST_OFFER:
 
-
       peer_connection_create_offer(&g_pc);
 
       break;
@@ -63,14 +61,11 @@ void signal_handler(int signal) {
 
 int main(int argc, char *argv[]) {
 
-  char device_id[128] = {0,};
+  char device_id[128] = {0};
 
   static pthread_t thread;
 
-  PeerOptions options = {0};
-
-  options.video_codec = CODEC_H264;
-  options.video_outgoing_pipeline = PIPE_LINE;
+  PeerOptions options = { .video_codec = CODEC_H264, .video_outgoing_pipeline = PIPE_LINE };
 
   peer_connection_configure(&g_pc, &options);
   peer_connection_init(&g_pc);
@@ -79,9 +74,9 @@ int main(int argc, char *argv[]) {
 
   pthread_create(&thread, NULL, peer_connection_thread, NULL);
 
-  snprintf(device_id, sizeof(device_id), "test_666");//%d", getpid());
+  snprintf(device_id, sizeof(device_id), "test_%d", getpid());
 
-  printf("open http://127.0.0.1?deviceId=%s\n", device_id);
+  printf("open https://sepfy.github.io/webrtc/?deviceId=%s\n", device_id);
 
   signal(SIGINT, signal_handler);
 

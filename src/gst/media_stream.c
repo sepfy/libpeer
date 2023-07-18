@@ -199,7 +199,7 @@ MediaStream* media_stream_create(MediaCodec codec,
 
       case CODEC_H264:
         snprintf(media_stream->outgoing_pipeline_text, sizeof(media_stream->outgoing_pipeline_text),
-         "%s ! video/x-h264, stream-format=(string)byte-stream, level=(string)4, alighnment=(string)au ! rtph264pay name=rtp config-interval=-1 ssrc=1 ! appsink name=sink",
+         "%s ! video/x-h264, stream-format=(string)byte-stream, alighnment=(string)au ! rtph264pay name=rtp config-interval=-1 ssrc=1 ! appsink name=sink",
          outgoing_pipeline_text);
         break;
       case CODEC_VP8:
