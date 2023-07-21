@@ -51,71 +51,6 @@ int utils_is_valid_ip_address(char *ip_address) {
   return 0;
 }
 
-Buffer* utils_buffer_new(int size) {
-
-  Buffer *rb;
-  rb = (Buffer*)malloc(sizeof(Buffer));
-
-  rb->data = (uint8_t*)malloc(size);
-  rb->size = size;
-  rb->head = 0;
-  rb->tail = 0;
-
-  return rb;
-}
-
-void utils_buffer_clear(Buffer *rb) {
-
-  rb->head = 0;
-  rb->tail = 0;
-}
-
-void utils_buffer_free(Buffer *rb) {
-
-  if (rb) {
-
-    free(rb->data);
-    rb->data = NULL;
-    rb = NULL;
-  }
-}
-
-int utils_buffer_push(Buffer *rb, const uint8_t *data, int size) {
-
-  int free_space = (rb->size + rb->head - rb->tail - 1) % rb->size;
-  if (size > free_space) {
-    return -1;
-  }
-  int tail_end = (rb->tail + size) % rb->size;
-  if (tail_end < rb->tail) {
-      int first_size = rb->size - rb->tail;
-      memcpy(rb->data + rb->tail, data, first_size);
-      memcpy(rb->data, data + first_size, size - first_size);
-  } else {
-      memcpy(rb->data + rb->tail, data, size);
-  }
-  rb->tail = tail_end;
-  return size;
-}
-
-int utils_buffer_pop(Buffer *rb, uint8_t *data, int size) {
-
-  int used_space = (rb->size + rb->tail - rb->head) % rb->size;
-  if (size > used_space) {
-    return -1;
-  }
-  int head_end = (rb->head + size) % rb->size;
-  if (head_end < rb->head) {
-      int first_size = rb->size - rb->head;
-      memcpy(data, rb->data + rb->head, first_size);
-      memcpy(data + first_size, rb->data, size - first_size);
-  } else {
-      memcpy(data, rb->data + rb->head, size);
-  }
-  rb->head = head_end;
-  return size;
-}
-
 void utils_random_string(char *s, const int len) {
 
   int i;
@@ -146,5 +81,4 @@ void utils_get_sha1(const char *input, size_t input_len, const char *key, unsign
   mbedtls_md_free(&ctx);
 
 }
-
 

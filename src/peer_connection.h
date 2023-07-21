@@ -17,7 +17,7 @@ extern "C" {
 #include "config.h"
 #include "rtp.h"
 #include "rtcp_packet.h"
-
+#include "buffer.h"
 
 #ifdef HAVE_GST
 #include "gst/media_stream.h"
