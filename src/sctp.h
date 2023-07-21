@@ -4,6 +4,7 @@
 #include "config.h"
 #include "dtls_srtp.h"
 #include "utils.h"
+#include "buffer.h"
 
 #ifndef HAVE_USRSCTP
 

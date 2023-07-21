@@ -8,7 +8,7 @@
 #define STATE_CHANGED(pc, curr_state) if(pc->oniceconnectionstatechange && pc->state != curr_state) { pc->oniceconnectionstatechange(curr_state, pc->user_data); pc->state = curr_state; }
 
 static void peer_connection_on_rtp_packet(const uint8_t *packet, size_t bytes, void *user_data) {
-
+#if 0
   Buffer **rb = (Buffer**) user_data;
 
   if (rb) {
@@ -18,6 +18,7 @@ static void peer_connection_on_rtp_packet(const uint8_t *packet, size_t bytes, v
       utils_buffer_push(rb[0], (uint8_t*)&bytes, sizeof(bytes));
     }
   }
+#endif
 }
 
 static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t len) {
@@ -100,12 +101,13 @@ void peer_connection_init(PeerConnection *pc) {
   pc->dtls_srtp.udp_recv = peer_connection_dtls_srtp_recv;
   pc->dtls_srtp.udp_send = peer_connection_dtls_srtp_send;
 
-  pc->video_rb[0] = utils_buffer_new(VIDEO_RB_SIZE_LENGTH);
-  pc->video_rb[1] = utils_buffer_new(VIDEO_RB_DATA_LENGTH);
-  pc->audio_rb[0] = utils_buffer_new(AUDIO_RB_SIZE_LENGTH);
-  pc->audio_rb[1] = utils_buffer_new(AUDIO_RB_DATA_LENGTH);
-  pc->data_rb[0] = utils_buffer_new(DATA_RB_SIZE_LENGTH);
-  pc->data_rb[1] = utils_buffer_new(DATA_RB_DATA_LENGTH);
+  pc->video_rb[0] = buffer_new(VIDEO_RB_SIZE_LENGTH);
+  pc->video_rb[1] = buffer_new(VIDEO_RB_DATA_LENGTH);
+  pc->audio_rb[0] = buffer_new(AUDIO_RB_SIZE_LENGTH);
+  pc->audio_rb[1] = buffer_new(AUDIO_RB_DATA_LENGTH);
+  pc->data_rb[0] = buffer_new(DATA_RB_SIZE_LENGTH);
+  pc->data_rb[1] = buffer_new(DATA_RB_DATA_LENGTH);
+LOGI("address %p", pc->data_rb[1]);
 
   if (pc->options.audio_codec) {
 #ifdef HAVE_GST
@@ -156,7 +158,7 @@ int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t l
     return -1;
   }
 
-  return sctp_outgoing_data(&pc->sctp, message, len, PPID_STRING);
+  return buffer_push_tail(pc->data_rb[1], (const uint8_t*)message, len);
 }
 
 int peer_connection_datachannel_send_binary(PeerConnection *pc, char *message, size_t len) {
@@ -166,7 +168,7 @@ int peer_connection_datachannel_send_binary(PeerConnection *pc, char *message, s
     return -1;
   }
 
-  return sctp_outgoing_data(&pc->sctp, message, len, PPID_BINARY);
+  return buffer_push_tail(pc->data_rb[1], (const uint8_t*)message, len);
 }
 
 static void peer_connection_state_new(PeerConnection *pc) {
@@ -277,8 +279,11 @@ int peer_connection_loop(PeerConnection *pc) {
         }
       } else if (pc->dtls_srtp.state == DTLS_SRTP_STATE_CONNECTED) {
 
-        uint16_t bytes;
+        int bytes;
+        uint8_t *data = NULL;
 
+// TODO: fix this
+#if 0
         if (utils_buffer_pop(pc->audio_rb[0], (uint8_t*)&bytes, sizeof(bytes)) > 0) {
           if (utils_buffer_pop(pc->audio_rb[1], pc->agent_buf, bytes) > 0) {
             peer_connection_send_rtp_packet(pc, pc->agent_buf, bytes);
@@ -290,18 +295,14 @@ int peer_connection_loop(PeerConnection *pc) {
             peer_connection_send_rtp_packet(pc, pc->agent_buf, bytes);
 	  }
         }
-        if (utils_buffer_pop(pc->data_rb[0], (uint8_t*)&bytes, sizeof(bytes)) > 0) {
-          if (utils_buffer_pop(pc->data_rb[1], pc->agent_buf, bytes) > 0) {
-#if 0
-  printf("send data: %d\t", bytes);
-  for (int i = 0; i < 24; ++i) {
-    printf("%02x ", pc->agent_buf[i]);
-  }
-  printf("\n");
 #endif
 
-            dtls_srtp_write(&pc->dtls_srtp, pc->agent_buf, bytes);
-         }
+        data = buffer_peak_head(pc->data_rb[1], &bytes);
+
+        if (data) {
+
+           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_BINARY);
+           buffer_pop_head(pc->data_rb[1]);
         }
 
         if ((pc->agent_ret = agent_recv(&pc->agent, pc->agent_buf, sizeof(pc->agent_buf))) > 0) {

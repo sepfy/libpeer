@@ -10,6 +10,7 @@
 #include <speex/speex_preprocess.h>
 #endif
 
+#include "buffer.h"
 #include "utils.h"
 #include "codec.h"
 

@@ -103,12 +103,7 @@ static int sctp_outgoing_data_cb(void *userdata, void *buf, size_t len, uint8_t 
 
   Sctp *sctp = (Sctp*)userdata;
 
-  if (utils_buffer_push(sctp->data_rb[1], (const uint8_t*)buf, len) == len) {
-    uint16_t bytes = len;
-    utils_buffer_push(sctp->data_rb[0], (uint8_t*)&bytes, sizeof(bytes));
-  } else {
-    LOGE("sctp outgoing data cb error");
-  }
+  dtls_srtp_write(sctp->dtls_srtp, buf, len);
 
   return 0;
 }
