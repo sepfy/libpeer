@@ -56,7 +56,7 @@ typedef struct RtpHeader {
 typedef struct RtpPacket {
 
   RtpHeader header;
-  uint8_t *payload;
+  uint8_t payload[0];
 
 } RtpPacket;
 
@@ -73,18 +73,18 @@ typedef struct RtpPacketizer RtpPacketizer;
 struct RtpPacketizer {
 
   RtpPayloadType type;
-  void (*on_packet)(const uint8_t *packet, size_t bytes, void *user_data);
+  void (*on_packet)(uint8_t *packet, size_t bytes, void *user_data);
   int (*encode_func)(RtpPacketizer *rtp_packetizer, uint8_t *buf, size_t size);
   void *user_data;
   uint16_t seq_number;
   uint32_t ssrc;
-  uint8_t buf[CONFIG_MTU];
   uint32_t timestamp;
+  uint8_t buf[CONFIG_MTU + 1];
 };
 
 int rtp_packet_validate(uint8_t *packet, size_t size);
 
-void rtp_packetizer_init(RtpPacketizer *rtp_packetizer, MediaCodec codec, void (*on_packet)(const uint8_t *packet, size_t bytes, void *user_data), void *user_data);
+void rtp_packetizer_init(RtpPacketizer *rtp_packetizer, MediaCodec codec, void (*on_packet)(uint8_t *packet, size_t bytes, void *user_data), void *user_data);
 
 int rtp_packetizer_encode(RtpPacketizer *rtp_packetizer, uint8_t *buf, size_t size);
 

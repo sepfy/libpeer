@@ -1,12 +1,10 @@
-project(examples)
+project(example)
 
-include_directories(${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/signaling ${GST_INCLUDE_DIRS})
+file(GLOB SRCS "*.c")
 
-set(EXAMPLE_LIBS pear ${TARGET_LIBS})
+include_directories(${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/signaling)
 
-#add_subdirectory(screencast)
-add_subdirectory(video_on_demand)
-add_subdirectory(surveillance)
-add_subdirectory(home_camera)
-add_subdirectory(datachannel)
+add_executable(example ${SRCS})
+
+target_link_libraries(example pear ${TARGET_LIBS})
 
