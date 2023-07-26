@@ -10,11 +10,11 @@ typedef enum MediaCodec {
 
   /* Video */
   CODEC_H264,
-  CODEC_VP8,
-  CODEC_MJPEG,
+  CODEC_VP8, // not implemented yet 
+  CODEC_MJPEG, // not implemented yet
 
   /* Audio */
-  CODEC_OPUS,
+  CODEC_OPUS, // not implemented yet
   CODEC_PCMA,
   CODEC_PCMU,
 

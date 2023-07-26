@@ -155,7 +155,6 @@ typedef struct Sctp {
   void (*onclose)(void *userdata);
 
   void *userdata;
-
   uint8_t buf[CONFIG_MTU];
 } Sctp;
 

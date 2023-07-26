@@ -19,10 +19,6 @@ extern "C" {
 #include "rtcp_packet.h"
 #include "buffer.h"
 
-#ifdef HAVE_GST
-#include "gst/media_stream.h"
-#endif
-
 typedef enum PeerConnectionState {
 
   PEER_CONNECTION_CLOSED = 0,
@@ -35,18 +31,19 @@ typedef enum PeerConnectionState {
 
 } PeerConnectionState;
 
+typedef enum DataChannelType {
+
+  DATA_CHANNEL_NONE = 0, 
+  DATA_CHANNEL_STRING,
+  DATA_CHANNEL_BINARY,
+
+} DataChannelType;
+
 typedef struct PeerOptions {
 
   MediaCodec audio_codec;
   MediaCodec video_codec;
-  int datachannel;
-  
-#ifdef HAVE_GST
-  const char *audio_outgoing_pipeline;
-  const char *audio_incoming_pipeline;
-  const char *video_outgoing_pipeline;
-  const char *video_incoming_pipeline;
-#endif
+  DataChannelType datachannel;
 
 } PeerOptions;
 
@@ -76,17 +73,12 @@ struct PeerConnection {
   int agent_ret;
   int b_offer_created;
 
-  Buffer *audio_rb[2];
-  Buffer *video_rb[2];
-  Buffer *data_rb[2];
+  Buffer *audio_rb;
+  Buffer *video_rb;
+  Buffer *data_rb;
 
-#ifdef HAVE_GST
-  MediaStream *audio_stream;
-  MediaStream *video_stream;
-#else
   RtpPacketizer audio_packetizer;
   RtpPacketizer video_packetizer;
-#endif
 
 };
 
