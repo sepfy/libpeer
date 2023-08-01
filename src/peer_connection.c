@@ -2,10 +2,58 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "sctp.h"
+#include "agent.h"
+#include "dtls_srtp.h"
+#include "sdp.h"
+#include "config.h"
+#include "rtp.h"
+#include "rtcp_packet.h"
+#include "buffer.h"
 #include "ports.h"
 #include "peer_connection.h"
 
 #define STATE_CHANGED(pc, curr_state) if(pc->oniceconnectionstatechange && pc->state != curr_state) { pc->oniceconnectionstatechange(curr_state, pc->user_data); pc->state = curr_state; }
+
+struct PeerConnection {
+
+  PeerOptions options;
+  PeerConnectionState state;
+  Agent agent;
+  DtlsSrtp dtls_srtp;
+  Sctp sctp;
+
+  Sdp local_sdp;
+  Sdp remote_sdp;
+
+  void (*onicecandidate)(char *sdp, void *user_data);
+  void (*oniceconnectionstatechange)(PeerConnectionState state, void *user_data);
+  void (*ontrack)(uint8_t *packet, size_t bytes, void *user_data);
+  void (*on_connected)(void *userdata);
+  void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *user_data);
+
+  void *user_data;
+
+  uint8_t temp_buf[CONFIG_MTU];
+  uint8_t agent_buf[CONFIG_MTU];
+  int agent_ret;
+  int b_offer_created;
+
+  Buffer *audio_rb;
+  Buffer *video_rb;
+  Buffer *data_rb;
+
+  RtpPacketizer audio_packetizer;
+  RtpPacketizer video_packetizer;
+
+};
+
+static int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes) {
+
+  dtls_srtp_encrypt_rtp_packet(&pc->dtls_srtp, packet, &bytes);
+
+  return agent_send(&pc->agent, packet, bytes);
+}
 
 static void peer_connection_on_rtp_packet(uint8_t *packet, size_t bytes, void *user_data) {
 
@@ -83,16 +131,19 @@ static void peer_connection_incoming_rtcp(PeerConnection *pc, uint8_t *buf, size
   }
 }
 
-void peer_connection_configure(PeerConnection *pc, PeerOptions *options) {
+PeerConnection* peer_connection_create(PeerOptions *options, void *user_data) {
+
+  PeerConnection *pc = calloc(1, sizeof(PeerConnection));
+  if (!pc) {
+    return NULL;
+  }
 
   memcpy(&pc->options, options, sizeof(PeerOptions));
-}
-
-void peer_connection_init(PeerConnection *pc) {
 
   uint32_t ssrc;
   RtpPayloadType type;
 
+  pc->user_data = user_data;
   pc->agent.mode = AGENT_MODE_CONTROLLED;
 
   memset(&pc->sctp, 0, sizeof(pc->sctp));
@@ -120,6 +171,16 @@ void peer_connection_init(PeerConnection *pc) {
      peer_connection_on_rtp_packet, (void*)pc);
   }
 
+  return pc;
+}
+
+void peer_connection_destroy(PeerConnection *pc) {
+
+  if (pc) {
+
+    free(pc);
+    pc = NULL;
+  }
 }
 
 int peer_connection_send_audio(PeerConnection *pc, const uint8_t *buf, size_t len) {
@@ -149,6 +210,7 @@ int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t l
     return -1;
   }
 
+  return 0;
   return buffer_push_tail(pc->data_rb, (const uint8_t*)message, len);
 }
 
@@ -335,13 +397,6 @@ void peer_connection_create_offer(PeerConnection *pc) {
 
   STATE_CHANGED(pc, PEER_CONNECTION_NEW);
   pc->b_offer_created = 0;
-}
-
-int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes) {
-
-  dtls_srtp_encrypt_rtp_packet(&pc->dtls_srtp, packet, &bytes);
-
-  return agent_send(&pc->agent, packet, bytes);
 }
 
 int peer_connection_send_rtcp_pil(PeerConnection *pc, uint32_t ssrc) {

@@ -2,6 +2,7 @@
 #include <string.h>
 #include <arpa/inet.h>
 
+#include "peer_connection.h"
 #include "rtp.h"
 #include "utils.h"
 

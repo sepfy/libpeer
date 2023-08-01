@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <endian.h>
 
-#include "codec.h"
+#include "peer_connection.h"
 #include "config.h"
 
 #ifdef ESP32

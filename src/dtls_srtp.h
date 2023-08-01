@@ -13,7 +13,7 @@
 #include <mbedtls/x509_csr.h>
 #include <mbedtls/timing.h>
 
-#include <srtp.h>
+#include <srtp2/srtp.h>
 
 #include "udp.h"
 #include "address.h"

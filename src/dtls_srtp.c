@@ -196,11 +196,6 @@ int dtls_srtp_init(DtlsSrtp *dtls_srtp, DtlsSrtpRole role, void *user_data) {
 
   mbedtls_ssl_setup(&dtls_srtp->ssl, &dtls_srtp->conf);
 
-  if(srtp_init() != srtp_err_status_ok) {
-
-    LOGE("libsrtp init failed");
-  }
-
   return 0;
 }
 
@@ -224,8 +219,6 @@ void dtls_srtp_deinit(DtlsSrtp *dtls_srtp) {
     srtp_dealloc(dtls_srtp->srtp_in);
     srtp_dealloc(dtls_srtp->srtp_out);
   }
-
-  srtp_shutdown();
 }
 
 static void dtls_srtp_key_derivation(void *context, mbedtls_ssl_key_export_type secret_type,
