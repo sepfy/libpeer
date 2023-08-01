@@ -1,15 +1,6 @@
-[submodule "third_party/libnice"]
-	path = third_party/libnice
-	url = https://github.com/libnice/libnice.git
 [submodule "third_party/libsrtp"]
 	path = third_party/libsrtp
 	url = https://github.com/cisco/libsrtp.git
-[submodule "third_party/media-server"]
-	path = third_party/media-server
-	url = https://github.com/ireader/media-server.git
-[submodule "third_party/httpserver.h"]
-	path = third_party/httpserver.h
-	url = https://github.com/jeremycw/httpserver.h.git
 [submodule "third_party/cJSON"]
 	path = third_party/cJSON
 	url = https://github.com/DaveGamble/cJSON.git
@@ -19,6 +10,6 @@
 [submodule "third_party/mbedtls"]
 	path = third_party/mbedtls
 	url = https://github.com/Mbed-TLS/mbedtls.git
-[submodule "third_party/mosquitto"]
-	path = third_party/mosquitto
-	url = https://github.com/eclipse/mosquitto
+[submodule "third_party/MQTT-C"]
+	path = third_party/MQTT-C
+	url = https://github.com/LiamBindle/MQTT-C.git
