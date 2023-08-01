@@ -5,19 +5,12 @@
 #ifndef PEER_CONNECTION_H_
 #define PEER_CONNECTION_H_
 
+#include <stdlib.h>
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include "sctp.h"
-#include "agent.h"
-#include "dtls_srtp.h"
-#include "sdp.h"
-#include "codec.h"
-#include "config.h"
-#include "rtp.h"
-#include "rtcp_packet.h"
-#include "buffer.h"
 
 typedef enum PeerConnectionState {
 
@@ -39,6 +32,22 @@ typedef enum DataChannelType {
 
 } DataChannelType;
 
+typedef enum MediaCodec {
+
+  CODEC_NONE = 0,
+
+  /* Video */
+  CODEC_H264,
+  CODEC_VP8, // not implemented yet 
+  CODEC_MJPEG, // not implemented yet
+
+  /* Audio */
+  CODEC_OPUS, // not implemented yet
+  CODEC_PCMA,
+  CODEC_PCMU,
+
+} MediaCodec;
+
 typedef struct PeerOptions {
 
   MediaCodec audio_codec;
@@ -49,48 +58,26 @@ typedef struct PeerOptions {
 
 typedef struct PeerConnection PeerConnection;
 
-struct PeerConnection {
+PeerConnection* peer_connection_create(PeerOptions *options, void *user_data);
 
-  PeerOptions options;
-  PeerConnectionState state;
-  Agent agent;
-  DtlsSrtp dtls_srtp;
-  Sctp sctp;
+void peer_connection_destroy(PeerConnection *pc);
 
-  Sdp local_sdp;
-  Sdp remote_sdp;
+int peer_connection_loop(PeerConnection *pc);
+/**
+ * @brief send message to data channel
+ * @param[in] peer connection
+ * @param[in] message buffer
+ * @param[in] length of message
+ */
+int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len);
 
-  void (*onicecandidate)(char *sdp, void *user_data);
-  void (*oniceconnectionstatechange)(PeerConnectionState state, void *user_data);
-  void (*ontrack)(uint8_t *packet, size_t bytes, void *user_data);
-  void (*on_connected)(void *userdata);
-  void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *user_data);
+int peer_connection_send_audio(PeerConnection *pc, const uint8_t *packet, size_t bytes);
 
-  void *user_data;
-
-  uint8_t temp_buf[CONFIG_MTU];
-  uint8_t agent_buf[CONFIG_MTU];
-  int agent_ret;
-  int b_offer_created;
-
-  Buffer *audio_rb;
-  Buffer *video_rb;
-  Buffer *data_rb;
-
-  RtpPacketizer audio_packetizer;
-  RtpPacketizer video_packetizer;
-
-};
-
-void peer_connection_configure(PeerConnection *pc, PeerOptions *options);
-
-void peer_connection_init(PeerConnection *pc);
+int peer_connection_send_video(PeerConnection *pc, const uint8_t *packet, size_t bytes);
 
 void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp);
 
 void peer_connection_create_offer(PeerConnection *pc);
-
-int peer_connection_loop(PeerConnection *pc);
 
 /**
  * @brief register callback function to handle packet loss from RTCP receiver report
@@ -101,13 +88,6 @@ int peer_connection_loop(PeerConnection *pc);
 void peer_connection_on_receiver_packet_loss(PeerConnection *pc,
  void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *userdata));
 
-/**
- * @brief register callback function to handle event when the connection is established
- * @param[in] peer connection
- * @param[in] callback function void (*cb)(void *userdata)
- * @param[in] userdata for callback function
- */
-void peer_connection_on_connected(PeerConnection *pc, void (*on_connected)(void *userdata));
 /**
  * @brief Set the callback function to handle onicecandidate event.
  * @param A PeerConnection.
@@ -133,7 +113,6 @@ void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
  */
 void peer_connection_ontrack(PeerConnection *pc, void (*ontrack)(uint8_t *packet, size_t bytes, void *userdata));
 
-
 /**
  * @brief register callback function to handle event of datachannel
  * @param[in] peer connection
@@ -146,27 +125,9 @@ void peer_connection_ondatachannel(PeerConnection *pc,
  void (*onopen)(void *userdata),
  void (*onclose)(void *userdata));
 
-/**
- * @brief send message to data channel
- * @param[in] peer connection
- * @param[in] message buffer
- * @param[in] length of message
- */
-int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len);
-int peer_connection_datachannel_send_binary(PeerConnection *pc, char *message, size_t len);
-
-int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes);
-
-void peer_connection_set_host_address(PeerConnection *pc, const char *host);
-
-int peer_connection_send_audio(PeerConnection *pc, const uint8_t *packet, size_t bytes);
-
-int peer_connection_send_video(PeerConnection *pc, const uint8_t *packet, size_t bytes);
-
-void peer_connection_set_current_ip(const char *ip);
-
 #ifdef __cplusplus
 }
 #endif
 
 #endif // PEER_CONNECTION_H_
+

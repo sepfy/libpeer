@@ -3,35 +3,39 @@
 BASE_PATH=$(readlink -f $0)
 BASE_DIR=$(dirname $BASE_PATH)
 
+mkdir -p $BASE_DIR/dist/
+
 # Build libsrtp
 cd $BASE_DIR/third_party/libsrtp
 mkdir -p build && cd build
-cmake -DCMAKE_C_FLAGS="-fPIC" ..
+cmake -DCMAKE_C_FLAGS="-fPIC" -DTEST_APPS=off -DCMAKE_INSTALL_PREFIX=$BASE_DIR/dist ..
 make -j4
-
-# Build libnice
-cd $BASE_DIR/third_party/libnice
-meson builddir -Ddefault_library=static
-ninja -C builddir
-
-# Build librtp
-cd $BASE_DIR/third_party/media-server/librtp/
-make -j4
+make install
 
 # Build cJSON
 cd $BASE_DIR/third_party/cJSON
-make static
+mkdir -p build && cd build
+cmake -DCMAKE_C_FLAGS="-fPIC" -DBUILD_SHARED_LIBS=off -DENABLE_CJSON_TEST=off -DCMAKE_INSTALL_PREFIX=$BASE_DIR/dist ..
+make -j4
+make install
 
-# Buld mosquitto
-cd $BASE_DIR/third_party/mosquitto/lib
-make WITH_STATIC_LIBRARIES=yes
+cd $BASE_DIR/third_party/MQTT-C
+mkdir -p build && cd build
+cmake -DMQTT_C_EXAMPLES=off -DCMAKE_PREFIX_PATH=$BASE_DIR/dist -DCMAKE_INSTALL_LIBDIR=$BASE_DIR/dist/lib -DCMAKE_INSTALL_INCLUDEDIR=$BASE_DIR/dist/include/ ..
+make -j4
+make install
+cp ../examples/templates/posix_sockets.h $BASE_DIR/dist/include/
 
 # Build mbedTLS
 cd $BASE_DIR/third_party/mbedtls
 sed -i 's/\/\/#define MBEDTLS_SSL_DTLS_SRTP/#define MBEDTLS_SSL_DTLS_SRTP/g' include/mbedtls/mbedtls_config.h
-make lib CFLAGS=-fPIC
+mkdir -p build && cd build
+cmake -DCMAKE_C_FLAGS="-fPIC" -DENABLE_TESTING=off -DENABLE_PROGRAMS=off -DCMAKE_INSTALL_PREFIX=$BASE_DIR/dist ..
+make install
 
 cd $BASE_DIR/third_party/usrsctp
 mkdir -p build && cd build
-cmake -DCMAKE_C_FLAGS="-fPIC" ..
+cmake -DCMAKE_C_FLAGS="-fPIC" -Dsctp_build_programs=off -DCMAKE_INSTALL_PREFIX=$BASE_DIR/dist ..
 make -j4
+make install
+
