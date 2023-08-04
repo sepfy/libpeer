@@ -18,6 +18,8 @@ mkdir -p build && cd build
 cmake -DCMAKE_C_FLAGS="-fPIC" -DBUILD_SHARED_LIBS=off -DENABLE_CJSON_TEST=off -DCMAKE_INSTALL_PREFIX=$BASE_DIR/dist ..
 make -j4
 make install
+# keep the path consistent with esp-idf
+ln -s $BASE_DIR/dist/include/cjson/cJSON.h $BASE_DIR/dist/include/cJSON.h
 
 cd $BASE_DIR/third_party/MQTT-C
 mkdir -p build && cd build

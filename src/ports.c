@@ -4,6 +4,7 @@
 
 #ifdef ESP32
 #include <mdns.h>
+#include <esp_netif.h>
 #else
 #include <arpa/inet.h>
 #include <ifaddrs.h>
@@ -15,25 +16,21 @@
 #include "ports.h"
 #include "utils.h"
 
-static char g_current_ip[INET_ADDRSTRLEN] = {0};
-
-void ports_set_current_ip(const char *ip) {
-
-  snprintf(g_current_ip, INET_ADDRSTRLEN, "%s", ip);
-}
-
 int ports_get_current_ip(UdpSocket *udp_socket, Address *addr) {
 
   int ret = 0;
 
 #ifdef ESP32
-  struct sockaddr_in sa;
 
-  inet_pton(AF_INET, g_current_ip, &(sa.sin_addr));
+  esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
 
-  memcpy(addr->ipv4, &sa.sin_addr.s_addr, 4);
+  esp_netif_ip_info_t ip_info;
 
-  ret = 1;
+  if (esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
+
+    memcpy(addr->ipv4, &ip_info.ip.addr, 4);
+    ret = 1;
+  }
 #else
   struct ifaddrs *addrs,*tmp;
 

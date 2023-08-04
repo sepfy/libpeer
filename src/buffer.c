@@ -9,9 +9,9 @@
 Buffer* buffer_new(int size) {
 
   Buffer *rb;
-  rb = (Buffer*)malloc(sizeof(Buffer));
+  rb = (Buffer*)calloc(1, sizeof(Buffer));
 
-  rb->data = (uint8_t*)malloc(size);
+  rb->data = (uint8_t*)calloc(1, size);
   rb->size = size;
   rb->head = 0;
   rb->tail = 0;
@@ -74,7 +74,7 @@ int buffer_push_tail(Buffer *rb, const uint8_t *data, int size) {
 
 uint8_t* buffer_peak_head(Buffer *rb, int *size) {
 
-  if (rb->head == rb->tail) {
+  if (!rb || rb->head == rb->tail) {
 
     return NULL;
   }
@@ -97,7 +97,7 @@ uint8_t* buffer_peak_head(Buffer *rb, int *size) {
 
 void buffer_pop_head(Buffer *rb) {
 
-  if (rb->head == rb->tail) {
+  if (!rb || rb->head == rb->tail) {
     return;
   }
 
