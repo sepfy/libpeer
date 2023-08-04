@@ -185,8 +185,8 @@ void peer_connection_destroy(PeerConnection *pc) {
 
 int peer_connection_send_audio(PeerConnection *pc, const uint8_t *buf, size_t len) {
 
-  if (!pc->dtls_srtp.state == DTLS_SRTP_STATE_CONNECTED) {
-    LOGE("dtls_srtp not connected");
+  if (pc->state != PEER_CONNECTION_CONNECTED) {
+    //LOGE("dtls_srtp not connected");
     return -1;
   }
 
@@ -195,8 +195,8 @@ int peer_connection_send_audio(PeerConnection *pc, const uint8_t *buf, size_t le
 
 int peer_connection_send_video(PeerConnection *pc, const uint8_t *buf, size_t len) {
 
-  if (!pc->dtls_srtp.state == DTLS_SRTP_STATE_CONNECTED) {
-    LOGE("dtls_srtp not connected");
+  if (pc->state != PEER_CONNECTION_CONNECTED) {
+    //LOGE("dtls_srtp not connected");
     return -1;
   }
 
@@ -210,7 +210,6 @@ int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t l
     return -1;
   }
 
-  return 0;
   return buffer_push_tail(pc->data_rb, (const uint8_t*)message, len);
 }
 
@@ -303,19 +302,8 @@ int peer_connection_loop(PeerConnection *pc) {
 
           LOGD("DTLS-SRTP handshake done");
 
-#ifdef HAVE_GST
-          if (pc->audio_stream) {
-            media_stream_play(pc->audio_stream);
-          }
-
-          if (pc->video_stream) {
-            media_stream_play(pc->video_stream);
-          }
-#endif
-
           if (pc->options.datachannel) {
             LOGI("SCTP create socket");
-//            pc->sctp.data_rb = pc->data_rb;
             sctp_create_socket(&pc->sctp, &pc->dtls_srtp);
           }
 
@@ -454,7 +442,3 @@ void peer_connection_ondatachannel(PeerConnection *pc,
   }
 }
 
-void peer_connection_set_current_ip(const char *ip) {
-
-  ports_set_current_ip(ip);
-}

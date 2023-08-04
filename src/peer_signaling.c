@@ -1,11 +1,13 @@
 #include <string.h>
 #include <signal.h>
 #include <assert.h>
-#include <cjson/cJSON.h>
-#include <libwebsockets.h>
+#include <cJSON.h>
 
+#ifndef WITHOUT_MQTT
 #include <mqtt.h>
 #include "posix_sockets.h"
+#endif
+
 #include "base64.h"
 #include "peer_signaling.h"
 #include "utils.h"
@@ -19,13 +21,16 @@
 
 typedef struct PeerSignaling {
 
-  const char *client_id;
+#ifndef WITHOUT_MQTT
   struct mqtt_client client;
   uint8_t sendbuf[BUF_SIZE];
   uint8_t recvbuf[BUF_SIZE];
+  int sockfd;
+#endif
+
+  const char *client_id;
   char textbuf[BUF_SIZE];
   int id;
-  int sockfd;
   PeerConnection *pc;
 
 } PeerSignaling;
@@ -62,7 +67,7 @@ void peer_signaling_process_request(const char *msg, size_t size) {
         
         if (params && cJSON_IsString(params)) {
           memset(g_ps.textbuf, 0, sizeof(g_ps.textbuf));
-          base64_decode(params->valuestring, strlen(params->valuestring), g_ps.textbuf, sizeof(g_ps.textbuf));
+          base64_decode(params->valuestring, strlen(params->valuestring), (uint8_t*)g_ps.textbuf, sizeof(g_ps.textbuf));
           peer_connection_set_remote_description(g_ps.pc, g_ps.textbuf);
         }
       }
@@ -74,21 +79,18 @@ void peer_signaling_process_request(const char *msg, size_t size) {
 
 void peer_signaling_onmessage_cb(void** unused, struct mqtt_response_publish *published) {
 
+#ifndef WITHOUT_MQTT
   peer_signaling_process_request((const char*)published->application_message, published->application_message_size);
+#endif
 }
 
+char* peer_signaling_create_offer(char *description) {
 
-static void peer_signaling_onicecandidate(char *description, void *userdata) {
-
-  char topic[128];
-
-  char *payload;
-
-  snprintf(topic, sizeof(topic), "webrtc/%s/jsonrpc-reply", g_ps.client_id);
+  char *payload = NULL;
 
   memset(g_ps.textbuf, 0, sizeof(g_ps.textbuf));
   
-  base64_encode(description, strlen(description), g_ps.textbuf, sizeof(g_ps.textbuf));
+  base64_encode((const unsigned char *)description, strlen(description), g_ps.textbuf, sizeof(g_ps.textbuf));
   
   cJSON *json = cJSON_CreateObject();
 
@@ -100,15 +102,29 @@ static void peer_signaling_onicecandidate(char *description, void *userdata) {
 
   payload = cJSON_PrintUnformatted(json);
 
+  cJSON_Delete(json);
+
+  return payload;
+}
+
+static void peer_signaling_onicecandidate(char *description, void *userdata) {
+
+  char topic[128];
+
+  char *payload;
+
+  snprintf(topic, sizeof(topic), "webrtc/%s/jsonrpc-reply", g_ps.client_id);
+
+#ifndef WITHOUT_MQTT
+  payload = peer_signaling_create_offer(description);
   mqtt_publish(&g_ps.client, topic, payload, strlen(payload), MQTT_PUBLISH_QOS_0);
+#endif
 
   free(payload);
-
-  cJSON_Delete(json);
 }
 
 int peer_signaling_join_channel(const char *client_id, PeerConnection *pc) {
-
+#ifndef WITHOUT_MQTT
   uint8_t connect_flags = MQTT_CONNECT_CLEAN_SESSION;
   char topic[64];
   memset(topic, 0, sizeof(topic));
@@ -136,21 +152,25 @@ int peer_signaling_join_channel(const char *client_id, PeerConnection *pc) {
   }
 
   mqtt_subscribe(&g_ps.client, topic, 0);
-
-  g_ps.pc = pc;
   peer_connection_onicecandidate(pc, peer_signaling_onicecandidate);
-
+#endif
+  g_ps.pc = pc;
   return 0;
 }
 
 int peer_signaling_loop() {
-
+#ifndef WITHOUT_MQTT
   return mqtt_sync((struct mqtt_client*) &g_ps.client);
+#else
+  return 0;
+#endif
+
 }
 
 void peer_signaling_leave_channel() {
-
+#ifndef WITHOUT_MQTT
   if (g_ps.sockfd != -1)
     close(g_ps.sockfd);
+#endif
 }
 
