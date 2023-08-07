@@ -2,6 +2,7 @@
 #include <signal.h>
 #include <assert.h>
 #include <cJSON.h>
+#include <unistd.h>
 
 #ifndef WITHOUT_MQTT
 #include <mqtt.h>
@@ -18,6 +19,7 @@
 #define MQTT_HOST "mqtt.eclipseprojects.io"
 #define MQTT_PORT "1883"
 #define BUF_SIZE 4096
+#define TOPIC_SIZE 128
 
 typedef struct PeerSignaling {
 
@@ -28,8 +30,10 @@ typedef struct PeerSignaling {
   int sockfd;
 #endif
 
-  const char *client_id;
   char textbuf[BUF_SIZE];
+  char subtopic[TOPIC_SIZE];
+  char pubtopic[TOPIC_SIZE];
+
   int id;
   PeerConnection *pc;
 
@@ -109,15 +113,11 @@ char* peer_signaling_create_offer(char *description) {
 
 static void peer_signaling_onicecandidate(char *description, void *userdata) {
 
-  char topic[128];
-
   char *payload;
-
-  snprintf(topic, sizeof(topic), "webrtc/%s/jsonrpc-reply", g_ps.client_id);
 
 #ifndef WITHOUT_MQTT
   payload = peer_signaling_create_offer(description);
-  mqtt_publish(&g_ps.client, topic, payload, strlen(payload), MQTT_PUBLISH_QOS_0);
+  mqtt_publish(&g_ps.client, g_ps.pubtopic, payload, strlen(payload), MQTT_PUBLISH_QOS_0);
 #endif
 
   free(payload);
@@ -126,11 +126,9 @@ static void peer_signaling_onicecandidate(char *description, void *userdata) {
 int peer_signaling_join_channel(const char *client_id, PeerConnection *pc) {
 #ifndef WITHOUT_MQTT
   uint8_t connect_flags = MQTT_CONNECT_CLEAN_SESSION;
-  char topic[64];
-  memset(topic, 0, sizeof(topic));
 
-  snprintf(topic, sizeof(topic), "webrtc/%s/jsonrpc", client_id);
-  g_ps.client_id = client_id;
+  snprintf(g_ps.subtopic, sizeof(g_ps.subtopic), "webrtc/%s/jsonrpc", client_id);
+  snprintf(g_ps.pubtopic, sizeof(g_ps.pubtopic), "webrtc/%s/jsonrpc-reply", client_id);
 
   if ((g_ps.sockfd = open_nb_socket(MQTT_HOST, MQTT_PORT)) < 0) {
 
@@ -143,7 +141,7 @@ int peer_signaling_join_channel(const char *client_id, PeerConnection *pc) {
 
   mqtt_connect(&g_ps.client, client_id, NULL, NULL, 0, NULL, NULL, connect_flags, 400);
 
-  LOGI("Subscribing to %s", topic);
+  LOGI("Subscribing to %s", g_ps.subtopic);
 
   if (g_ps.client.error != MQTT_OK) {
 
@@ -151,7 +149,7 @@ int peer_signaling_join_channel(const char *client_id, PeerConnection *pc) {
     return -1;
   }
 
-  mqtt_subscribe(&g_ps.client, topic, 0);
+  mqtt_subscribe(&g_ps.client, g_ps.subtopic, 0);
   peer_connection_onicecandidate(pc, peer_signaling_onicecandidate);
 #endif
   g_ps.pc = pc;
