@@ -16,8 +16,9 @@
 
 static const char *TAG = "I2S_ACC";
 
-extern PeerConnectionState eState;
 extern PeerConnection *g_pc;
+extern int gDataChannelOpened;
+extern int get_timestamp();
 
 void audio_init(void) {
 
@@ -78,14 +79,20 @@ int32_t getSample(uint8_t *dt,int32_t dl){
 
 void audio_task(void *arg) {
 
+  int frame_size = 8000/1000*50; // 50ms
   int ret;
-  int16_t audioraw[160];
-  uint8_t pcma[160];
+  int16_t audioraw[frame_size];
+  uint8_t pcma[frame_size];
+  static int64_t last_time;
+  int64_t curr_time;
+  float bytes = 0;
+
+  last_time = get_timestamp();
 
   for (;;) {
 
     // send audio data when connected
-    if (eState == PEER_CONNECTION_CONNECTED) {
+    if (gDataChannelOpened) {
 
       ret = getSample((uint8_t*)audioraw, sizeof(audioraw));
 
@@ -97,11 +104,21 @@ void audio_task(void *arg) {
           pcma[i] = ALaw_Encode(audioraw[i] << 4);
         }
         peer_connection_send_audio(g_pc, pcma, sizeof(pcma));
+
+        bytes += sizeof(pcma);
+        if (bytes > 100000) {
+
+          curr_time = get_timestamp();
+          ESP_LOGI(TAG, "audio bitrate: %.1f bps", 1000.0 * (bytes * 8.0 / (float)(curr_time - last_time)));
+          last_time = curr_time;
+          bytes = 0;
+        }
+
       }
 
     }
 
-    vTaskDelay(pdMS_TO_TICKS(20));
+    vTaskDelay(pdMS_TO_TICKS(50));
   }
 
 

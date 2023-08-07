@@ -13,6 +13,7 @@
 
 extern PeerConnection *g_pc;
 extern int gDataChannelOpened;
+extern int get_timestamp();
 static const char *TAG = "Camera";
 
 #define CAM_PIN_PWDN -1
@@ -82,13 +83,6 @@ esp_err_t camera_init(){
     return ESP_OK;
 }
 
-int64_t camera_get_timestamp() {
-
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return (tv.tv_sec * 1000LL + (tv.tv_usec / 1000LL));
-}
-
 void camera_task(void *pvParameters) {
 
   static int fps = 0;
@@ -99,7 +93,7 @@ void camera_task(void *pvParameters) {
 
   ESP_LOGI(TAG, "Camera Task Started");
 
-  last_time = camera_get_timestamp();
+  last_time = get_timestamp();
 
   for(;;) {
 
@@ -119,7 +113,7 @@ void camera_task(void *pvParameters) {
 
       if ((fps % 100) == 0) {
 
-        curr_time = camera_get_timestamp();
+        curr_time = get_timestamp();
         ESP_LOGI(TAG, "Camera FPS=%.2f", 1000.0f / (float)(curr_time - last_time) * 100.0f);
         last_time = curr_time;
       }
@@ -127,8 +121,8 @@ void camera_task(void *pvParameters) {
       esp_camera_fb_return(fb);
     }
 
-    // 20 FPS
-    vTaskDelay(pdMS_TO_TICKS(50));
+    // 15 FPS
+    vTaskDelay(pdMS_TO_TICKS(1000/14));
   }
 
 }

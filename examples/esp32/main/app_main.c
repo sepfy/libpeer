@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include <sys/time.h>
 #include <sys/param.h>
 #include "esp_system.h"
 #include "esp_partition.h"
@@ -33,6 +34,13 @@ extern void mqtt_app_start(const char *client_id, PeerConnection *pc);
 PeerConnection *g_pc;
 PeerConnectionState eState = PEER_CONNECTION_CLOSED;
 int gDataChannelOpened = 0;
+
+int64_t get_timestamp() {
+
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (tv.tv_sec * 1000LL + (tv.tv_usec / 1000LL));
+}
 
 static void oniceconnectionstatechange(PeerConnectionState state, void *user_data) {
 
