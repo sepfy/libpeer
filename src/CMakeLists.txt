@@ -2,7 +2,7 @@ project(lib)
 
 file(GLOB SRCS "*.c")
 
-file(GLOB HEADERS "*.h")
+file(GLOB HEADERS "peer.h" "peer_connection.h" "peer_signaling.h")
 
 add_library(peer SHARED ${SRCS})
 
