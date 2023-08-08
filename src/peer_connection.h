@@ -111,7 +111,9 @@ void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
  * @param A callback function to handle ontrack event.
  * @param A userdata which is pass to callback function. 
  */
-void peer_connection_ontrack(PeerConnection *pc, void (*ontrack)(uint8_t *packet, size_t bytes, void *userdata));
+void peer_connection_onaudiotrack(PeerConnection *pc, void (*onaudiotrack)(uint8_t *packet, size_t bytes, void *userdata));
+
+void peer_connection_onvideotrack(PeerConnection *pc, void (*onvideotrack)(uint8_t *packet, size_t bytes, void *userdata));
 
 /**
  * @brief register callback function to handle event of datachannel

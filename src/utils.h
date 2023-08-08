@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include "config.h"
 
 #define LEVEL_ERROR 0x00
 #define LEVEL_WARN 0x01

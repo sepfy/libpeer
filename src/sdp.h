@@ -16,6 +16,8 @@ void sdp_append_h264(Sdp *sdp);
   
 void sdp_append_pcma(Sdp *sdp);
   
+void sdp_append_pcmu(Sdp *sdp);
+
 void sdp_append_datachannel(Sdp *sdp);
 
 void sdp_create(Sdp *sdp, int b_video, int b_audio, int b_datachannel);

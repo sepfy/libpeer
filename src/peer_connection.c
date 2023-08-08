@@ -28,7 +28,8 @@ struct PeerConnection {
 
   void (*onicecandidate)(char *sdp, void *user_data);
   void (*oniceconnectionstatechange)(PeerConnectionState state, void *user_data);
-  void (*ontrack)(uint8_t *packet, size_t bytes, void *user_data);
+  void (*onvideotrack)(uint8_t *packet, size_t bytes, void *user_data);
+  void (*onaudiotrack)(uint8_t *packet, size_t bytes, void *user_data);
   void (*on_connected)(void *userdata);
   void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *user_data);
 
@@ -244,12 +245,26 @@ static void peer_connection_state_new(PeerConnection *pc) {
     strcat(pc->local_sdp.content, description);
   }
 
-  if (pc->options.audio_codec == CODEC_PCMA) {
 
-    sdp_append_pcma(&pc->local_sdp);
-    sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-    sdp_append(&pc->local_sdp, "a=setup:actpass");
-    strcat(pc->local_sdp.content, description);
+  switch (pc->options.audio_codec) {
+
+    case CODEC_PCMA:
+
+      sdp_append_pcma(&pc->local_sdp);
+      sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
+      sdp_append(&pc->local_sdp, "a=setup:actpass");
+      strcat(pc->local_sdp.content, description);
+      break;
+
+    case CODEC_PCMU:
+
+      sdp_append_pcmu(&pc->local_sdp);
+      sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
+      sdp_append(&pc->local_sdp, "a=setup:actpass");
+      strcat(pc->local_sdp.content, description);
+      break;
+    default:
+      break;
   }
 
   if (pc->options.datachannel) {
@@ -424,9 +439,16 @@ void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
   pc->oniceconnectionstatechange = oniceconnectionstatechange;
 }
 
-void peer_connection_ontrack(PeerConnection *pc, void (*ontrack)(uint8_t *packet, size_t byte, void *userdata)) {
+void peer_connection_onaudiotrack(PeerConnection *pc,
+ void (*onaudiotrack)(uint8_t *packet, size_t byte, void *userdata)) {
 
-  pc->ontrack = ontrack;
+  pc->onaudiotrack = onaudiotrack;
+}
+
+void peer_connection_onvideotrack(PeerConnection *pc,
+ void (*onvideotrack)(uint8_t *packet, size_t byte, void *userdata)) {
+
+  pc->onvideotrack = onvideotrack;
 }
 
 void peer_connection_ondatachannel(PeerConnection *pc,
