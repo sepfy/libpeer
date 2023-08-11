@@ -179,6 +179,10 @@ void peer_connection_destroy(PeerConnection *pc) {
 
   if (pc) {
 
+    buffer_free(pc->data_rb);
+    buffer_free(pc->audio_rb);
+    buffer_free(pc->video_rb);
+
     free(pc);
     pc = NULL;
   }

@@ -2,7 +2,7 @@
 #define CONFIG_H_
 
 #define SCTP_MTU (1200)
-#define CONFIG_MTU (1434)
+#define CONFIG_MTU (1200)
 
 #ifdef ESP32
 #define RSA_KEY_LENGTH 512

@@ -16,6 +16,8 @@ typedef struct Buffer {
 
 Buffer* buffer_new(int size);
 
+void buffer_free(Buffer *rb);
+
 uint8_t* buffer_peak_head(Buffer *rb, int *size);
 
 int buffer_push_tail(Buffer *rb, const uint8_t *data, int size);

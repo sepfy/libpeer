@@ -14,16 +14,14 @@ int reader_init(const char *path) {
   int size;
   FILE *video_fp = NULL;
   FILE *audio_fp = NULL;
-  char filename[64];
+  char videofile[] = "test.264";
+  char audiofile[] = "alaw08m.wav";
 
-  memset(filename, 0, sizeof(filename));
-  snprintf(filename, sizeof(filename), "%s/test.264", path);
-
-  video_fp = fopen(filename, "rb");
+  video_fp = fopen(videofile, "rb");
 
   if (video_fp == NULL) {
 
-    printf("open file %s failed\n", filename);
+    printf("open file %s failed\n", videofile);
     return -1;
   }
 
@@ -34,14 +32,11 @@ int reader_init(const char *path) {
   fread(g_video_buf, g_video_size, 1, video_fp);
   fclose(video_fp);
 
-  memset(filename, 0, sizeof(filename));
-  snprintf(filename, sizeof(filename), "%s/test.alaw", path);
-
-  audio_fp = fopen(filename, "rb");
+  audio_fp = fopen(audiofile, "rb");
 
   if (audio_fp == NULL) {
 
-    printf("open file %s failed\n", filename);
+    printf("open file %s failed\n", audiofile);
     return -1;
   }
 
@@ -90,6 +85,12 @@ int reader_get_video_frame(uint8_t *buf, int *size) {
 
   pend = reader_h264_find_nalu(pstart + 1, buf_end);
 
+  if (pend == buf_end) {
+
+    pstart = NULL;
+    return -1;
+  }
+
   nalu_size = pend - pstart;
 
   if ((pstart[4] & 0x1f) == 0x07) {
@@ -128,10 +129,12 @@ int reader_get_audio_frame(uint8_t *buf, int *size) {
   static int pos = 0;
   *size = 160;
   if ((pos + *size) > g_audio_size) {
-    return -1;
+    pos = 0;
   }
+
   memcpy(buf, g_audio_buf + pos, *size);
   pos += *size;
+
   return 0;
 }
 
