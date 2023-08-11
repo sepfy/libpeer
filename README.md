@@ -1,8 +1,8 @@
-# Pear - WebRTC Toolkit for IoT/Embedded Device
+# libpeer - Portable WebRTC Library for IoT/Embedded Device
 
 ![pear-ci](https://github.com/sepfy/pear/actions/workflows/pear-ci.yml/badge.svg)
 
-Pear is a WebRTC SDK written in C. The SDK aims to integrate IoT/Embedded device video/audio streaming with WebRTC.
+libpeer is a WebRTC implementation written in C, developed with BSD socket. The library aims to integrate IoT/Embedded device video/audio streaming with WebRTC, such as ESP32 and Raspberry Pi
 
 ### Features
 
@@ -16,11 +16,11 @@ Pear is a WebRTC SDK written in C. The SDK aims to integrate IoT/Embedded device
 
 ### Dependencies
 
-* [libsrtp](https://github.com/cisco/libsrtp)
 * [mbedtls](https://github.com/Mbed-TLS/mbedtls)
+* [libsrtp](https://github.com/cisco/libsrtp)
 * [usrsctp](https://github.com/sctplab/usrsctp)
 * [cJSON](https://github.com/DaveGamble/cJSON.git)
-* [mosquitto](https://github.com/eclipse/mosquitto)
+* [MQTT-C](https://github.com/LiamBindle/MQTT-C)
 
 ### Getting Started
 Download test video/audio file from ...
@@ -36,7 +36,7 @@ $ ./example
 ```
 
 ### Supported Platforms
-- [Raspberry Pi](https://github.com/sepfy/pear-raspberrypi-example)
-- [ESP32](https://github.com/sepfy/pear-esp32-examples)
-- [M1s Dock](https://github.com/sepfy/pear-m1s-example)
+- [Raspberry Pi](https://github.com/sepfy/pear/tree/main/examples/raspberrypi)
+- [ESP32](https://github.com/sepfy/pear/tree/main/examples/esp32)
+
 
