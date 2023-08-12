@@ -14,10 +14,11 @@
 #include "peer_connection.h"
 #include "g711.h"
 
-static const char *TAG = "I2S_ACC";
+static const char *TAG = "MIC";
 
 extern PeerConnection *g_pc;
 extern int gDataChannelOpened;
+extern PeerConnectionState eState;
 extern int get_timestamp();
 
 void audio_init(void) {
@@ -92,7 +93,7 @@ void audio_task(void *arg) {
   for (;;) {
 
     // send audio data when connected
-    if (gDataChannelOpened) {
+    if ((eState == PEER_CONNECTION_CONNECTED) && gDataChannelOpened) {
 
       ret = getSample((uint8_t*)audioraw, sizeof(audioraw));
 

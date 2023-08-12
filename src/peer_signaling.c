@@ -5,19 +5,20 @@
 #include <unistd.h>
 
 #ifndef WITHOUT_MQTT
+#define MQTT_USE_MBEDTLS
 #include <mqtt.h>
-#include "posix_sockets.h"
+#include <mbedtls_sockets.h>
 #endif
 
+#include "config.h"
 #include "base64.h"
 #include "peer_signaling.h"
 #include "utils.h"
 
-#define JSONRPC_METHOD_REQUEST_OFFER "request_offer"
-#define JSONRPC_METHOD_RESPONSE_ANSWER "response_answer"
+#define JRPC_PEER_OFFER "PEER_OFFER"
+#define JRPC_PEER_ANSWER "PEER_ANSWER"
+#define JRPC_PEER_CLOSE "PEER_CLOSE"
 
-#define MQTT_HOST "mqtt.eclipseprojects.io"
-#define MQTT_PORT "1883"
 #define BUF_SIZE 4096
 #define TOPIC_SIZE 128
 
@@ -27,7 +28,8 @@ typedef struct PeerSignaling {
   struct mqtt_client client;
   uint8_t sendbuf[BUF_SIZE];
   uint8_t recvbuf[BUF_SIZE];
-  int sockfd;
+  struct mbedtls_context ctx;
+  mqtt_pal_socket_handle sockfd;
 #endif
 
   char textbuf[BUF_SIZE];
@@ -61,11 +63,11 @@ void peer_signaling_process_request(const char *msg, size_t size) {
 
     if (method) {
 
-      if (strcmp(method->valuestring, JSONRPC_METHOD_REQUEST_OFFER) == 0) {
+      if (strcmp(method->valuestring, JRPC_PEER_OFFER) == 0) {
 
           peer_connection_create_offer(g_ps.pc);
       
-      } else if (strcmp(method->valuestring, JSONRPC_METHOD_RESPONSE_ANSWER) == 0) {
+      } else if (strcmp(method->valuestring, JRPC_PEER_ANSWER) == 0) {
         
         cJSON *params = cJSON_GetObjectItem(json, "params");
         
@@ -123,14 +125,19 @@ static void peer_signaling_onicecandidate(char *description, void *userdata) {
   free(payload);
 }
 
-int peer_signaling_join_channel(const char *client_id, PeerConnection *pc) {
+int peer_signaling_join_channel(const char *client_id, PeerConnection *pc, const char *cacert) {
 #ifndef WITHOUT_MQTT
   uint8_t connect_flags = MQTT_CONNECT_CLEAN_SESSION;
 
   snprintf(g_ps.subtopic, sizeof(g_ps.subtopic), "webrtc/%s/jsonrpc", client_id);
   snprintf(g_ps.pubtopic, sizeof(g_ps.pubtopic), "webrtc/%s/jsonrpc-reply", client_id);
 
-  if ((g_ps.sockfd = open_nb_socket(MQTT_HOST, MQTT_PORT)) < 0) {
+  open_nb_socket(&g_ps.ctx, MQTT_HOST, MQTT_PORT, cacert);
+  g_ps.sockfd = &g_ps.ctx.ssl_ctx;
+
+  LOGI("Connecting to %s", MQTT_HOST);
+
+  if (g_ps.sockfd == NULL) {
 
     LOGE("error: create socket");
     return -1;
@@ -167,8 +174,7 @@ int peer_signaling_loop() {
 
 void peer_signaling_leave_channel() {
 #ifndef WITHOUT_MQTT
-  if (g_ps.sockfd != -1)
-    close(g_ps.sockfd);
+  mbedtls_ssl_free(g_ps.sockfd);
 #endif
 }
 

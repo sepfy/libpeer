@@ -23,10 +23,10 @@ ln -s $BASE_DIR/dist/include/cjson/cJSON.h $BASE_DIR/dist/include/cJSON.h
 
 cd $BASE_DIR/third_party/MQTT-C
 mkdir -p build && cd build
-cmake -DMQTT_C_EXAMPLES=off -DCMAKE_PREFIX_PATH=$BASE_DIR/dist -DCMAKE_INSTALL_LIBDIR=$BASE_DIR/dist/lib -DCMAKE_INSTALL_INCLUDEDIR=$BASE_DIR/dist/include/ ..
+cmake -DMQTT_C_EXAMPLES=off -DCMAKE_PREFIX_PATH=$BASE_DIR/dist -DCMAKE_INSTALL_LIBDIR=$BASE_DIR/dist/lib -DCMAKE_INSTALL_INCLUDEDIR=$BASE_DIR/dist/include/ -DMQTT_C_MbedTLS_SUPPORT=on ..
 make -j4
 make install
-cp ../examples/templates/posix_sockets.h $BASE_DIR/dist/include/
+cp ../examples/templates/mbedtls_sockets.h $BASE_DIR/dist/include/
 
 # Build mbedTLS
 cd $BASE_DIR/third_party/mbedtls

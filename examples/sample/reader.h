@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 
-int reader_init(const char *folder_path);
+int reader_init();
 
 int reader_get_video_frame(uint8_t *buf, int *size);
 

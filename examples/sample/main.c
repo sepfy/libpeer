@@ -83,7 +83,12 @@ int main(int argc, char *argv[]) {
 
   PeerOptions options = { .datachannel = DATA_CHANNEL_STRING, .video_codec = CODEC_H264, .audio_codec = CODEC_PCMA };
 
-  snprintf(buf, sizeof(buf), "test_%d", 12);
+  if (argc < 2) {
+    printf("usage: %s <cacert>\n", argv[0]);
+    return 0;
+  }
+
+  snprintf(buf, sizeof(buf), "test_%d", getpid());
   printf("open https://sepfy.github.io/webrtc?deviceId=%s\n", buf);
 
   peer_init();
@@ -91,7 +96,7 @@ int main(int argc, char *argv[]) {
   peer_connection_oniceconnectionstatechange(g_pc, onconnectionstatechange);
   peer_connection_ondatachannel(g_pc, onmessasge, onopen, onclose);
 
-  peer_signaling_join_channel(buf, g_pc);
+  peer_signaling_join_channel(buf, g_pc, argv[1]);
 
   pthread_create(&peer_connection_thread, NULL, peer_connection_task, NULL);
   pthread_create(&peer_singaling_thread, NULL, peer_singaling_task, NULL);

@@ -19,7 +19,7 @@
 
 #include "peer.h"
 
-static const char *TAG = "mqtt";
+static const char *TAG = "MQTT";
 
 const char *client_id;
 
@@ -110,7 +110,7 @@ void mqtt_app_start(const char *clientid, PeerConnection *pc) {
       .address.uri = CONFIG_BROKER_URI,
       .verification.certificate = (const char *)mqtt_eclipseprojects_io_pem_start
     },
-    .buffer.size = 2048,
+    .buffer.size = 4096,
     .task.stack_size = 4096,
   };
 
@@ -121,6 +121,7 @@ void mqtt_app_start(const char *clientid, PeerConnection *pc) {
 
   client_id = clientid;
   peer_connection_onicecandidate(pc, mqtt_onicecandidate);
-  peer_signaling_join_channel(client_id, pc);
+  peer_signaling_join_channel(client_id, pc, NULL);
+
 }
 

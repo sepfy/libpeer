@@ -9,7 +9,7 @@ static int g_audio_size = 0;
 static uint8_t *g_video_buf = NULL;
 static uint8_t *g_audio_buf = NULL;
 
-int reader_init(const char *path) {
+int reader_init() {
 
   int size;
   FILE *video_fp = NULL;

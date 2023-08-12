@@ -13,6 +13,7 @@
 
 extern PeerConnection *g_pc;
 extern int gDataChannelOpened;
+extern PeerConnectionState eState;
 extern int get_timestamp();
 static const char *TAG = "Camera";
 
@@ -97,7 +98,7 @@ void camera_task(void *pvParameters) {
 
   for(;;) {
 
-    if (gDataChannelOpened) {
+    if ((eState == PEER_CONNECTION_CONNECTED) && gDataChannelOpened) {
 
       fb = esp_camera_fb_get();
 
