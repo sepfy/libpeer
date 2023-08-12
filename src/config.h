@@ -17,6 +17,10 @@
 #define DATA_RB_DATA_LENGTH (SCTP_MTU * 128)
 #endif
 
+// siganling
+#define MQTT_HOST "mqtt.eclipseprojects.io"
+#define MQTT_PORT "8883"
+
 //#define LOG_LEVEL LEVEL_DEBUG
 
 #endif // CONFIG_H_
