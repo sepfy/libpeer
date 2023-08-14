@@ -54,6 +54,9 @@ typedef struct PeerOptions {
   MediaCodec video_codec;
   DataChannelType datachannel;
 
+  void (*onaudiotrack)(uint8_t *data, size_t size, void *userdata);
+  void (*onvideotrack)(uint8_t *data, size_t size, void *userdata);
+
 } PeerOptions;
 
 typedef struct PeerConnection PeerConnection;
@@ -104,16 +107,6 @@ void peer_connection_onicecandidate(PeerConnection *pc, void (*onicecandidate)(c
  */
 void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
  void (*oniceconnectionstatechange)(PeerConnectionState state, void *userdata));
-
-/**
- * @brief Set the callback function to handle ontrack event.
- * @param A PeerConnection.
- * @param A callback function to handle ontrack event.
- * @param A userdata which is pass to callback function. 
- */
-void peer_connection_onaudiotrack(PeerConnection *pc, void (*onaudiotrack)(uint8_t *packet, size_t bytes, void *userdata));
-
-void peer_connection_onvideotrack(PeerConnection *pc, void (*onvideotrack)(uint8_t *packet, size_t bytes, void *userdata));
 
 /**
  * @brief register callback function to handle event of datachannel

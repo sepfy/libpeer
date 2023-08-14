@@ -28,8 +28,6 @@ struct PeerConnection {
 
   void (*onicecandidate)(char *sdp, void *user_data);
   void (*oniceconnectionstatechange)(PeerConnectionState state, void *user_data);
-  void (*onvideotrack)(uint8_t *packet, size_t bytes, void *user_data);
-  void (*onaudiotrack)(uint8_t *packet, size_t bytes, void *user_data);
   void (*on_connected)(void *userdata);
   void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *user_data);
 
@@ -44,34 +42,21 @@ struct PeerConnection {
   Buffer *video_rb;
   Buffer *data_rb;
 
-  RtpPacketizer audio_packetizer;
-  RtpPacketizer video_packetizer;
+  RtpEncoder artp_encoder;
+  RtpEncoder vrtp_encoder;
+  RtpDecoder vrtp_decoder;
+  RtpDecoder artp_decoder;
+
+  uint32_t remote_assrc;
+  uint32_t remote_vssrc;
 
 };
 
-static int peer_connection_send_rtp_packet(PeerConnection *pc, uint8_t *packet, int bytes) {
+static void peer_connection_outgoing_rtp_packet(uint8_t *data, size_t size, void *user_data) {
 
-  dtls_srtp_encrypt_rtp_packet(&pc->dtls_srtp, packet, &bytes);
-
-  return agent_send(&pc->agent, packet, bytes);
-}
-
-static void peer_connection_on_rtp_packet(uint8_t *packet, size_t bytes, void *user_data) {
-
-#if 0
-  printf("size (%d): ", bytes);
-  for (int i = 0; i < 20; i++)
-    printf("%.2x ", packet[i]);
-  printf("\n");
-#endif
-#if 0
-  uint64_t sum = 0;
-  for (int i = 0; i < bytes; i++) {
-		sum += packet[i];
-	}
-  printf("size = %d, sum = %ld\n", bytes, sum);
-#endif
-  peer_connection_send_rtp_packet((PeerConnection *) user_data, packet, bytes);
+  PeerConnection *pc = (PeerConnection *) user_data;
+  dtls_srtp_encrypt_rtp_packet(&pc->dtls_srtp, data, (int*)&size);
+  agent_send(&pc->agent, data, size);
 }
 
 static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t len) {
@@ -141,7 +126,6 @@ PeerConnection* peer_connection_create(PeerOptions *options, void *user_data) {
 
   memcpy(&pc->options, options, sizeof(PeerOptions));
 
-  uint32_t ssrc;
   RtpPayloadType type;
 
   pc->user_data = user_data;
@@ -161,15 +145,23 @@ PeerConnection* peer_connection_create(PeerOptions *options, void *user_data) {
   if (pc->options.audio_codec) {
     LOGI("Audio allocates heap size: %d", AUDIO_RB_DATA_LENGTH);
     pc->audio_rb = buffer_new(AUDIO_RB_DATA_LENGTH);
-    rtp_packetizer_init(&pc->audio_packetizer, pc->options.audio_codec,
-     peer_connection_on_rtp_packet, (void*)pc);
+
+    rtp_encoder_init(&pc->artp_encoder, pc->options.audio_codec,
+     peer_connection_outgoing_rtp_packet, (void*)pc);
+
+    rtp_decoder_init(&pc->artp_decoder, pc->options.audio_codec,
+     pc->options.onaudiotrack, pc->user_data);
   }
 
   if (pc->options.video_codec) {
     LOGI("Video allocates heap size: %d", VIDEO_RB_DATA_LENGTH);
     pc->video_rb = buffer_new(VIDEO_RB_DATA_LENGTH);
-    rtp_packetizer_init(&pc->video_packetizer, pc->options.video_codec,
-     peer_connection_on_rtp_packet, (void*)pc);
+
+    rtp_encoder_init(&pc->vrtp_encoder, pc->options.video_codec,
+     peer_connection_outgoing_rtp_packet, (void*)pc);
+
+    rtp_decoder_init(&pc->vrtp_decoder, pc->options.video_codec,
+     pc->options.onvideotrack, pc->user_data);
   }
 
   return pc;
@@ -287,6 +279,7 @@ static void peer_connection_state_new(PeerConnection *pc) {
 
 int peer_connection_loop(PeerConnection *pc) {
 
+  uint32_t ssrc = 0;
   memset(pc->agent_buf, 0, sizeof(pc->agent_buf));
   pc->agent_ret = -1;
 
@@ -334,13 +327,13 @@ int peer_connection_loop(PeerConnection *pc) {
 
         data = buffer_peak_head(pc->video_rb, &bytes);
         if (data) {
-          rtp_packetizer_encode(&pc->video_packetizer, data, bytes);
+          rtp_encoder_encode(&pc->vrtp_encoder, data, bytes);
           buffer_pop_head(pc->video_rb);
         }
 
         data = buffer_peak_head(pc->audio_rb, &bytes);
         if (data) {
-          rtp_packetizer_encode(&pc->audio_packetizer, data, bytes);
+          rtp_encoder_encode(&pc->artp_encoder, data, bytes);
           buffer_pop_head(pc->audio_rb);
         }
 
@@ -374,6 +367,15 @@ int peer_connection_loop(PeerConnection *pc) {
           } else if (rtp_packet_validate(pc->agent_buf, pc->agent_ret)) {
             LOGD("Got RTP packet");
 
+            dtls_srtp_decrypt_rtp_packet(&pc->dtls_srtp, pc->agent_buf, &pc->agent_ret);
+
+            ssrc = rtp_get_ssrc(pc->agent_buf);
+            if (ssrc == pc->remote_assrc) {
+              rtp_decoder_decode(&pc->artp_decoder, pc->agent_buf, pc->agent_ret);
+            } else if (ssrc == pc->remote_vssrc) {
+              rtp_decoder_decode(&pc->vrtp_decoder, pc->agent_buf, pc->agent_ret);
+            }
+
           }
 
         }
@@ -395,6 +397,32 @@ int peer_connection_loop(PeerConnection *pc) {
 }
 
 void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp_text) {
+
+  char *start = (char*)sdp_text;
+  char *line = NULL;
+  char buf[256];
+  char *ssrc_start = NULL;
+  uint32_t *ssrc = NULL;
+
+  while ((line = strstr(start, "\r\n"))) {
+
+    line = strstr(start, "\r\n");
+    strncpy(buf, start, line - start);
+    buf[line - start] = '\0';
+
+    if (strstr(buf, "a=mid:video")) {
+      ssrc = &pc->remote_vssrc;
+    } else if (strstr(buf, "a=mid:audio")) {
+      ssrc = &pc->remote_assrc;
+    }
+
+    if ((ssrc_start = strstr(buf, "a=ssrc:")) && ssrc) {
+      *ssrc = strtoul(ssrc_start + 7, NULL, 10);
+      LOGD("SSRC: %u", *ssrc);
+    }
+
+    start = line + 2;
+  }
 
   agent_set_remote_description(&pc->agent, (char*)sdp_text);
   STATE_CHANGED(pc, PEER_CONNECTION_CHECKING);
@@ -441,18 +469,6 @@ void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
  void (*oniceconnectionstatechange)(PeerConnectionState state, void *userdata)) {
 
   pc->oniceconnectionstatechange = oniceconnectionstatechange;
-}
-
-void peer_connection_onaudiotrack(PeerConnection *pc,
- void (*onaudiotrack)(uint8_t *packet, size_t byte, void *userdata)) {
-
-  pc->onaudiotrack = onaudiotrack;
-}
-
-void peer_connection_onvideotrack(PeerConnection *pc,
- void (*onvideotrack)(uint8_t *packet, size_t byte, void *userdata)) {
-
-  pc->onvideotrack = onvideotrack;
 }
 
 void peer_connection_ondatachannel(PeerConnection *pc,
