@@ -23,7 +23,6 @@ libpeer is a WebRTC implementation written in C, developed with BSD socket. The 
 * [MQTT-C](https://github.com/LiamBindle/MQTT-C)
 
 ### Getting Started
-Download test video/audio file from ...
 ```bash
 $ sudo apt -y install git cmake
 $ git clone --recursive https://github.com/sepfy/pear
@@ -32,11 +31,12 @@ $ mkdir cmake
 $ cd cmake
 $ cmake ..
 $ make
-$ ./example
+$ echo "" | openssl s_client -showcerts -connect mqtt.eclipseprojects.io:8883 | sed -n "1,/Root/d; /BEGIN/,/END/p" | openssl x509 -outform PEM >mqtt_eclipse_org.pem # Download certificate for signaling
+$ wget http://www.live555.com/liveMedia/public/264/test.264 # Download test video file
+$ wget https://mauvecloud.net/sounds/alaw08m.wav # Download test audio file
+$ ./examples/sample/sample
 ```
 
 ### Supported Platforms
-- [Raspberry Pi](https://github.com/sepfy/pear/tree/main/examples/raspberrypi)
 - [ESP32](https://github.com/sepfy/pear/tree/main/examples/esp32)
-
-
+- [Raspberry Pi](https://github.com/sepfy/pear/tree/main/examples/raspberrypi)
