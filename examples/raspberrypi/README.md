@@ -20,8 +20,8 @@ $ sudo apt install -y gstreamer1.0-alsa gstreamer1.0-tools gstreamer1.0-plugins-
 
 ### Build
 ```bash
-$ git clone --recursive https://github.com/sepfy/pear
-$ cd pear
+$ git clone --recursive https://github.com/sepfy/libpeer
+$ cd libpeer
 $ ./build-third-party.sh
 $ mkdir cmake && cd camke
 $ cmake -DCMAKE_INSTALL_PREFIX=. ..
@@ -36,5 +36,4 @@ $ make
 $ echo "" | openssl s_client -showcerts -connect mqtt.eclipseprojects.io:8883 | sed -n "1,/Root/d; /BEGIN/,/END/p" | openssl x509 -outform PEM >mqtt_eclipse_org.pem
 $ ./raspberrypi mqtt_eclipse_org.pem
 ```
-
 
