@@ -25,7 +25,8 @@ libpeer is a WebRTC implementation written in C, developed with BSD socket. The 
 ### Getting Started
 ```bash
 $ sudo apt -y install git cmake
-$ git clone --recursive https://github.com/sepfy/pear
+$ git clone --recursive https://github.com/sepfy/libpeer
+$ cd libpeer
 $ ./build-third-party.sh
 $ mkdir cmake
 $ cd cmake
@@ -38,5 +39,5 @@ $ ./examples/sample/sample
 ```
 
 ### Supported Platforms
-- [ESP32](https://github.com/sepfy/pear/tree/main/examples/esp32)
-- [Raspberry Pi](https://github.com/sepfy/pear/tree/main/examples/raspberrypi)
+- [ESP32](https://github.com/sepfy/libpeer/tree/main/examples/esp32)
+- [Raspberry Pi](https://github.com/sepfy/libpeer/tree/main/examples/raspberrypi)
