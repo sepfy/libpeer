@@ -57,4 +57,6 @@ int utils_get_ipv4addr(char *hostname, char *ipv4addr, size_t size);
 
 int utils_is_valid_ip_address(char *ip_address);
 
+uint64_t utils_get_timestamp();
+
 #endif // UTILS_H_

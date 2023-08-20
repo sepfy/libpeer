@@ -24,9 +24,9 @@ int udp_socket_open(UdpSocket *udp_socket) {
     return -1;
   }
 
-  int flags = fcntl(udp_socket->fd, F_GETFL, 0);
+  //int flags = fcntl(udp_socket->fd, F_GETFL, 0);
 
-  fcntl(udp_socket->fd, F_SETFL, flags | O_NONBLOCK);
+  //fcntl(udp_socket->fd, F_SETFL, flags | O_NONBLOCK);
   return 0;
 }
 
@@ -93,14 +93,22 @@ int udp_get_local_address(UdpSocket *udp_socket, Address *addr) {
 
 int udp_socket_sendto(UdpSocket *udp_socket, Address *addr, const uint8_t *buf, int len) {
 
+  fd_set write_set;
+  struct timeval tv;
+  struct sockaddr_in sin;
+  int ret = -1;
+
   if (udp_socket->fd < 0) {
 
     LOGE("sendto before socket init");
     return -1;
   }
 
-  struct sockaddr_in sin;
+  FD_ZERO(&write_set);
+  FD_SET(udp_socket->fd, &write_set);
 
+  tv.tv_sec = 0;
+  tv.tv_usec = 1000;
   sin.sin_family = AF_INET;
 
   memcpy(&sin.sin_addr.s_addr, addr->ipv4, 4);
@@ -110,11 +118,22 @@ int udp_socket_sendto(UdpSocket *udp_socket, Address *addr, const uint8_t *buf, 
   sin.sin_port = htons(addr->port);
 
   //LOGD("sendto addr %d.%d.%d.%d (%d)", addr->ipv4[0], addr->ipv4[1], addr->ipv4[2], addr->ipv4[3], addr->port);
-  int ret = sendto(udp_socket->fd, buf, len, 0, (struct sockaddr *)&sin, sizeof(sin));
 
-  if (ret < 0) {
-    LOGE("Failed to sendto: %s", strerror(errno));
+  if ((ret = select(udp_socket->fd + 1, NULL, &write_set, NULL, &tv)) < 0) {
+
+    LOGE("Failed to select: %s", strerror(errno));
     return -1;
+  }
+
+  if (FD_ISSET(udp_socket->fd, &write_set)) {
+
+    ret = sendto(udp_socket->fd, buf, len, 0, (struct sockaddr *)&sin, sizeof(sin));
+
+    if (ret < 0) {
+
+      LOGE("Failed to sendto: %s", strerror(errno));
+      return -1;
+    }
   }
 
   return ret;
@@ -122,8 +141,9 @@ int udp_socket_sendto(UdpSocket *udp_socket, Address *addr, const uint8_t *buf, 
 
 int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, uint8_t *buf, int len) {
 
+  fd_set read_set;
+  struct timeval tv;
   struct sockaddr_in sin;
-
   int ret;
 
   if (udp_socket->fd < 0) {
@@ -131,6 +151,11 @@ int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, uint8_t *buf, int 
     LOGE("recvfrom before socket init");
     return -1; 
   }
+
+  FD_ZERO(&read_set);
+  FD_SET(udp_socket->fd, &read_set);
+  tv.tv_sec = 0;
+  tv.tv_usec = 1000;
 
   socklen_t sin_len = sizeof(sin);
 
@@ -140,40 +165,24 @@ int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, uint8_t *buf, int 
 
   sin.sin_port = htons(addr->port);
   sin.sin_addr.s_addr = htonl(INADDR_ANY);
-#if 0
-  fd_set read_set;
-  FD_ZERO(&read_set);
-  FD_SET(udp_socket->fd, &read_set);
 
-  struct timeval tv;
-  tv.tv_sec = 10;
-  tv.tv_usec = 0;
-  ret = select(udp_socket->fd + 1, &read_set, NULL, NULL, &tv);
+  if ((ret = select(udp_socket->fd + 1, &read_set, NULL, NULL, &tv)) < 0) {
 
-  if (ret < 0) {
-
-    LOGE("select() failed");
+    LOGE("Failed to select: %s", strerror(errno));
     return -1;
-
-  } else if (ret == 0) {
-
-    LOGD("select() timeout");
-    return 0;
   }
-#endif
-  ret = recvfrom(udp_socket->fd, buf, len, 0, (struct sockaddr *)&sin, &sin_len);
-  if (ret < 0) {
 
-    if (errno == EWOULDBLOCK || errno == EAGAIN) {
+  if (FD_ISSET(udp_socket->fd, &read_set)) {
 
-    } else  {
+    ret = recvfrom(udp_socket->fd, buf, len, 0, (struct sockaddr *)&sin, &sin_len);
 
-      LOGE("recvfrom() failed: %s", strerror(errno));
+    if (ret < 0) {
+
+      LOGE("Failed to recvfrom: %s", strerror(errno));
+      return -1;
     }
-    return -1;
   }
 
   return ret;
-  
 }
 

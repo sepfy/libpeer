@@ -3,11 +3,12 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
+
 #include <stdint.h>
 #include <string.h>
 #include "utils.h"
 #include "mbedtls/md.h"
-
 
 // http://haoyuanliu.github.io/2017/01/16/%E5%9C%B0%E5%9D%80%E6%9F%A5%E8%AF%A2%E5%87%BD%E6%95%B0gethostbyname-%E5%92%8Cgetaddrinfo/
 int utils_get_ipv4addr(char *hostname, char *ipv4addr, size_t size) {
@@ -82,3 +83,9 @@ void utils_get_sha1(const char *input, size_t input_len, const char *key, unsign
 
 }
 
+uint64_t utils_get_timestamp() {
+
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (uint64_t) tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}

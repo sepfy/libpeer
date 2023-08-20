@@ -2,7 +2,7 @@
 #define CONFIG_H_
 
 #define SCTP_MTU (1200)
-#define CONFIG_MTU (1200)
+#define CONFIG_MTU (1300)
 
 #ifdef ESP32
 #define RSA_KEY_LENGTH 512
@@ -20,6 +20,8 @@
 // siganling
 #define MQTT_HOST "mqtt.eclipseprojects.io"
 #define MQTT_PORT "8883"
+
+#define KEEPALIVE_CONNCHECK 10000
 
 //#define LOG_LEVEL LEVEL_DEBUG
 

@@ -67,7 +67,7 @@ static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t 
   DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx; 
   PeerConnection *pc = (PeerConnection *) dtls_srtp->user_data;
 
-  if (pc->agent_ret > 0 && pc->agent_ret < len) {
+  if (pc->agent_ret > 0 && pc->agent_ret <= len) {
 
     memcpy(buf, pc->agent_buf, pc->agent_ret);
     return pc->agent_ret;
@@ -378,6 +378,9 @@ int peer_connection_loop(PeerConnection *pc) {
 
           }
 
+        } else if (pc->agent_ret < 0) {
+
+          STATE_CHANGED(pc, PEER_CONNECTION_DISCONNECTED);
         }
       }
       break;

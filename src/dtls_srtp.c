@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
 #include "mbedtls/ssl.h"
 #include "dtls_srtp.h"
@@ -9,6 +10,20 @@
 #include "udp.h"
 #include "config.h"
 #include "utils.h"
+
+typedef struct DtlsHeader DtlsHeader;
+
+struct DtlsHeader {
+
+  uint8_t content_type;
+  uint16_t version;
+  uint16_t epoch;
+  uint32_t seqnum;
+  uint16_t seqnum_hi;
+  uint16_t length;
+
+}__attribute__((packed));
+
 
 int dtls_srtp_udp_send(void *ctx, const uint8_t *buf, size_t len) {
 
@@ -481,9 +496,13 @@ int dtls_srtp_read(DtlsSrtp *dtls_srtp, unsigned char *buf, size_t len) {
 
 int dtls_srtp_validate(uint8_t *buf) {
 
+  DtlsHeader *header = (DtlsHeader *)buf;
+
   if(buf == NULL)
     return 0;
-	
+
+  LOGD("DTLS content type: %d, version: %d, epoch: %d, sequence: %d, length: %d (%.4x)", header->content_type, header->version, header->epoch, ntohs(header->seqnum_hi), ntohs(header->length), header->length);
+
   return ((*buf >= 20) && (*buf <= 64));
 }
 

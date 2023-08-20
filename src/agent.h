@@ -61,7 +61,7 @@ struct Agent {
   Address host_addr;
   int b_host_addr;
   int controlling;
-
+  uint64_t binding_request_time;
   AgentState state;
 
   AgentMode mode;

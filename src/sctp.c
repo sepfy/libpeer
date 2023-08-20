@@ -295,7 +295,6 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
            ntohs(sack->number_of_dup_tsns));
         }
 #endif
-
         break;
       case SCTP_COOKIE_ECHO:
         LOGD("SCTP_COOKIE_ECHO");
@@ -303,6 +302,7 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
         common->type = SCTP_COOKIE_ACK;
         common->length = htons(4);
         length = ntohs(common->length) + sizeof(SctpHeader);
+        pos = len; // Do not handle other msg
         break;
       default:
         LOGI("Unknown chunk type %d", chunk_common->type);

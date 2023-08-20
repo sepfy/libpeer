@@ -103,7 +103,14 @@ int agent_send(Agent *agent, const uint8_t *buf, int len) {
 
 int agent_recv(Agent *agent, uint8_t *buf, int len) {
 
-  int ret;
+  int ret = 0;
+
+  if (agent->nominated_pair->state == ICE_CANDIDATE_STATE_SUCCEEDED &&
+   (utils_get_timestamp() - agent->binding_request_time) > KEEPALIVE_CONNCHECK) {
+
+    LOGI("Connection timeout");
+    return -1;
+  }
 
   memset(buf, 0, len); 
   ret = udp_socket_recvfrom(&agent->udp_socket, &agent->nominated_pair->local->addr, buf, len);
@@ -153,20 +160,17 @@ int agent_recv(Agent *agent, uint8_t *buf, int len) {
         stun_msg_finish(&msg, agent->local_upwd);
 
         udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
-      LOGD("send binding respnse to remote ip: %d.%d.%d.%d, port: %d", agent->nominated_pair->remote->addr.ipv4[0], agent->nominated_pair->remote->addr.ipv4[1], agent->nominated_pair->remote->addr.ipv4[2], agent->nominated_pair->remote->addr.ipv4[3], agent->nominated_pair->remote->addr.port);
-
-
+        LOGD("send binding respnse to remote ip: %d.%d.%d.%d, port: %d", agent->nominated_pair->remote->addr.ipv4[0], agent->nominated_pair->remote->addr.ipv4[1], agent->nominated_pair->remote->addr.ipv4[2], agent->nominated_pair->remote->addr.ipv4[3], agent->nominated_pair->remote->addr.port);
+        agent->binding_request_time = utils_get_timestamp();
       }
     } else {
 
-      LOGD("Not STUN message recvied");
-      return ret;
-
+      LOGD("Not STUN message size %d received", ret);
     }
 
   }
 
-  return -1;
+  return ret;
 }
 
 
