@@ -11,12 +11,13 @@
 #include <sys/ioctl.h>
 #include <netdb.h>
 #include <errno.h>
+#include <unistd.h>
 #endif
 
 #include "ports.h"
 #include "utils.h"
 
-int ports_get_current_ip(UdpSocket *udp_socket, Address *addr) {
+int ports_get_host_addr(Address *addr) {
 
   int ret = 0;
 
@@ -36,10 +37,12 @@ int ports_get_current_ip(UdpSocket *udp_socket, Address *addr) {
 
   struct ifreq ifr;
 
-  if (udp_socket->fd < 0) {
+  int fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+  if (fd < 0) {
 
     LOGE("get_host_address before socket init");
-    return -1;
+    return 0;
   }
 
   getifaddrs(&addrs);
@@ -52,26 +55,25 @@ int ports_get_current_ip(UdpSocket *udp_socket, Address *addr) {
 
       strncpy(ifr.ifr_name, tmp->ifa_name, IFNAMSIZ);
 
-      if (ioctl(udp_socket->fd, SIOCGIFADDR, &ifr) == 0) {
+      if (strstr(ifr.ifr_name, "w") && ioctl(fd, SIOCGIFADDR, &ifr) == 0) {
 
         LOGD("interface: %s, address: %s", ifr.ifr_name, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
 
-        addr[ret].family = AF_INET;
-        memcpy(addr[ret].ipv4, &((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr, 4);
-        ret++;
+        addr->family = AF_INET;
+        memcpy(addr->ipv4, &((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr, 4);
+        ret = 1;
+        break;
       }
-
-
     }
 
     tmp = tmp->ifa_next;
   }
 
   freeifaddrs(addrs);
+  close(fd);
 #endif
   return ret;
 }
-
 
 int ports_resolve_mdns_host(const char *host, Address *addr) {
 

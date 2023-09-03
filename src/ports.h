@@ -7,9 +7,7 @@
 
 int ports_resolve_mdns_host(const char *host, Address *addr);
 
-int ports_get_current_ip(UdpSocket *udp_socket, Address *addr);
-
-void ports_set_current_ip(const char *ip);
+int ports_get_host_addr(Address *addr);
 
 #endif // PORTS_H_
 

@@ -43,15 +43,6 @@ int utils_get_ipv4addr(char *hostname, char *ipv4addr, size_t size) {
   return -1;
 }
 
-int utils_is_valid_ip_address(char *ip_address) {
-#if 0
-  struct sockaddr_in sa;
-  int result = inet_pton(AF_INET, ip_address, &(sa.sin_addr));
-  return result == 0;
-#endif
-  return 0;
-}
-
 void utils_random_string(char *s, const int len) {
 
   int i;
@@ -70,17 +61,28 @@ void utils_random_string(char *s, const int len) {
   s[len] = '\0';
 }
 
-void utils_get_sha1(const char *input, size_t input_len, const char *key, unsigned char *output) {
+void utils_get_hmac_sha1(const char *input, size_t input_len, const char *key, size_t key_len, unsigned char *output) {
 
   mbedtls_md_context_t ctx;
   mbedtls_md_type_t md_type = MBEDTLS_MD_SHA1;
   mbedtls_md_init(&ctx);
   mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(md_type), 1);
-  mbedtls_md_hmac_starts(&ctx, (const unsigned char *) key, strlen(key));
+  mbedtls_md_hmac_starts(&ctx, (const unsigned char *) key, key_len);
   mbedtls_md_hmac_update(&ctx, (const unsigned char *) input, input_len);
   mbedtls_md_hmac_finish(&ctx, output);
   mbedtls_md_free(&ctx);
+}
 
+void utils_get_md5(const char *input, size_t input_len, unsigned char *output) {
+
+  mbedtls_md_context_t ctx;
+  mbedtls_md_type_t md_type = MBEDTLS_MD_MD5;
+  mbedtls_md_init(&ctx);
+  mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(md_type), 1);
+  mbedtls_md_starts(&ctx);
+  mbedtls_md_update(&ctx, (const unsigned char *) input, input_len);
+  mbedtls_md_finish(&ctx, output);
+  mbedtls_md_free(&ctx);
 }
 
 uint64_t utils_get_timestamp() {
@@ -89,3 +91,4 @@ uint64_t utils_get_timestamp() {
   gettimeofday(&tv, NULL);
   return (uint64_t) tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
+

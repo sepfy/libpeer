@@ -51,11 +51,9 @@
 
 void utils_random_string(char *s, const int len);
 
-void utils_get_sha1(const char *input, size_t input_len, const char *key, unsigned char *output);
+void utils_get_hmac_sha1(const char *input, size_t input_len, const char *key, size_t key_len, unsigned char *output);
 
-int utils_get_ipv4addr(char *hostname, char *ipv4addr, size_t size);
-
-int utils_is_valid_ip_address(char *ip_address);
+void utils_get_md5(const char *input, size_t input_len, unsigned char *output);
 
 uint64_t utils_get_timestamp();
 

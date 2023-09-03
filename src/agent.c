@@ -14,37 +14,127 @@
 #include "agent.h"
 #include "ports.h"
 
-static int agent_get_host_candidates(Agent *agent) {
+static int agent_create_host_addr(Agent *agent, uint16_t port, Address *host_addr) {
 
-  int ret, i;
-
-  Address addr[AGENT_MAX_CANDIDATES];
-
-  ret = ports_get_current_ip(&agent->udp_socket, addr);
-
-  for (i = 0; i < ret; i++) {
-
-    ice_candidate_create(&agent->local_candidates[agent->local_candidates_count++], agent->local_candidates_count, ICE_CANDIDATE_TYPE_HOST, &addr[i]);
+  if (ports_get_host_addr(host_addr)) {
+    host_addr->port = port;
+    return 0;
   }
+  return -1;
+}
 
+static int agent_create_bind_addr(Agent *agent, Address *serv_addr) {
+
+  int ret = -1;
+  Address bind_addr;
+  StunMessage send_msg;
+  StunMessage recv_msg;
+  UdpSocket udp_socket;
+  udp_socket_open(&udp_socket);
+  udp_socket.timeout = 5000;
+
+  memset(&send_msg, 0, sizeof(send_msg));
+
+  stun_msg_create(&send_msg, STUN_METHOD_BINDING);
+
+  do {
+
+    ret = udp_socket_sendto(&udp_socket, serv_addr, send_msg.buf, send_msg.size);
+
+    if (ret == -1) {
+      LOGE("Failed to send STUN Binding Request.");
+      break;
+    }
+
+    memset(&recv_msg, 0, sizeof(recv_msg));
+    ret = udp_socket_recvfrom(&udp_socket, serv_addr, recv_msg.buf, sizeof(recv_msg.buf));
+
+    if (ret == -1) {
+      LOGD("Failed to receive STUN Binding Response.");
+      break;
+    }
+
+    stun_parse_msg_buf(&recv_msg);
+    memcpy(&bind_addr, &recv_msg.mapped_addr, sizeof(Address));
+
+  } while(0);
+
+  udp_socket_close(&udp_socket);
+
+  IceCandidate *ice_candidate = agent->local_candidates + agent->local_candidates_count++;
+  ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_SRFLX, &bind_addr);
   return ret;
 }
 
-static void agent_get_stun_candidates(Agent *agent, Address *serv_addr) {
+static int agent_create_turn_addr(Agent *agent, Address *serv_addr, const char *username, const char *credential) {
 
-  Address addr;
+  int ret = -1;
+  uint32_t attr = ntohl(0x11000000);
+  Address turn_addr;
+  StunMessage send_msg;
+  StunMessage recv_msg;
+  UdpSocket udp_socket;
+  udp_socket_open(&udp_socket);
+  udp_socket.timeout = 5000;
 
-  stun_get_local_address(serv_addr, &addr);
+  memset(&send_msg, 0, sizeof(send_msg));
+  stun_msg_create(&send_msg, STUN_METHOD_ALLOCATE);
+  stun_msg_write_attr(&send_msg, STUN_ATTR_REQUESTED_TRANSPORT, sizeof(attr), (char*)&attr); // UDP
+  stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_USERNAME, strlen(username), (char*)username);
 
-  ice_candidate_create(&agent->local_candidates[agent->local_candidates_count++], agent->local_candidates_count, ICE_CANDIDATE_TYPE_SRFLX, &addr);
+  do {
+
+    ret = udp_socket_sendto(&udp_socket, serv_addr, send_msg.buf, send_msg.size);
+
+    if (ret == -1) {
+      LOGE("Failed to send STUN Binding Request.");
+      break;
+    }
+
+    memset(&recv_msg, 0, sizeof(recv_msg));
+    ret = udp_socket_recvfrom(&udp_socket, serv_addr, recv_msg.buf, sizeof(recv_msg.buf));
+
+    if (ret == -1) {
+      LOGD("Failed to receive STUN Binding Response.");
+      break;
+    }
+
+    stun_parse_msg_buf(&recv_msg);
+
+    if (recv_msg.stunclass == STUN_CLASS_ERROR && recv_msg.stunmethod == STUN_METHOD_ALLOCATE) {
+
+      memset(&send_msg, 0, sizeof(send_msg));
+      stun_msg_create(&send_msg, STUN_METHOD_ALLOCATE);
+      stun_msg_write_attr(&send_msg, STUN_ATTR_REQUESTED_TRANSPORT, sizeof(attr), (char*)&attr); // UDP
+      stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_USERNAME, strlen(username), (char*)username);
+      stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_NONCE, strlen(recv_msg.nonce), recv_msg.nonce);
+      stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REALM, strlen(recv_msg.realm), recv_msg.realm);
+      stun_msg_finish(&send_msg, STUN_CREDENTIAL_LONG_TERM, credential, strlen(credential));
+      ret = udp_socket_sendto(&udp_socket, serv_addr, send_msg.buf, send_msg.size);
+      memset(&recv_msg, 0, sizeof(recv_msg));
+      ret = udp_socket_recvfrom(&udp_socket, serv_addr, recv_msg.buf, sizeof(recv_msg.buf));
+      stun_parse_msg_buf(&recv_msg);
+    }
+    memcpy(&turn_addr, &recv_msg.relayed_addr, sizeof(Address));
+
+  } while(0);
+
+  udp_socket_close(&udp_socket);
+
+
+  IceCandidate *ice_candidate = agent->local_candidates + agent->local_candidates_count++;
+  ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_RELAY, &turn_addr);
+  return ret;
+}
+
+void agent_init(Agent *agent) {
 
 }
 
-void agent_reset(Agent *agent) {
+void agent_deinit(Agent *agent) {
 
   udp_socket_close(&agent->udp_socket);
   memset(agent, 0, sizeof(Agent));
-  agent->state = AGENT_STATE_GATHERING_ENDED;
 }
 
 void agent_gather_candidate(Agent *agent, const char *urls, const char *username, const char *credential) {
@@ -57,11 +147,7 @@ void agent_gather_candidate(Agent *agent, const char *urls, const char *username
 
   agent->state = AGENT_STATE_GATHERING_STARTED;
 
-  memset(agent->local_candidates, 0, sizeof(agent->local_candidates));
-
   udp_socket_open(&agent->udp_socket);
-
-  ret = agent_get_host_candidates(agent);
 
   do {
 
@@ -88,29 +174,24 @@ void agent_gather_candidate(Agent *agent, const char *urls, const char *username
 
     if (strncmp(urls, "stun:", 5) == 0) {
 
-      agent_get_stun_candidates(agent, &resolved_addr);
+      agent_create_bind_addr(agent, &resolved_addr);
 
     } else if (strncmp(urls, "turn:", 5) == 0) {
 
+      agent_create_turn_addr(agent, &resolved_addr, username, credential);
     }
-
 
   } while (0);
 
-  LOGW("Invalid stun/turn server url %s", urls);
-
-
-  for (i = 0; i < ret; i++) {
-    agent->local_candidates[i].addr.port = agent->local_candidates[agent->local_candidates_count-1].addr.port;
-  }
-
-  agent->state = AGENT_STATE_GATHERING_COMPLETED;
 }
 
 void agent_get_local_description(Agent *agent, char *description, int length) {
 
-  memset(description, 0, length);
+  int i;
+  int ncandidates = 0;
+  Address host_addr;
 
+  memset(description, 0, length);
   memset(agent->local_ufrag, 0, sizeof(agent->local_ufrag));
   memset(agent->local_upwd, 0, sizeof(agent->local_upwd));
 
@@ -118,11 +199,14 @@ void agent_get_local_description(Agent *agent, char *description, int length) {
   utils_random_string(agent->local_upwd, ICE_UPWD_LENGTH);
 
   snprintf(description, length, "a=ice-ufrag:%s\na=ice-pwd:%s\n", agent->local_ufrag, agent->local_upwd);
+  ncandidates = agent->local_candidates_count;
+  // add host candidate
+  for (i = 0; i < ncandidates; i++) {
+    agent_create_host_addr(agent, agent->local_candidates[i].addr.port, &host_addr);
+    ice_candidate_create(&agent->local_candidates[agent->local_candidates_count++], agent->local_candidates_count, ICE_CANDIDATE_TYPE_HOST, &host_addr);
+  }
 
   for (int i = 0; i < agent->local_candidates_count; i++) {
-
-    agent->local_candidates[i].foundation = i + 1;
-
     ice_candidate_to_description(&agent->local_candidates[i], description + strlen(description), length - strlen(description));
   }
 
@@ -194,9 +278,9 @@ int agent_recv(Agent *agent, uint8_t *buf, int len) {
         // TODO: XOR-MAPPED-ADDRESS
         char mapped_address[8];
         stun_set_mapped_address(mapped_address, NULL, &agent->nominated_pair->remote->addr);
-        stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_MAPPED_ADDRESS, 8, mapped_address);
-        stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
-        stun_msg_finish(&msg, agent->local_upwd);
+        stun_msg_write_attr(&msg, STUN_ATTR_TYPE_MAPPED_ADDRESS, 8, mapped_address);
+        stun_msg_write_attr(&msg, STUN_ATTR_TYPE_USERNAME, strlen(username), username);
+        stun_msg_finish(&msg, STUN_CREDENTIAL_SHORT_TERM, agent->local_upwd, ICE_UPWD_LENGTH);
 
         udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
         LOGD("send binding respnse to remote ip: %d.%d.%d.%d, port: %d", agent->nominated_pair->remote->addr.ipv4[0], agent->nominated_pair->remote->addr.ipv4[1], agent->nominated_pair->remote->addr.ipv4[2], agent->nominated_pair->remote->addr.ipv4[3], agent->nominated_pair->remote->addr.port);
@@ -281,10 +365,10 @@ int agent_connectivity_check(Agent *agent) {
       memset(username, 0, sizeof(username));
       snprintf(username, sizeof(username), "%s:%s", agent->remote_ufrag, agent->local_ufrag);
 
-      stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
-      stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_PRIORITY, 4, (char *)&agent->nominated_pair->priority); 
-      stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
-      stun_msg_finish(&msg, agent->remote_upwd);
+      stun_msg_write_attr(&msg, STUN_ATTR_TYPE_USERNAME, strlen(username), username);
+      stun_msg_write_attr(&msg, STUN_ATTR_TYPE_PRIORITY, 4, (char *)&agent->nominated_pair->priority); 
+      stun_msg_write_attr(&msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
+      stun_msg_finish(&msg, STUN_CREDENTIAL_SHORT_TERM, agent->remote_upwd, ICE_UPWD_LENGTH);
 
       LOGD("send binding request to remote ip: %d.%d.%d.%d, port: %d", agent->nominated_pair->remote->addr.ipv4[0], agent->nominated_pair->remote->addr.ipv4[1], agent->nominated_pair->remote->addr.ipv4[2], agent->nominated_pair->remote->addr.ipv4[3], agent->nominated_pair->remote->addr.port);
 
@@ -297,21 +381,6 @@ int agent_connectivity_check(Agent *agent) {
       agent_recv(agent, buf, sizeof(buf));
     }
 
-#if 0
-  if (agent->nominated_pair->state == ICE_CANDIDATE_STATE_WAITING) {
- 
-    stun_create_binding_request(&msg);
-    char username[64];
-    memset(username, 0, sizeof(username));
-    snprintf(username, sizeof(username), "%s:%s", agent->remote_ufrag, agent->local_ufrag);
-
-    stun_msg_write_attr(&msg, STUN_ATTRIBUTE_USERNAME, strlen(username), username);
-    stun_msg_write_attr2(&msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
-    stun_msg_finish(&msg, agent->remote_upwd);
-    udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, (char *)msg.buf, msg.size);
-    agent->nominated_pair->state = ICE_CANDIDATE_STATE_INPROGRESS;
-  }
-#endif
   return agent->nominated_pair->state == ICE_CANDIDATE_STATE_SUCCEEDED;
 }
 

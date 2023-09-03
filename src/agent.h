@@ -16,9 +16,6 @@
 #include "ice.h"
 #include "base64.h"
 
-#define STUN_IP "142.250.21.127"
-#define STUN_PORT 19302
-
 #define AGENT_MAX_DESCRIPTION 40960
 #define AGENT_MAX_CANDIDATES 10
 #define AGENT_MAX_CANDIDATE_PAIRS 100
@@ -99,7 +96,9 @@ void agent_set_host_address(Agent *agent, Address *addr);
 
 int agent_connectivity_check(Agent *agent);
 
-void agent_reset(Agent *agent);
+void agent_init(Agent *agent);
+
+void agent_deinit(Agent *agent);
 
 #endif // AGENT_H_
 

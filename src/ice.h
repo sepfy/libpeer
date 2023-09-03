@@ -24,6 +24,8 @@ typedef enum IceCandidateType {
 
   ICE_CANDIDATE_TYPE_HOST,
   ICE_CANDIDATE_TYPE_SRFLX,
+  ICE_CANDIDATE_TYPE_PRFLX,
+  ICE_CANDIDATE_TYPE_RELAY,
 
 } IceCandidateType;
 

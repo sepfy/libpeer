@@ -9,7 +9,7 @@
 #define STUN_PORT 19302
 
 int main(int argc, char *argv[]) {
-
+#if 0
   PeerConnection pc;
 
   const char *sdp_text;
@@ -65,5 +65,6 @@ int main(int argc, char *argv[]) {
   while (1) {
     usleep(100*1000);
   }
+#endif
 }
 

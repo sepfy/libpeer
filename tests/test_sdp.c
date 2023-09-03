@@ -10,7 +10,7 @@ void on_agent_state_changed(AgentState state, void *user_data) {
 } 
 
 int main(int argc, char *argv[]) {
-
+#if 0
   Agent agent;
 
   char remote_description[AGENT_MAX_DESCRIPTION];
@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
   agent.mode = AGENT_MODE_CONTROLLING;
   //agent.mode = AGENT_MODE_CONTROLLED;
   agent_set_remote_description(&agent, remote_description);
-
+#endif
   return 0;
 }
 

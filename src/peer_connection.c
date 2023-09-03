@@ -235,7 +235,7 @@ static void peer_connection_state_new(PeerConnection *pc) {
 
   memset(pc->temp_buf, 0, sizeof(pc->temp_buf));
 
-  agent_reset(&pc->agent);
+  agent_deinit(&pc->agent);
 
   dtls_srtp_reset_session(&pc->dtls_srtp);
 

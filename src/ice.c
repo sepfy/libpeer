@@ -9,37 +9,42 @@
 #include "utils.h"
 #include "ice.h"
 
-static void ice_candidate_calculate_priority(IceCandidate *candidate) {
+static uint8_t ice_candidate_type_preference(IceCandidateType type) {
 
-  // priority = (2^24)*(type preference) + (2^8)*(local preference) + (256 - component ID)
-
-  switch (candidate->type) {
-
+  switch (type) {
     case ICE_CANDIDATE_TYPE_HOST:
-      candidate->priority = 2130706432 + 16777215 + (256 - candidate->component);
-      break;
-
+      return 126;
     case ICE_CANDIDATE_TYPE_SRFLX:
-      candidate->priority = 1694498815 + 16777215 + (256 - candidate->component);
-      break;
-
+      return 100;
+    case ICE_CANDIDATE_TYPE_RELAY:
+      return 0;
     default:
-      break;
+      return 0;
   }
+}
 
+static uint16_t ice_candidate_local_preference(IceCandidate *candidate) {
+
+  return candidate->addr.port;
+}
+
+static void ice_candidate_priority(IceCandidate *candidate) {
+
+  // priority = (2^24)*(type preference) + (2^8)*(local preference) + (256 - component ID) 
+  candidate->priority = (1 << 24) * ice_candidate_type_preference(candidate->type) + (1 << 8) * ice_candidate_local_preference(candidate) + (256 - candidate->component);
 }
 
 void ice_candidate_create(IceCandidate *candidate, int foundation, IceCandidateType type, Address *addr) {
 
   memcpy(&candidate->addr, addr, sizeof(Address));
-
+LOGI("%p foundation: %d, type: %d, addr: %d.%d.%d.%d:%d", candidate, foundation, type, addr->ipv4[0], addr->ipv4[1], addr->ipv4[2], addr->ipv4[3], addr->port);
   candidate->type = type;
 
   candidate->foundation = foundation;
   // 1: RTP, 2: RTCP
   candidate->component = 1;
 
-  ice_candidate_calculate_priority(candidate);
+  ice_candidate_priority(candidate);
 
   snprintf(candidate->transport, sizeof(candidate->transport), "%s", "UDP");
 }
@@ -64,7 +69,13 @@ void ice_candidate_to_description(IceCandidate *candidate, char *description, in
        candidate->raddr.ipv4[3],
        candidate->raddr.port);
       break;
-
+    case ICE_CANDIDATE_TYPE_RELAY:
+      snprintf(typ_raddr, sizeof(typ_raddr), "relay raddr %d.%d.%d.%d rport %d",
+       candidate->raddr.ipv4[0],
+       candidate->raddr.ipv4[1],
+       candidate->raddr.ipv4[2],
+       candidate->raddr.ipv4[3],
+       candidate->raddr.port);
     default:
       break;
   }
