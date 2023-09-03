@@ -39,6 +39,13 @@ typedef enum StunMsgType {
 #define STUN_ATTRIBUTE_XOR_MAPPED_ADDRESS 0x0020
 #define STUN_ATTRIBUTE_FINGERPRINT 0x8028
 
+typedef enum StunMethod {
+
+  STUN_METHOD_BINDING = 0x0001,
+  STUN_METHOD_ALLOCATE = 0x0003,
+
+} StunMethod;
+
 typedef enum StunAttrType {
 
   STUN_ATTR_TYPE_MAPPED_ADDRESS = 0x0001,
@@ -91,7 +98,7 @@ void stun_parse_binding_response(char *attr_buf, size_t len, Address *addr);
 
 void stun_parse_msg_buf(StunMessage *msg);
 
-int stun_get_local_address(const char *stun_server, int stun_port, Address *addr);
+int stun_get_local_address(Address *bind_addr, Address *addr);
 
 void stun_calculate_fingerprint(char *buf, size_t len, uint32_t *fingerprint);
 

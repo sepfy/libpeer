@@ -9,6 +9,7 @@ struct UdpSocket {
 
   int fd;
   Address bind_addr;
+  uint64_t timeout;
 };
 
 int udp_socket_open(UdpSocket *udp_socket);

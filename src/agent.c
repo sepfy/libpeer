@@ -24,19 +24,19 @@ static int agent_get_host_candidates(Agent *agent) {
 
   for (i = 0; i < ret; i++) {
 
-    ice_candidate_create(&agent->local_candidates[agent->local_candidates_count++], ICE_CANDIDATE_TYPE_HOST, &addr[i]);
+    ice_candidate_create(&agent->local_candidates[agent->local_candidates_count++], agent->local_candidates_count, ICE_CANDIDATE_TYPE_HOST, &addr[i]);
   }
 
   return ret;
 }
 
-static void agent_get_stun_candidates(Agent *agent) {
+static void agent_get_stun_candidates(Agent *agent, Address *serv_addr) {
 
   Address addr;
 
-  stun_get_local_address(STUN_IP, STUN_PORT, &addr);
+  stun_get_local_address(serv_addr, &addr);
 
-  ice_candidate_create(&agent->local_candidates[agent->local_candidates_count++], ICE_CANDIDATE_TYPE_SRFLX, &addr);
+  ice_candidate_create(&agent->local_candidates[agent->local_candidates_count++], agent->local_candidates_count, ICE_CANDIDATE_TYPE_SRFLX, &addr);
 
 }
 
@@ -47,9 +47,13 @@ void agent_reset(Agent *agent) {
   agent->state = AGENT_STATE_GATHERING_ENDED;
 }
 
-void agent_gather_candidates(Agent *agent) {
+void agent_gather_candidate(Agent *agent, const char *urls, const char *username, const char *credential) {
 
   int ret, i;
+  char *port = NULL;
+  char hostname[64];
+  Address resolved_addr;
+  memset(hostname, 0, sizeof(hostname));
 
   agent->state = AGENT_STATE_GATHERING_STARTED;
 
@@ -59,7 +63,42 @@ void agent_gather_candidates(Agent *agent) {
 
   ret = agent_get_host_candidates(agent);
 
-  agent_get_stun_candidates(agent);
+  do {
+
+    if ((port = strstr(urls + 5, ":")) == NULL) {
+      break;
+    }
+
+    snprintf(hostname, port - urls - 5 + 1, "%s", urls + 5);
+
+    if (!addr_ipv4_validate(hostname, strlen(hostname), &resolved_addr)) {
+
+      ports_resolve_mdns_host(hostname, &resolved_addr);
+    }
+
+    resolved_addr.port = atoi(port + 1);
+
+    LOGI("resolved_addr.ipv4: %d.%d.%d.%d",
+     resolved_addr.ipv4[0], resolved_addr.ipv4[1], resolved_addr.ipv4[2], resolved_addr.ipv4[3]);
+    LOGI("resolved_addr.port: %d", resolved_addr.port);
+
+    if (resolved_addr.port <= 0) {
+      break;
+    }
+
+    if (strncmp(urls, "stun:", 5) == 0) {
+
+      agent_get_stun_candidates(agent, &resolved_addr);
+
+    } else if (strncmp(urls, "turn:", 5) == 0) {
+
+    }
+
+
+  } while (0);
+
+  LOGW("Invalid stun/turn server url %s", urls);
+
 
   for (i = 0; i < ret; i++) {
     agent->local_candidates[i].addr.port = agent->local_candidates[agent->local_candidates_count-1].addr.port;

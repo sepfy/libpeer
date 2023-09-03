@@ -29,13 +29,13 @@ static void ice_candidate_calculate_priority(IceCandidate *candidate) {
 
 }
 
-void ice_candidate_create(IceCandidate *candidate, IceCandidateType type, Address *addr) {
+void ice_candidate_create(IceCandidate *candidate, int foundation, IceCandidateType type, Address *addr) {
 
   memcpy(&candidate->addr, addr, sizeof(Address));
 
   candidate->type = type;
 
-  candidate->foundation = 1;
+  candidate->foundation = foundation;
   // 1: RTP, 2: RTCP
   candidate->component = 1;
 

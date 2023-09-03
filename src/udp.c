@@ -25,8 +25,8 @@ int udp_socket_open(UdpSocket *udp_socket) {
   }
 
   //int flags = fcntl(udp_socket->fd, F_GETFL, 0);
-
   //fcntl(udp_socket->fd, F_SETFL, flags | O_NONBLOCK);
+  udp_socket->timeout = 1;
   return 0;
 }
 
@@ -107,8 +107,8 @@ int udp_socket_sendto(UdpSocket *udp_socket, Address *addr, const uint8_t *buf, 
   FD_ZERO(&write_set);
   FD_SET(udp_socket->fd, &write_set);
 
-  tv.tv_sec = 0;
-  tv.tv_usec = 1000;
+  tv.tv_sec = udp_socket->timeout/1000;
+  tv.tv_usec = udp_socket->timeout%1000*1000;
   sin.sin_family = AF_INET;
 
   memcpy(&sin.sin_addr.s_addr, addr->ipv4, 4);
@@ -154,8 +154,8 @@ int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, uint8_t *buf, int 
 
   FD_ZERO(&read_set);
   FD_SET(udp_socket->fd, &read_set);
-  tv.tv_sec = 0;
-  tv.tv_usec = 1000;
+  tv.tv_sec = udp_socket->timeout/1000;
+  tv.tv_usec = udp_socket->timeout%1000*1000;
 
   socklen_t sin_len = sizeof(sin);
 

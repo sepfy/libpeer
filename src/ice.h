@@ -64,7 +64,7 @@ struct IceCandidatePair {
   uint64_t priority;
 };
 
-void ice_candidate_create(IceCandidate *ice_candidate, IceCandidateType type, Address *addr);
+void ice_candidate_create(IceCandidate *ice_candidate, int foundation, IceCandidateType type, Address *addr);
 
 void ice_candidate_to_description(IceCandidate *candidate, char *description, int length);
 

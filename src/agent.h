@@ -77,7 +77,7 @@ struct Agent {
   uint32_t transaction_id[3];
 };
 
-void agent_gather_candidates(Agent *agent);
+void agent_gather_candidate(Agent *agent, const char *urls, const char *username, const char *credential);
 
 void agent_get_local_description(Agent *agent, char *description, int length);
 

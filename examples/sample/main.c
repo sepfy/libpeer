@@ -14,7 +14,7 @@ PeerConnectionState g_state;
 
 static void onconnectionstatechange(PeerConnectionState state, void *data) {
 
-  printf("state is changed: %d\n", state);
+  printf("state is changed: %s\n", peer_connection_state_to_string(state));
   g_state = state;
 }
 
@@ -81,18 +81,25 @@ int main(int argc, char *argv[]) {
 
   signal(SIGINT, signal_handler);
 
-  PeerOptions options = { .datachannel = DATA_CHANNEL_STRING, .video_codec = CODEC_H264, .audio_codec = CODEC_PCMA };
+  PeerConfiguration config = {
+   .ice_servers = {
+    { .urls = "stun:142.250.21.127:19302" },
+   },
+   .datachannel = DATA_CHANNEL_STRING,
+   .video_codec = CODEC_H264,
+   .audio_codec = CODEC_PCMA
+  };
 
   if (argc < 2) {
     printf("usage: %s <cacert>\n", argv[0]);
     return 0;
   }
 
-  snprintf(buf, sizeof(buf), "test_%d", getpid());
+  snprintf(buf, sizeof(buf), "test_%d", 12);//getpid());
   printf("open https://sepfy.github.io/webrtc?deviceId=%s\n", buf);
 
   peer_init();
-  g_pc = peer_connection_create(&options, NULL); 
+  g_pc = peer_connection_create(&config);
   peer_connection_oniceconnectionstatechange(g_pc, onconnectionstatechange);
   peer_connection_ondatachannel(g_pc, onmessasge, onopen, onclose);
 

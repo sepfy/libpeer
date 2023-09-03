@@ -250,7 +250,7 @@ void stun_parse_binding_response(char *buf, size_t len, Address *addr) {
   }
 }
 
-int stun_get_local_address(const char *stun_server, int stun_port, Address *addr) {
+int stun_get_local_address(Address *serv_addr, Address *addr) {
 
   int ret = -1;
 
@@ -264,8 +264,8 @@ int stun_get_local_address(const char *stun_server, int stun_port, Address *addr
   struct sockaddr_in server_addr;
   memset(&server_addr, 0, sizeof(server_addr));
   server_addr.sin_family = AF_INET;
-  server_addr.sin_addr.s_addr = inet_addr(stun_server);
-  server_addr.sin_port = htons(stun_port);
+  memcpy(&server_addr.sin_addr.s_addr, serv_addr->ipv4, 4);
+  server_addr.sin_port = htons(serv_addr->port);
 
   StunMessage msg;
 

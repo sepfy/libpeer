@@ -48,7 +48,17 @@ typedef enum MediaCodec {
 
 } MediaCodec;
 
-typedef struct PeerOptions {
+typedef struct IceServer {
+
+  const char *urls;
+  const char *username;
+  const char *credential;
+
+} IceServer;
+
+typedef struct PeerConfiguration {
+
+  IceServer ice_servers[5];
 
   MediaCodec audio_codec;
   MediaCodec video_codec;
@@ -57,11 +67,15 @@ typedef struct PeerOptions {
   void (*onaudiotrack)(uint8_t *data, size_t size, void *userdata);
   void (*onvideotrack)(uint8_t *data, size_t size, void *userdata);
 
-} PeerOptions;
+  void *user_data;
+
+} PeerConfiguration;
 
 typedef struct PeerConnection PeerConnection;
 
-PeerConnection* peer_connection_create(PeerOptions *options, void *user_data);
+const char* peer_connection_state_to_string(PeerConnectionState state);
+
+PeerConnection* peer_connection_create(PeerConfiguration *config);
 
 void peer_connection_destroy(PeerConnection *pc);
 
