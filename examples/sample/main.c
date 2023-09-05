@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
 
   while (!g_interrupted) {
 
-    if (g_state == PEER_CONNECTION_CONNECTED) {
+    if (g_state == PEER_CONNECTION_COMPLETED) {
 
       curr_time = get_timestamp();
 

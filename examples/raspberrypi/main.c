@@ -46,7 +46,7 @@ static void onconnectionstatechange(PeerConnectionState state, void *data) {
 
   printf("state is changed: %d\n", state);
   g_state = state;
-  if (g_state == PEER_CONNECTION_CONNECTED) {
+  if (g_state == PEER_CONNECTION_COMPLETED) {
 
     gst_element_set_state(g_media.camera_pipeline, GST_STATE_PLAYING);
     gst_element_set_state(g_media.mic_pipeline, GST_STATE_PLAYING);

@@ -93,7 +93,7 @@ void audio_task(void *arg) {
   for (;;) {
 
     // send audio data when connected
-    if ((eState == PEER_CONNECTION_CONNECTED) && gDataChannelOpened) {
+    if ((eState == PEER_CONNECTION_COMPLETED) && gDataChannelOpened) {
 
       ret = getSample((uint8_t*)audioraw, sizeof(audioraw));
 

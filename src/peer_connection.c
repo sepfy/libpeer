@@ -201,7 +201,7 @@ void peer_connection_destroy(PeerConnection *pc) {
 
 int peer_connection_send_audio(PeerConnection *pc, const uint8_t *buf, size_t len) {
 
-  if (pc->state != PEER_CONNECTION_CONNECTED) {
+  if (pc->state != PEER_CONNECTION_COMPLETED) {
     //LOGE("dtls_srtp not connected");
     return -1;
   }
@@ -211,7 +211,7 @@ int peer_connection_send_audio(PeerConnection *pc, const uint8_t *buf, size_t le
 
 int peer_connection_send_video(PeerConnection *pc, const uint8_t *buf, size_t len) {
 
-  if (pc->state != PEER_CONNECTION_CONNECTED) {
+  if (pc->state != PEER_CONNECTION_COMPLETED) {
     //LOGE("dtls_srtp not connected");
     return -1;
   }
@@ -305,6 +305,8 @@ static void peer_connection_state_new(PeerConnection *pc) {
 
 int peer_connection_loop(PeerConnection *pc) {
 
+  int bytes;
+  uint8_t *data = NULL;
   uint32_t ssrc = 0;
   memset(pc->agent_buf, 0, sizeof(pc->agent_buf));
   pc->agent_ret = -1;
@@ -334,83 +336,79 @@ int peer_connection_loop(PeerConnection *pc) {
       break;
 
     case PEER_CONNECTION_CONNECTED:
-      if (pc->dtls_srtp.state == DTLS_SRTP_STATE_INIT) {
 
-        if (dtls_srtp_handshake(&pc->dtls_srtp, NULL) == 0) {
+      if (dtls_srtp_handshake(&pc->dtls_srtp, NULL) == 0) {
 
-          LOGD("DTLS-SRTP handshake done");
+        LOGD("DTLS-SRTP handshake done");
 
-          if (pc->config.datachannel) {
-            LOGI("SCTP create socket");
-            sctp_create_socket(&pc->sctp, &pc->dtls_srtp);
-          }
-
-        }
-      } else if (pc->dtls_srtp.state == DTLS_SRTP_STATE_CONNECTED) {
-
-        int bytes;
-        uint8_t *data = NULL;
-
-        data = buffer_peak_head(pc->video_rb, &bytes);
-        if (data) {
-          rtp_encoder_encode(&pc->vrtp_encoder, data, bytes);
-          buffer_pop_head(pc->video_rb);
+        if (pc->config.datachannel) {
+          LOGI("SCTP create socket");
+          sctp_create_socket(&pc->sctp, &pc->dtls_srtp);
         }
 
-        data = buffer_peak_head(pc->audio_rb, &bytes);
-        if (data) {
-          rtp_encoder_encode(&pc->artp_encoder, data, bytes);
-          buffer_pop_head(pc->audio_rb);
-        }
-
-        data = buffer_peak_head(pc->data_rb, &bytes);
-        if (data) {
-
-           if (pc->config.datachannel == DATA_CHANNEL_STRING)
-             sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_STRING);
-           else
-             sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_BINARY);
-           buffer_pop_head(pc->data_rb);
-        }
-
-        if ((pc->agent_ret = agent_recv(&pc->agent, pc->agent_buf, sizeof(pc->agent_buf))) > 0) {
-          LOGD("agent_recv %d", pc->agent_ret);
-
-          if (rtcp_packet_validate(pc->agent_buf, pc->agent_ret)) {
-            LOGD("Got RTCP packet");
-            dtls_srtp_decrypt_rtcp_packet(&pc->dtls_srtp, pc->agent_buf, &pc->agent_ret);
-            peer_connection_incoming_rtcp(pc, pc->agent_buf, pc->agent_ret);
-
-          } else if (dtls_srtp_validate(pc->agent_buf)) {
-
-            int ret = dtls_srtp_read(&pc->dtls_srtp, pc->temp_buf, sizeof(pc->temp_buf));
-            LOGD("Got DTLS data %d", ret);
-
-            if (ret > 0) {
-              sctp_incoming_data(&pc->sctp, (char*)pc->temp_buf, ret);
-            }
-
-          } else if (rtp_packet_validate(pc->agent_buf, pc->agent_ret)) {
-            LOGD("Got RTP packet");
-
-            dtls_srtp_decrypt_rtp_packet(&pc->dtls_srtp, pc->agent_buf, &pc->agent_ret);
-
-            ssrc = rtp_get_ssrc(pc->agent_buf);
-            if (ssrc == pc->remote_assrc) {
-              rtp_decoder_decode(&pc->artp_decoder, pc->agent_buf, pc->agent_ret);
-            } else if (ssrc == pc->remote_vssrc) {
-              rtp_decoder_decode(&pc->vrtp_decoder, pc->agent_buf, pc->agent_ret);
-            }
-
-          }
-
-        } else if (pc->agent_ret < 0) {
-
-          STATE_CHANGED(pc, PEER_CONNECTION_DISCONNECTED);
-        }
+        STATE_CHANGED(pc, PEER_CONNECTION_COMPLETED);
       }
       break;
     case PEER_CONNECTION_COMPLETED:
+
+      data = buffer_peak_head(pc->video_rb, &bytes);
+      if (data) {
+        rtp_encoder_encode(&pc->vrtp_encoder, data, bytes);
+        buffer_pop_head(pc->video_rb);
+      }
+
+      data = buffer_peak_head(pc->audio_rb, &bytes);
+      if (data) {
+        rtp_encoder_encode(&pc->artp_encoder, data, bytes);
+        buffer_pop_head(pc->audio_rb);
+      }
+
+      data = buffer_peak_head(pc->data_rb, &bytes);
+      if (data) {
+
+         if (pc->config.datachannel == DATA_CHANNEL_STRING)
+           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_STRING);
+         else
+           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_BINARY);
+         buffer_pop_head(pc->data_rb);
+      }
+
+      if ((pc->agent_ret = agent_recv(&pc->agent, pc->agent_buf, sizeof(pc->agent_buf))) > 0) {
+        LOGD("agent_recv %d", pc->agent_ret);
+
+        if (rtcp_packet_validate(pc->agent_buf, pc->agent_ret)) {
+          LOGD("Got RTCP packet");
+          dtls_srtp_decrypt_rtcp_packet(&pc->dtls_srtp, pc->agent_buf, &pc->agent_ret);
+          peer_connection_incoming_rtcp(pc, pc->agent_buf, pc->agent_ret);
+
+        } else if (dtls_srtp_validate(pc->agent_buf)) {
+
+          int ret = dtls_srtp_read(&pc->dtls_srtp, pc->temp_buf, sizeof(pc->temp_buf));
+          LOGD("Got DTLS data %d", ret);
+
+          if (ret > 0) {
+            sctp_incoming_data(&pc->sctp, (char*)pc->temp_buf, ret);
+          }
+
+        } else if (rtp_packet_validate(pc->agent_buf, pc->agent_ret)) {
+          LOGD("Got RTP packet");
+
+          dtls_srtp_decrypt_rtp_packet(&pc->dtls_srtp, pc->agent_buf, &pc->agent_ret);
+
+          ssrc = rtp_get_ssrc(pc->agent_buf);
+          if (ssrc == pc->remote_assrc) {
+            rtp_decoder_decode(&pc->artp_decoder, pc->agent_buf, pc->agent_ret);
+          } else if (ssrc == pc->remote_vssrc) {
+            rtp_decoder_decode(&pc->vrtp_decoder, pc->agent_buf, pc->agent_ret);
+          }
+
+        }
+
+      } else if (pc->agent_ret < 0) {
+
+        STATE_CHANGED(pc, PEER_CONNECTION_DISCONNECTED);
+      }
+
       break;
     case PEER_CONNECTION_FAILED:
       break;

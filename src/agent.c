@@ -226,7 +226,7 @@ int agent_send(Agent *agent, const uint8_t *buf, int len) {
 
 int agent_recv(Agent *agent, uint8_t *buf, int len) {
 
-  int ret = 0;
+  int ret = -1;
 
   if (agent->nominated_pair->state == ICE_CANDIDATE_STATE_SUCCEEDED &&
    (utils_get_timestamp() - agent->binding_request_time) > KEEPALIVE_CONNCHECK) {
@@ -240,7 +240,6 @@ int agent_recv(Agent *agent, uint8_t *buf, int len) {
   if (ret > 0) {
 
     StunMsgType type = stun_is_stun_msg(buf, ret);
-
 
     if (type == STUN_MSG_TYPE_BINDING_ERROR_RESPONSE) {
 
@@ -289,11 +288,12 @@ int agent_recv(Agent *agent, uint8_t *buf, int len) {
     } else {
 
       LOGD("Not STUN message size %d received", ret);
+      return ret;
     }
 
   }
 
-  return ret;
+  return 0;
 }
 
 
