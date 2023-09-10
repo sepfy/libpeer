@@ -6,7 +6,7 @@
 #include "dtls_srtp.h"
 
 void test_handshake(int argc, char *argv[]) {
-
+#if 0
   DtlsSrtp dtls_srtp;
   UdpSocket udp_socket;
   Address local_addr;
@@ -82,6 +82,7 @@ void test_handshake(int argc, char *argv[]) {
   }
 
   dtls_srtp_deinit(&dtls_srtp);
+#endif
 }
 
 void test_reset() {

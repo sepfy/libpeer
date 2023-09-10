@@ -46,6 +46,10 @@ static void oniceconnectionstatechange(PeerConnectionState state, void *user_dat
 
   ESP_LOGI(TAG, "PeerConnectionState: %d", state);
   eState = state;
+  // not support datachannel close event
+  if (eState != PEER_CONNECTION_COMPLETED) {
+    gDataChannelOpened = 0;
+  }
 }
 
 static void onmessasge(char *msg, size_t len, void *userdata) {
@@ -80,7 +84,13 @@ void app_main(void) {
     static char deviceid[32] = {0};
     uint8_t mac[8] = {0};
 
-    PeerOptions options = { .datachannel = DATA_CHANNEL_BINARY, .audio_codec = CODEC_PCMA };
+    PeerConfiguration config = {
+     .ice_servers = {
+      { .urls = "stun:stun.l.google.com:19302" }
+     },
+     .datachannel = DATA_CHANNEL_BINARY,
+     .audio_codec = CODEC_PCMA
+    };
 
     ESP_LOGI(TAG, "[APP] Startup..");
     ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
@@ -112,7 +122,7 @@ void app_main(void) {
 
     audio_init();
 
-    g_pc = peer_connection_create(&options, NULL);
+    g_pc = peer_connection_create(&config);
     peer_connection_oniceconnectionstatechange(g_pc, oniceconnectionstatechange);
     peer_connection_ondatachannel(g_pc, onmessasge, onopen, onclose);
 

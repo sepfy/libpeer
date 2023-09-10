@@ -146,8 +146,6 @@ PeerConnection* peer_connection_create(PeerConfiguration *config) {
 
   memcpy(&pc->config, config, sizeof(PeerConfiguration));
 
-  RtpPayloadType type;
-
   pc->agent.mode = AGENT_MODE_CONTROLLED;
 
   memset(&pc->sctp, 0, sizeof(pc->sctp));
@@ -331,8 +329,6 @@ int peer_connection_loop(PeerConnection *pc) {
         pc->agent.selected_pair = pc->agent.nominated_pair;
       }
 
-      agent_recv(&pc->agent, pc->agent_buf, sizeof(pc->agent_buf));
-
       break;
 
     case PEER_CONNECTION_CONNECTED:
@@ -404,8 +400,11 @@ int peer_connection_loop(PeerConnection *pc) {
 
         }
 
-      } else if (pc->agent_ret < 0) {
+      }
 
+      if ((utils_get_timestamp() - pc->agent.binding_request_time) > KEEPALIVE_CONNCHECK) {
+
+        LOGI("binding request timeout");
         STATE_CHANGED(pc, PEER_CONNECTION_DISCONNECTED);
       }
 

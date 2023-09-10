@@ -496,8 +496,6 @@ int dtls_srtp_read(DtlsSrtp *dtls_srtp, unsigned char *buf, size_t len) {
 
 int dtls_srtp_validate(uint8_t *buf) {
 
-  DtlsHeader *header = (DtlsHeader *)buf;
-
   if(buf == NULL)
     return 0;
 

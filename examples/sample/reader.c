@@ -11,7 +11,6 @@ static uint8_t *g_audio_buf = NULL;
 
 int reader_init() {
 
-  int size;
   FILE *video_fp = NULL;
   FILE *audio_fp = NULL;
   char videofile[] = "test.264";

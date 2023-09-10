@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
 
   PeerConfiguration config = {
    .ice_servers = {
-    { .urls = "stun:142.250.21.127:19302" },
+    { .urls = "stun:stun.l.google.com:19302" },
    },
    .datachannel = DATA_CHANNEL_STRING,
    .video_codec = CODEC_H264,
@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  snprintf(buf, sizeof(buf), "test_%d", 12);//getpid());
+  snprintf((char*)buf, sizeof(buf), "test_%d", getpid());
   printf("open https://sepfy.github.io/webrtc?deviceId=%s\n", buf);
 
   peer_init();
@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
   peer_connection_oniceconnectionstatechange(g_pc, onconnectionstatechange);
   peer_connection_ondatachannel(g_pc, onmessasge, onopen, onclose);
 
-  peer_signaling_join_channel(buf, g_pc, argv[1]);
+  peer_signaling_join_channel((const char*)buf, g_pc, argv[1]);
 
   pthread_create(&peer_connection_thread, NULL, peer_connection_task, NULL);
   pthread_create(&peer_singaling_thread, NULL, peer_singaling_task, NULL);

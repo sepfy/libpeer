@@ -37,9 +37,7 @@ static void ice_candidate_priority(IceCandidate *candidate) {
 void ice_candidate_create(IceCandidate *candidate, int foundation, IceCandidateType type, Address *addr) {
 
   memcpy(&candidate->addr, addr, sizeof(Address));
-LOGI("%p foundation: %d, type: %d, addr: %d.%d.%d.%d:%d", candidate, foundation, type, addr->ipv4[0], addr->ipv4[1], addr->ipv4[2], addr->ipv4[3], addr->port);
   candidate->type = type;
-
   candidate->foundation = foundation;
   // 1: RTP, 2: RTCP
   candidate->component = 1;

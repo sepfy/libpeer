@@ -23,6 +23,9 @@
 
 #define KEEPALIVE_CONNCHECK 10000
 
+// default use wifi interface
+#define IFR_NAME "w"
+
 //#define LOG_LEVEL LEVEL_DEBUG
 
 #endif // CONFIG_H_

@@ -43,8 +43,8 @@ int main(int argc, char *argv[]) {
 
   char stunserver[] = "stun:stun.l.google.com:19302";
   char turnserver[] = "turn:global.turn.twilio.com:3478?transport=udp";
-  char username[] = "1f1e2c0c3a0953fad50dc9a2626d1a5505b0a6770d799a655cb64a0b97a22fa0";
-  char credential[] = "7H7q/JoXzEUgK4C4m1j8Ws4ETc4c+Av6O/4SP8qaBfg=";
+  char username[] = "8e9ed7b70d63b66684c74932c8bce26363956e338d353a4e0e039fe6140f64c2";
+  char credential[] = "hXQwBJFQX8YHPH6adGgb4XCmKnJQPvhU/VaWwypf/LI=";
 
   agent_init(&agent);
 
