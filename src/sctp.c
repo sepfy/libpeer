@@ -222,14 +222,7 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
         LOGD("SCTP_DATA");
         data_chunk = (SctpDataChunk*)in_packet->chunks;
 
-        if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_CONTROL && data_chunk->data[0] == 0x03) {
-          sack = (SctpSackChunk*)out_packet->chunks;
-          sack->common.type = SCTP_SACK;
-          sack->common.flags = 0x00;
-          sack->common.length = htons(16);
-          sack->cumulative_tsn_ack = data_chunk->tsn;
-          sack->a_rwnd = htonl(0x02);
-          length = ntohs(sack->common.length) + sizeof(SctpHeader);
+        if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_CONTROL && data_chunk->data[0] == DATA_CHANNEL_OPEN) {
 
           if (!sctp->connected) {
             sctp->connected = 1;
@@ -237,7 +230,23 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
               sctp->onopen(sctp->userdata);
             }
           }
+
+        } else if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_DOMSTRING) {
+
+          if (sctp->onmessasge) {
+            sctp->onmessasge((char*)data_chunk->data, ntohs(data_chunk->length) - sizeof(SctpDataChunk), sctp->userdata);
+          }
         }
+
+        sack = (SctpSackChunk*)out_packet->chunks;
+        sack->common.type = SCTP_SACK;
+        sack->common.flags = 0x00;
+        sack->common.length = htons(16);
+        sack->cumulative_tsn_ack = data_chunk->tsn;
+        sack->a_rwnd = htonl(0x02);
+        length = ntohs(sack->common.length) + sizeof(SctpHeader);
+        pos = len; // Do not handle other msg
+
         break;
       case SCTP_INIT:
         LOGD("SCTP_INIT");

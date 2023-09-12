@@ -54,6 +54,7 @@ static void oniceconnectionstatechange(PeerConnectionState state, void *user_dat
 
 static void onmessasge(char *msg, size_t len, void *userdata) {
 
+  ESP_LOGI(TAG, "Datachannel message: %.*s, size", len, msg);
 }
 
 void onopen(void *userdata) {
