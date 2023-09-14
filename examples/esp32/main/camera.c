@@ -57,7 +57,7 @@ static camera_config_t camera_config = {
     .xclk_freq_hz = 20000000,
     .pixel_format = PIXFORMAT_JPEG,
     .frame_size = FRAMESIZE_VGA,
-    .jpeg_quality = 12,
+    .jpeg_quality = 10,
     .fb_count = 2,
     .grab_mode = CAMERA_GRAB_WHEN_EMPTY
 };
@@ -87,8 +87,8 @@ esp_err_t camera_init(){
 void camera_task(void *pvParameters) {
 
   static int fps = 0;
-  static int16_t last_time;
-  int16_t curr_time;
+  static int64_t last_time;
+  int64_t curr_time;
 
   camera_fb_t * fb = NULL;
 
@@ -122,8 +122,8 @@ void camera_task(void *pvParameters) {
       esp_camera_fb_return(fb);
     }
 
-    // 15 FPS
-    vTaskDelay(pdMS_TO_TICKS(1000/14));
+    // 10 FPS
+    vTaskDelay(pdMS_TO_TICKS(1000/10));
   }
 
 }
