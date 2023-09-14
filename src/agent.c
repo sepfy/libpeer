@@ -31,6 +31,8 @@ static int agent_create_bind_addr(Agent *agent, Address *serv_addr) {
   StunMessage recv_msg;
   UdpSocket udp_socket;
   udp_socket_open(&udp_socket);
+  // blocking 5s
+  udp_blocking_timeout(&udp_socket, 5000);
 
   memset(&send_msg, 0, sizeof(send_msg));
 
@@ -74,7 +76,8 @@ static int agent_create_turn_addr(Agent *agent, Address *serv_addr, const char *
   StunMessage recv_msg;
   UdpSocket udp_socket;
   udp_socket_open(&udp_socket);
-
+  // blocking 5s
+  udp_blocking_timeout(&udp_socket, 5000);
   memset(&send_msg, 0, sizeof(send_msg));
   stun_msg_create(&send_msg, STUN_METHOD_ALLOCATE);
   stun_msg_write_attr(&send_msg, STUN_ATTR_REQUESTED_TRANSPORT, sizeof(attr), (char*)&attr); // UDP
@@ -92,11 +95,10 @@ static int agent_create_turn_addr(Agent *agent, Address *serv_addr, const char *
     memset(&recv_msg, 0, sizeof(recv_msg));
     ret = udp_socket_recvfrom(&udp_socket, serv_addr, recv_msg.buf, sizeof(recv_msg.buf));
 
-    if (ret == -1) {
-      LOGD("Failed to receive STUN Binding Response.");
+    if (ret <= 0) {
+      LOGE("Failed to receive STUN Binding Response.");
       break;
     }
-
     stun_parse_msg_buf(&recv_msg);
 
     if (recv_msg.stunclass == STUN_CLASS_ERROR && recv_msg.stunmethod == STUN_METHOD_ALLOCATE) {
