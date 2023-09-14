@@ -212,6 +212,7 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
   // prepare outgoing packet
   memset(sctp->buf, 0, sizeof(sctp->buf));
 
+  // chunks
   while ((4*(pos + 3)/4) < len) {
 
     chunk_common = (SctpChunkCommon*)(buf + pos);
@@ -219,8 +220,8 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
     switch (chunk_common->type) {
 
       case SCTP_DATA:
-        LOGD("SCTP_DATA");
-        data_chunk = (SctpDataChunk*)in_packet->chunks;
+        data_chunk = (SctpDataChunk*)(buf + pos);
+        LOGI("SCTP_DATA. ppid = %ld", ntohl(data_chunk->ppid));
 
         if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_CONTROL && data_chunk->data[0] == DATA_CHANNEL_OPEN) {
 

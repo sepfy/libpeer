@@ -9,7 +9,8 @@ struct UdpSocket {
 
   int fd;
   Address bind_addr;
-  uint64_t timeout;
+  long long int timeout_sec;
+  long int timeout_usec;
 };
 
 int udp_socket_open(UdpSocket *udp_socket);
@@ -25,6 +26,8 @@ int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, uint8_t *buf, int 
 int udp_socket_get_host_address(UdpSocket *udp_socket, Address *addr);
 
 int udp_resolve_mdns_host(const char *host, Address *addr);
+
+void udp_blocking_timeout(UdpSocket *udp_socket, long long int ms);
 
 #endif // UDP_SOCKET_H_
 

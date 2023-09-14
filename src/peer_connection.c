@@ -224,7 +224,11 @@ int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t l
     return -1;
   }
 
-  return buffer_push_tail(pc->data_rb, (const uint8_t*)message, len);
+  if (buffer_push_tail(pc->data_rb, (const uint8_t*)message, len) < 0) {
+    buffer_clear(pc->data_rb);
+  }
+
+  return 0;
 }
 
 static void peer_connection_state_new(PeerConnection *pc) {

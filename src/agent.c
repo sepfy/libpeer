@@ -31,7 +31,6 @@ static int agent_create_bind_addr(Agent *agent, Address *serv_addr) {
   StunMessage recv_msg;
   UdpSocket udp_socket;
   udp_socket_open(&udp_socket);
-  udp_socket.timeout = 5000;
 
   memset(&send_msg, 0, sizeof(send_msg));
 
@@ -75,7 +74,6 @@ static int agent_create_turn_addr(Agent *agent, Address *serv_addr, const char *
   StunMessage recv_msg;
   UdpSocket udp_socket;
   udp_socket_open(&udp_socket);
-  udp_socket.timeout = 5000;
 
   memset(&send_msg, 0, sizeof(send_msg));
   stun_msg_create(&send_msg, STUN_METHOD_ALLOCATE);

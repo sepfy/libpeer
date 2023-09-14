@@ -14,6 +14,12 @@
 #include "utils.h"
 #include "udp.h"
 
+void udp_blocking_timeout(UdpSocket *udp_socket, long long int ms) {
+
+  udp_socket->timeout_sec = ms/1000;
+  udp_socket->timeout_usec = ms%1000*1000;
+}
+
 int udp_socket_open(UdpSocket *udp_socket) {
 
   udp_socket->fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -26,7 +32,7 @@ int udp_socket_open(UdpSocket *udp_socket) {
 
   //int flags = fcntl(udp_socket->fd, F_GETFL, 0);
   //fcntl(udp_socket->fd, F_SETFL, flags | O_NONBLOCK);
-  udp_socket->timeout = 1;
+  udp_blocking_timeout(udp_socket, 5);
   return 0;
 }
 
@@ -107,8 +113,8 @@ int udp_socket_sendto(UdpSocket *udp_socket, Address *addr, const uint8_t *buf, 
   FD_ZERO(&write_set);
   FD_SET(udp_socket->fd, &write_set);
 
-  tv.tv_sec = udp_socket->timeout/1000;
-  tv.tv_usec = udp_socket->timeout%1000*1000;
+  tv.tv_sec = udp_socket->timeout_sec;
+  tv.tv_usec = udp_socket->timeout_usec;
   sin.sin_family = AF_INET;
 
   memcpy(&sin.sin_addr.s_addr, addr->ipv4, 4);
@@ -154,8 +160,8 @@ int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, uint8_t *buf, int 
 
   FD_ZERO(&read_set);
   FD_SET(udp_socket->fd, &read_set);
-  tv.tv_sec = udp_socket->timeout/1000;
-  tv.tv_usec = udp_socket->timeout%1000*1000;
+  tv.tv_sec = udp_socket->timeout_sec;
+  tv.tv_usec = udp_socket->timeout_usec;
 
   socklen_t sin_len = sizeof(sin);
 
