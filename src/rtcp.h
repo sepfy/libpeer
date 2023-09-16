@@ -1,5 +1,5 @@
-#ifndef RTCP_PACKET_H_
-#define RTCP_PACKET_H_
+#ifndef RTCP_H_
+#define RTCP_H_
 
 #include <stdint.h>
 #include <endian.h>
@@ -71,12 +71,12 @@ typedef struct RtcpFb {
 
 } RtcpFb;
 
-int rtcp_packet_validate(uint8_t *packet, size_t size);
+int rtcp_probe(uint8_t *packet, size_t size);
 
-int rtcp_packet_get_pli(uint8_t *packet, int len, uint32_t ssrc);
+int rtcp_get_pli(uint8_t *packet, int len, uint32_t ssrc);
 
-int rtcp_packet_get_fir(uint8_t *packet, int len, int *seqnr);
+int rtcp_get_fir(uint8_t *packet, int len, int *seqnr);
 
-RtcpRr rtcp_packet_parse_rr(uint8_t *packet);
+RtcpRr rtcp_parse_rr(uint8_t *packet);
 
-#endif // RTCP_PACKET_H_
+#endif // RTCP_H_

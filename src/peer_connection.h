@@ -66,7 +66,7 @@ typedef struct PeerConfiguration {
 
   void (*onaudiotrack)(uint8_t *data, size_t size, void *userdata);
   void (*onvideotrack)(uint8_t *data, size_t size, void *userdata);
-
+  void (*on_request_keyframe)();
   void *user_data;
 
 } PeerConfiguration;

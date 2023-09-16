@@ -8,7 +8,7 @@
 #include "sdp.h"
 #include "config.h"
 #include "rtp.h"
-#include "rtcp_packet.h"
+#include "rtcp.h"
 #include "buffer.h"
 #include "ports.h"
 #include "peer_connection.h"
@@ -97,21 +97,42 @@ static int peer_connection_dtls_srtp_send(void *ctx, const uint8_t *buf, size_t 
 
 static void peer_connection_incoming_rtcp(PeerConnection *pc, uint8_t *buf, size_t len) {
 
-  RtcpHeader rtcp_header = {0};
-  memcpy(&rtcp_header, buf, sizeof(rtcp_header));
-  switch(rtcp_header.type) {
-    case RTCP_RR:
-      if(rtcp_header.rc > 0) {
-        RtcpRr rtcp_rr = rtcp_packet_parse_rr(buf);
-        uint32_t fraction = ntohl(rtcp_rr.report_block[0].flcnpl) >> 24;
-        uint32_t total = ntohl(rtcp_rr.report_block[0].flcnpl) & 0x00FFFFFF;
-        if(pc->on_receiver_packet_loss && fraction > 0) {
-          pc->on_receiver_packet_loss((float)fraction/256.0, total, pc->config.user_data);
+  RtcpHeader *rtcp_header;
+  size_t pos = 0;
+
+  while (pos < len) {
+
+    rtcp_header = (RtcpHeader*)(buf + pos);
+
+    switch(rtcp_header->type) {
+      case RTCP_RR:
+        LOGD("RTCP_PR");
+        if(rtcp_header->rc > 0) {
+// TODO: REMB, GCC ...etc
+#if 0
+          RtcpRr rtcp_rr = rtcp_parse_rr(buf);
+          uint32_t fraction = ntohl(rtcp_rr.report_block[0].flcnpl) >> 24;
+          uint32_t total = ntohl(rtcp_rr.report_block[0].flcnpl) & 0x00FFFFFF;
+          if(pc->on_receiver_packet_loss && fraction > 0) {
+
+            pc->on_receiver_packet_loss((float)fraction/256.0, total, pc->config.user_data);
+          }
+#endif
         }
+        break;
+      case RTCP_PSFB: {
+        int fmt = rtcp_header->rc;
+        LOGD("RTCP_PSFB %d", fmt);
+        // PLI and FIR
+        if ((fmt == 1 || fmt == 4) && pc->config.on_request_keyframe) {
+            pc->config.on_request_keyframe();
+        } 
       }
-      break;
-    default:
-      break;
+      default:
+        break;
+    }
+
+    pos += 4*ntohs(rtcp_header->length) + 4;
   }
 }
 
@@ -376,7 +397,7 @@ int peer_connection_loop(PeerConnection *pc) {
       if ((pc->agent_ret = agent_recv(&pc->agent, pc->agent_buf, sizeof(pc->agent_buf))) > 0) {
         LOGD("agent_recv %d", pc->agent_ret);
 
-        if (rtcp_packet_validate(pc->agent_buf, pc->agent_ret)) {
+        if (rtcp_probe(pc->agent_buf, pc->agent_ret)) {
           LOGD("Got RTCP packet");
           dtls_srtp_decrypt_rtcp_packet(&pc->dtls_srtp, pc->agent_buf, &pc->agent_ret);
           peer_connection_incoming_rtcp(pc, pc->agent_buf, pc->agent_ret);
@@ -402,6 +423,8 @@ int peer_connection_loop(PeerConnection *pc) {
             rtp_decoder_decode(&pc->vrtp_decoder, pc->agent_buf, pc->agent_ret);
           }
 
+        } else {
+          LOGW("Unknown data");
         }
 
       }
@@ -468,7 +491,7 @@ int peer_connection_send_rtcp_pil(PeerConnection *pc, uint32_t ssrc) {
 
   int ret = -1;
   uint8_t plibuf[128];
-  rtcp_packet_get_pli(plibuf, 12, ssrc);
+  rtcp_get_pli(plibuf, 12, ssrc);
  
   //TODO: encrypt rtcp packet
   //guint size = 12;
