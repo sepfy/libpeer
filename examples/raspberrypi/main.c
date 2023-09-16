@@ -66,7 +66,6 @@ static GstFlowReturn on_video_data(GstElement *sink, void *data) {
 
     buffer = gst_sample_get_buffer(sample);
     gst_buffer_map(buffer, &info, GST_MAP_READ);
-
     peer_connection_send_video(g_pc, info.data, info.size);
 
     gst_buffer_unmap(buffer, &info);
@@ -117,6 +116,11 @@ static void onmessasge(char *msg, size_t len, void *user_data) {
     printf(", send pong\n");
     peer_connection_datachannel_send(g_pc, "pong", 4);
   }
+}
+
+static void on_request_keyframe() {
+
+  printf("request keyframe\n");
 }
 
 static void signal_handler(int signal) {
@@ -180,9 +184,21 @@ int main(int argc, char *argv[]) {
 
   signal(SIGINT, signal_handler);
 
-  PeerOptions options = { .datachannel = DATA_CHANNEL_STRING, .video_codec = CODEC_H264, .audio_codec = CODEC_PCMA };
+  PeerConfiguration config = {
+   .ice_servers = {
+    { .urls = "stun:stun.l.google.com:19302" },
+   },
+   .datachannel = DATA_CHANNEL_STRING,
+   .video_codec = CODEC_H264,
+   .audio_codec = CODEC_PCMA,
+   .on_request_keyframe = on_request_keyframe
+  };
 
-  
+  if (argc < 2) {
+    printf("usage: %s <cacert>\n", argv[0]);
+    return 0;
+  }
+
   strcpy(device_id, "rpi-");
   get_hwaddr(device_id + 4, sizeof(device_id) - 4);
   printf("open https://sepfy.github.io/webrtc?deviceId=%s\n", device_id);
@@ -205,11 +221,11 @@ int main(int argc, char *argv[]) {
 
   peer_init();
 
-  g_pc = peer_connection_create(&options, NULL); 
+  g_pc = peer_connection_create(&config);
   peer_connection_oniceconnectionstatechange(g_pc, onconnectionstatechange);
   peer_connection_ondatachannel(g_pc, onmessasge, onopen, onclose);
 
-  peer_signaling_join_channel(device_id, g_pc);
+  peer_signaling_join_channel(device_id, g_pc, argv[1]);
 
   pthread_create(&peer_connection_thread, NULL, peer_connection_task, NULL);
   pthread_create(&peer_singaling_thread, NULL, peer_singaling_task, NULL);
