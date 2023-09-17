@@ -17,6 +17,41 @@ extern PeerConnectionState eState;
 extern int get_timestamp();
 static const char *TAG = "Camera";
 
+#if defined(CONFIG_ESP32S3_XIAO_SENSE)
+#define CAM_PIN_PWDN -1
+#define CAM_PIN_RESET -1
+#define CAM_PIN_XCLK 10
+#define CAM_PIN_SIOD 40
+#define CAM_PIN_SIOC 39
+#define CAM_PIN_D7 48
+#define CAM_PIN_D6 11
+#define CAM_PIN_D5 12
+#define CAM_PIN_D4 14
+#define CAM_PIN_D3 16
+#define CAM_PIN_D2 18
+#define CAM_PIN_D1 17
+#define CAM_PIN_D0 15
+#define CAM_PIN_VSYNC 38
+#define CAM_PIN_HREF 47
+#define CAM_PIN_PCLK 13
+#elif defined(CONFIG_ESP32_M5STACK_CAMERA_B)
+#define CAM_PIN_PWDN -1
+#define CAM_PIN_RESET 15
+#define CAM_PIN_XCLK 27
+#define CAM_PIN_SIOD 22
+#define CAM_PIN_SIOC 23
+#define CAM_PIN_D7 19
+#define CAM_PIN_D6 36
+#define CAM_PIN_D5 18
+#define CAM_PIN_D4 39
+#define CAM_PIN_D3 5
+#define CAM_PIN_D2 34
+#define CAM_PIN_D1 35
+#define CAM_PIN_D0 32
+#define CAM_PIN_VSYNC 25
+#define CAM_PIN_HREF 26
+#define CAM_PIN_PCLK 21
+#else // ESP32-EYE
 #define CAM_PIN_PWDN -1
 #define CAM_PIN_RESET -1
 #define CAM_PIN_XCLK 4
@@ -33,6 +68,7 @@ static const char *TAG = "Camera";
 #define CAM_PIN_VSYNC 5
 #define CAM_PIN_HREF 27
 #define CAM_PIN_PCLK 25
+#endif
 
 static camera_config_t camera_config = {
 
@@ -63,16 +99,6 @@ static camera_config_t camera_config = {
 };
 
 esp_err_t camera_init(){
-
-    gpio_config_t conf;
-    conf.mode = GPIO_MODE_INPUT;
-    conf.pull_up_en = GPIO_PULLUP_ENABLE;
-    conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    conf.intr_type = GPIO_INTR_DISABLE;
-    conf.pin_bit_mask = 1LL << 13;
-    gpio_config(&conf); 
-    conf.pin_bit_mask = 1LL << 14;
-    gpio_config(&conf);
 
     //initialize the camera
     esp_err_t err = esp_camera_init(&camera_config);

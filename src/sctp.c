@@ -221,7 +221,7 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
 
       case SCTP_DATA:
         data_chunk = (SctpDataChunk*)(buf + pos);
-        LOGI("SCTP_DATA. ppid = %ld", ntohl(data_chunk->ppid));
+        LOGD("SCTP_DATA. ppid = %ld", ntohl(data_chunk->ppid));
 
         if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_CONTROL && data_chunk->data[0] == DATA_CHANNEL_OPEN) {
 

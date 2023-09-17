@@ -1,5 +1,18 @@
 menu "Example Configuration"
 
+    choice ESP32_CAMERA_MODEL
+        prompt "Camera model"
+        default ESP32_EYE
+        help
+            Select the camera model to use.
+        config ESP32_EYE
+            bool "ESP32-EYE"
+        config ESP32_M5STACK_CAMERA_B
+            bool "M5STACK-CAMERA-B"
+        config ESP32S3_XIAO_SENSE
+            bool "ESP32S3-XIAO-SENSE"
+    endchoice
+
     config BROKER_URI
         string "Broker URL"
         default "mqtts://mqtt.eclipseprojects.io:8883"

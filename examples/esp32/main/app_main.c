@@ -121,13 +121,14 @@ void app_main(void) {
 
     camera_init();
 
-    audio_init();
-
     g_pc = peer_connection_create(&config);
     peer_connection_oniceconnectionstatechange(g_pc, oniceconnectionstatechange);
     peer_connection_ondatachannel(g_pc, onmessasge, onopen, onclose);
 
+#ifdef CONFIG_ESP32_EYE
+    audio_init();
     xTaskCreatePinnedToCore(audio_task, "audio", 4096, NULL, 5, &xAudioTaskHandle, 0);
+#endif
 
     xTaskCreatePinnedToCore(camera_task, "camera", 4096, NULL, 6, &xCameraTaskHandle, 0);
 
