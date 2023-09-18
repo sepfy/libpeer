@@ -91,6 +91,7 @@ struct RtpEncoder {
   uint16_t seq_number;
   uint32_t ssrc;
   uint32_t timestamp;
+  uint32_t timestamp_increment;
   uint8_t buf[CONFIG_MTU + 1];
 };
 

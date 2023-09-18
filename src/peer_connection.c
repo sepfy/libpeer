@@ -308,6 +308,13 @@ static void peer_connection_state_new(PeerConnection *pc) {
       sdp_append(&pc->local_sdp, "a=setup:actpass");
       strcat(pc->local_sdp.content, description);
       break;
+
+    case CODEC_OPUS:
+      sdp_append_opus(&pc->local_sdp);
+      sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
+      sdp_append(&pc->local_sdp, "a=setup:actpass");
+      strcat(pc->local_sdp.content, description);
+
     default:
       break;
   }

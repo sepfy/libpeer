@@ -65,6 +65,17 @@ void sdp_append_pcmu(Sdp *sdp) {
   sdp_append(sdp, "a=rtcp-mux");
 }
 
+void sdp_append_opus(Sdp *sdp) {
+
+  sdp_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 111");
+  sdp_append(sdp, "a=rtpmap:111 opus/48000/2");
+  sdp_append(sdp, "a=ssrc:6 cname:webrtc-opus");
+  sdp_append(sdp, "a=sendrecv");
+  sdp_append(sdp, "a=mid:audio");
+  sdp_append(sdp, "c=IN IP4 0.0.0.0");
+  sdp_append(sdp, "a=rtcp-mux");
+}
+
 void sdp_append_datachannel(Sdp *sdp) {
 
   sdp_append(sdp, "m=application 50712 UDP/DTLS/SCTP webrtc-datachannel");

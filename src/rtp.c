@@ -77,7 +77,7 @@ static int rtp_encoder_encode_h264_fu_a(RtpEncoder *rtp_encoder, uint8_t *buf, s
   rtp_packet->header.seq_number = htons(rtp_encoder->seq_number++);
   rtp_packet->header.timestamp = htonl(rtp_encoder->timestamp);
   rtp_packet->header.ssrc = htonl(rtp_encoder->ssrc);
-  rtp_encoder->timestamp += 90000/25; // 25 FPS.
+  rtp_encoder->timestamp += rtp_encoder->timestamp_increment;
 
   uint8_t type = buf[0] & 0x1f;
   uint8_t nri = (buf[0] & 0x60) >> 5;
@@ -173,7 +173,7 @@ static int rtp_encoder_encode_generic(RtpEncoder *rtp_encoder, uint8_t *buf, siz
   rtp_header->markerbit = 0;
   rtp_header->type = rtp_encoder->type;
   rtp_header->seq_number = htons(rtp_encoder->seq_number++);
-  rtp_encoder->timestamp += size; // 8000 HZ. 
+  rtp_encoder->timestamp += rtp_encoder->timestamp_increment;
   rtp_header->timestamp = htonl(rtp_encoder->timestamp);
   rtp_header->ssrc = htonl(rtp_encoder->ssrc);
   memcpy(rtp_encoder->buf + sizeof(RtpHeader), buf, size);
@@ -195,16 +195,24 @@ void rtp_encoder_init(RtpEncoder *rtp_encoder, MediaCodec codec, RtpOnPacket on_
     case CODEC_H264:
       rtp_encoder->type = PT_H264;
       rtp_encoder->ssrc = SSRC_H264;
+      rtp_encoder->timestamp_increment = 90000/30; // 25 FPS.
       rtp_encoder->encode_func = rtp_encoder_encode_h264;
       break;
     case CODEC_PCMA:
       rtp_encoder->type = PT_PCMA;
       rtp_encoder->ssrc = SSRC_PCMA;
+      rtp_encoder->timestamp_increment = AUDIO_LATENCY*8000/1000;
       rtp_encoder->encode_func = rtp_encoder_encode_generic;
       break;
     case CODEC_PCMU:
       rtp_encoder->type = PT_PCMU;
       rtp_encoder->ssrc = SSRC_PCMU;
+      rtp_encoder->timestamp_increment = AUDIO_LATENCY*8000/1000;
+      rtp_encoder->encode_func = rtp_encoder_encode_generic;
+    case CODEC_OPUS:
+      rtp_encoder->type = PT_OPUS;
+      rtp_encoder->ssrc = SSRC_OPUS;
+      rtp_encoder->timestamp_increment = AUDIO_LATENCY*48000/1000;
       rtp_encoder->encode_func = rtp_encoder_encode_generic;
     default:
       break;
@@ -235,9 +243,8 @@ void rtp_decoder_init(RtpDecoder *rtp_decoder, MediaCodec codec, RtpOnPacket on_
       rtp_decoder->decode_func = NULL;
       break;
     case CODEC_PCMA:
-      rtp_decoder->decode_func = rtp_decode_generic;
-      break;
     case CODEC_PCMU:
+    case CODEC_OPUS:
       rtp_decoder->decode_func = rtp_decode_generic;
     default:
       break;

@@ -10,8 +10,9 @@ libpeer is a WebRTC implementation written in C, developed with BSD socket. The 
   - H264
   - G.711 PCM (A-law)
   - G.711 PCM (µ-law)
+  - OPUS
 - DataChannel
-- STUN
+- STUN/TURN
 - Signaling
 
 ### Dependencies
