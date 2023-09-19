@@ -92,7 +92,7 @@ struct RtpEncoder {
   uint32_t ssrc;
   uint32_t timestamp;
   uint32_t timestamp_increment;
-  uint8_t buf[CONFIG_MTU + 1];
+  uint8_t buf[CONFIG_MTU + 128];
 };
 
 int rtp_packet_validate(uint8_t *packet, size_t size);
