@@ -91,56 +91,68 @@ void ice_candidate_to_description(IceCandidate *candidate, char *description, in
    typ_raddr);
 }
 
-int ice_candidate_from_description(IceCandidate *candidate, char *description) {
+int ice_candidate_from_description(IceCandidate *candidate, char *description, char *end) {
 
-  char type[16];
+  char *split_start = description + strlen("a=candidate:");
+  char *split_end = NULL;
+  int index = 0;
+  char buf[64];
+  // a=candidate:448736988 1 udp 2122260223 172.17.0.1 49250 typ host generation 0 network-id 1 network-cost 50
+  // a=candidate:udpcandidate 1 udp 120 192.168.1.102 8000 typ host
+  while ((split_end = strstr(split_start, " ")) != NULL && split_start < end) {
 
-  if (strstr(description, "local") != 0) {
+    memset(buf, 0, sizeof(buf));
+    strncpy(buf, split_start, split_end - split_start);
+    switch (index) {
 
-    // test for mDNS
-    char mdns[64];
-    sscanf(description, "a=candidate:%d %d %s %" SCNu32 " %s %hd typ %s",
-     &candidate->foundation,
-     &candidate->component,
-     candidate->transport,
-     &candidate->priority,
-     mdns,
-     &candidate->addr.port, type);
+      case 0:
+        candidate->foundation = atoi(buf);
+        break;
+      case 1:
+        candidate->component = atoi(buf);
+        break;
+      case 2:
+        if (strstr(buf, "UDP") == 0 && strstr(buf, "udp") == 0) {
+          // Only accept UDP candidates
+          return -1;
+        }
+        strncpy(candidate->transport, buf, strlen(buf));
+        break;
+      case 3:
+        candidate->priority = atoi(buf);
+        break;
+      case 4:
+        if (strstr(buf, "local") != 0) {
+          char mdns[64];
+          ports_resolve_mdns_host(mdns, &candidate->addr);
+          LOGD("mDNS host: %s, ip: %d.%d.%d.%d", mdns, candidate->addr.ipv4[0], candidate->addr.ipv4[1], candidate->addr.ipv4[2], candidate->addr.ipv4[3]);
+        } else if (!addr_ipv4_validate(buf, strlen(buf), &candidate->addr)) {
+          LOGW("Unknow address");
+          return -1;
+        }
+        break;
+      case 5:
+        candidate->addr.port = atoi(buf);
+        break;
+      case 7:
 
-    ports_resolve_mdns_host(mdns, &candidate->addr);
-    LOGD("mDNS host: %s, ip: %d.%d.%d.%d", mdns, candidate->addr.ipv4[0], candidate->addr.ipv4[1], candidate->addr.ipv4[2], candidate->addr.ipv4[3]);
+        if (strncmp(buf, "host", 4) == 0) {
+          candidate->type = ICE_CANDIDATE_TYPE_HOST;
+        } else if (strncmp(buf, "srflx", 5) == 0) {
+          candidate->type = ICE_CANDIDATE_TYPE_SRFLX;
+        } else if (strncmp(buf, "relay", 5) == 0) {
+          candidate->type = ICE_CANDIDATE_TYPE_RELAY;
+        } else {
+          LOGE("Unknown candidate type: %s", buf);
+          return -1;
+        }
+        break;
+      default:
+        break;
+    }
 
-  } else if (strstr(description, "UDP") == 0 && strstr(description, "udp") == 0) {
-    // Only accept UDP candidates
-    return -1;
-  } else if (sscanf(description, "a=candidate:%d %d %s %" SCNu32 " %hhu.%hhu.%hhu.%hhu %hd typ %s",
-   &candidate->foundation,
-   &candidate->component,
-   candidate->transport,
-   &candidate->priority,
-   &candidate->addr.ipv4[0],
-   &candidate->addr.ipv4[1],
-   &candidate->addr.ipv4[2],
-   &candidate->addr.ipv4[3],
-   &candidate->addr.port,
-   type) != 10) {
-
-    LOGE("Failed to parse candidate description: %s", description);
-    return -1;
-  }
-
-  if (strcmp(type, "host") == 0) {
-
-    candidate->type = ICE_CANDIDATE_TYPE_HOST;
-
-  } else if (strcmp(type, "srflx") == 0) {
-
-    candidate->type = ICE_CANDIDATE_TYPE_SRFLX;
-
-  } else {
-
-    LOGE("Unknown candidate type: %s", type);
-    return -1;
+    split_start = split_end + 1;
+    index++;
   }
 
   return 0;

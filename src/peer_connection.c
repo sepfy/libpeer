@@ -59,7 +59,7 @@ static void peer_connection_outgoing_rtp_packet(uint8_t *data, size_t size, void
 
 static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t len) {
 
-  static const int MAX_RECV = 10000;
+  static const int MAX_RECV = 200;
   int recv_max = 0; 
   int ret; 
   DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx; 
@@ -78,7 +78,7 @@ static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t 
     if (ret > 0) {
       break;
     }
-    usleep(1*1000);
+
     recv_max++;
 
   }
@@ -353,7 +353,10 @@ int peer_connection_loop(PeerConnection *pc) {
 
       agent_select_candidate_pair(&pc->agent);
 
-      if (agent_connectivity_check(&pc->agent)) {
+      if (!pc->agent.nominated_pair) {
+        STATE_CHANGED(pc, PEER_CONNECTION_FAILED);
+
+      } else if (agent_connectivity_check(&pc->agent)) {
 
         LOGD("Connectivity check success. pair: %p", pc->agent.nominated_pair);
 

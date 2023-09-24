@@ -70,7 +70,7 @@ void ice_candidate_create(IceCandidate *ice_candidate, int foundation, IceCandid
 
 void ice_candidate_to_description(IceCandidate *candidate, char *description, int length);
 
-int ice_candidate_from_description(IceCandidate *candidate, char *description);
+int ice_candidate_from_description(IceCandidate *candidate, char *description, char *end);
 
 int ice_candidate_get_local_address(IceCandidate *candidate, Address *address);
 

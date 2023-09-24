@@ -343,7 +343,7 @@ a=candidate:1 1 UDP 1 36.231.28.50 38143 typ srflx
 
     } else if (strncmp(line_start, "a=candidate:", strlen("a=candidate:")) == 0) {
 
-      if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], line_start) == 0) {
+      if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], line_start, line_end) == 0) {
         agent->remote_candidates_count++;
       }
     }
