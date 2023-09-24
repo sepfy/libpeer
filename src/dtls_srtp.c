@@ -168,9 +168,12 @@ int dtls_srtp_init(DtlsSrtp *dtls_srtp, DtlsSrtpRole role, void *user_data) {
 
   dtls_srtp_selfsign_cert(dtls_srtp);
 
+// XXX: Not sure if this is needed
+#if 0
   mbedtls_ssl_conf_verify(&dtls_srtp->conf, dtls_srtp_cert_verify, NULL);
 
   mbedtls_ssl_conf_authmode(&dtls_srtp->conf, MBEDTLS_SSL_VERIFY_REQUIRED);
+#endif
 
   mbedtls_ssl_conf_ca_chain(&dtls_srtp->conf, &dtls_srtp->cert, NULL);
 
@@ -423,8 +426,6 @@ int dtls_srtp_handshake(DtlsSrtp *dtls_srtp, Address *addr) {
 
   int ret;
 
-  const mbedtls_x509_crt *remote_crt;
-
   dtls_srtp->remote_addr = addr;
 
   if (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) {
@@ -437,6 +438,9 @@ int dtls_srtp_handshake(DtlsSrtp *dtls_srtp, Address *addr) {
 
   }
 
+// XXX: Not sure if this is needed
+#if 0
+  const mbedtls_x509_crt *remote_crt;
   if ((remote_crt = mbedtls_ssl_get_peer_cert(&dtls_srtp->ssl)) != NULL) {
 
     dtls_srtp_x509_digest(remote_crt, dtls_srtp->remote_fingerprint);
@@ -446,8 +450,8 @@ int dtls_srtp_handshake(DtlsSrtp *dtls_srtp, Address *addr) {
   } else {
 
     LOGE("no remote fingerprint");
-
   }
+#endif
 
   mbedtls_dtls_srtp_info dtls_srtp_negotiation_result;
   mbedtls_ssl_get_dtls_srtp_negotiation_result(&dtls_srtp->ssl, &dtls_srtp_negotiation_result);
