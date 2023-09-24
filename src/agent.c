@@ -80,7 +80,7 @@ static int agent_create_turn_addr(Agent *agent, Address *serv_addr, const char *
   udp_blocking_timeout(&udp_socket, 5000);
   memset(&send_msg, 0, sizeof(send_msg));
   stun_msg_create(&send_msg, STUN_METHOD_ALLOCATE);
-  stun_msg_write_attr(&send_msg, STUN_ATTR_REQUESTED_TRANSPORT, sizeof(attr), (char*)&attr); // UDP
+  stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REQUESTED_TRANSPORT, sizeof(attr), (char*)&attr); // UDP
   stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_USERNAME, strlen(username), (char*)username);
 
   do {
@@ -105,7 +105,7 @@ static int agent_create_turn_addr(Agent *agent, Address *serv_addr, const char *
 
       memset(&send_msg, 0, sizeof(send_msg));
       stun_msg_create(&send_msg, STUN_METHOD_ALLOCATE);
-      stun_msg_write_attr(&send_msg, STUN_ATTR_REQUESTED_TRANSPORT, sizeof(attr), (char*)&attr); // UDP
+      stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REQUESTED_TRANSPORT, sizeof(attr), (char*)&attr); // UDP
       stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_USERNAME, strlen(username), (char*)username);
       stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_NONCE, strlen(recv_msg.nonce), recv_msg.nonce);
       stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REALM, strlen(recv_msg.realm), recv_msg.realm);
@@ -192,8 +192,8 @@ void agent_get_local_description(Agent *agent, char *description, int length) {
   memset(agent->local_ufrag, 0, sizeof(agent->local_ufrag));
   memset(agent->local_upwd, 0, sizeof(agent->local_upwd));
 
-  utils_random_string(agent->local_ufrag, ICE_UFRAG_LENGTH);
-  utils_random_string(agent->local_upwd, ICE_UPWD_LENGTH);
+  utils_random_string(agent->local_ufrag, 4);
+  utils_random_string(agent->local_upwd, 24);
 
   snprintf(description, length, "a=ice-ufrag:%s\na=ice-pwd:%s\n", agent->local_ufrag, agent->local_upwd);
   ncandidates = agent->local_candidates_count;
@@ -238,7 +238,7 @@ void agent_process_stun_request(Agent *agent, StunMessage *stun_msg) {
         header = (StunHeader *)msg.buf;
         memcpy(header->transaction_id, agent->transaction_id, sizeof(header->transaction_id));
  
-        char username[64];
+        char username[584];
 
         snprintf(username, sizeof(username), "%s:%s", agent->local_ufrag, agent->remote_ufrag);
 
@@ -247,7 +247,7 @@ void agent_process_stun_request(Agent *agent, StunMessage *stun_msg) {
         stun_set_mapped_address(mapped_address, NULL, &agent->nominated_pair->remote->addr);
         stun_msg_write_attr(&msg, STUN_ATTR_TYPE_MAPPED_ADDRESS, 8, mapped_address);
         stun_msg_write_attr(&msg, STUN_ATTR_TYPE_USERNAME, strlen(username), username);
-        stun_msg_finish(&msg, STUN_CREDENTIAL_SHORT_TERM, agent->local_upwd, ICE_UPWD_LENGTH);
+        stun_msg_finish(&msg, STUN_CREDENTIAL_SHORT_TERM, agent->local_upwd, strlen(agent->local_upwd));
 
         udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
         agent->binding_request_time = utils_get_timestamp();
@@ -328,26 +328,27 @@ a=candidate:1 1 UDP 1 36.231.28.50 38143 typ srflx
 
   LOGD("Set remote description:\n%s", description);
 
-  char *line = strtok(description, "\r\n");
+  char *line_start = description;
+  char *line_end = NULL;
 
-  while (line) {
+  while ((line_end = strstr(line_start, "\r\n")) != NULL) {
 
-    if (strncmp(line, "a=ice-ufrag:", strlen("a=ice-ufrag:")) == 0) {
+    if (strncmp(line_start, "a=ice-ufrag:", strlen("a=ice-ufrag:")) == 0) {
 
-      memcpy(agent->remote_ufrag, line + strlen("a=ice-ufrag:"), ICE_UFRAG_LENGTH);
+      strncpy(agent->remote_ufrag, line_start + strlen("a=ice-ufrag:"), line_end - line_start - strlen("a=ice-ufrag:"));
 
-    } else if (strncmp(line, "a=ice-pwd:", strlen("a=ice-pwd:")) == 0) {
+    } else if (strncmp(line_start, "a=ice-pwd:", strlen("a=ice-pwd:")) == 0) {
 
-      memcpy(agent->remote_upwd, line + strlen("a=ice-pwd:"), ICE_UPWD_LENGTH);
+      strncpy(agent->remote_upwd, line_start + strlen("a=ice-pwd:"), line_end - line_start - strlen("a=ice-pwd:"));
 
-    } else if (strncmp(line, "a=candidate:", strlen("a=candidate:")) == 0) {
+    } else if (strncmp(line_start, "a=candidate:", strlen("a=candidate:")) == 0) {
 
-      if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], line) == 0) {
+      if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], line_start) == 0) {
         agent->remote_candidates_count++;
       }
     }
 
-    line = strtok(NULL, "\r\n");
+    line_start = line_end + 2;
   }
 
   LOGD("remote ufrag: %s", agent->remote_ufrag);
@@ -379,14 +380,16 @@ int agent_connectivity_check(Agent *agent) {
     agent_recv(agent, buf, sizeof(buf));
 
     stun_msg_create(&msg, STUN_CLASS_REQUEST | STUN_METHOD_BINDING);
-    char username[64];
+    char username[584];
     memset(username, 0, sizeof(username));
     snprintf(username, sizeof(username), "%s:%s", agent->remote_ufrag, agent->local_ufrag);
 
     stun_msg_write_attr(&msg, STUN_ATTR_TYPE_USERNAME, strlen(username), username);
-    stun_msg_write_attr(&msg, STUN_ATTR_TYPE_PRIORITY, 4, (char *)&agent->nominated_pair->priority); 
+    stun_msg_write_attr(&msg, STUN_ATTR_TYPE_PRIORITY, 4, (char *)&agent->nominated_pair->priority);
+    uint64_t tie_breaker = utils_get_timestamp();
     stun_msg_write_attr(&msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
-    stun_msg_finish(&msg, STUN_CREDENTIAL_SHORT_TERM, agent->remote_upwd, ICE_UPWD_LENGTH);
+    stun_msg_write_attr(&msg, STUN_ATTR_TYPE_ICE_CONTROLLED, 8, (char *)&tie_breaker);
+    stun_msg_finish(&msg, STUN_CREDENTIAL_SHORT_TERM, agent->remote_upwd, strlen(agent->remote_upwd));
 
     LOGD("send binding request to remote ip: %d.%d.%d.%d, port: %d", agent->nominated_pair->remote->addr.ipv4[0], agent->nominated_pair->remote->addr.ipv4[1], agent->nominated_pair->remote->addr.ipv4[2], agent->nominated_pair->remote->addr.ipv4[3], agent->nominated_pair->remote->addr.port);
 

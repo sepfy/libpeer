@@ -494,12 +494,12 @@ int dtls_srtp_read(DtlsSrtp *dtls_srtp, unsigned char *buf, size_t len) {
   return ret;
 }
 
-int dtls_srtp_validate(uint8_t *buf) {
+int dtls_srtp_probe(uint8_t *buf) {
 
   if(buf == NULL)
     return 0;
 
-  LOGD("DTLS content type: %d, version: %d, epoch: %d, sequence: %d, length: %d (%.4x)", header->content_type, header->version, header->epoch, ntohs(header->seqnum_hi), ntohs(header->length), header->length);
+  //LOGD("DTLS content type: %d, version: %d, epoch: %d, sequence: %d, length: %d (%.4x)", header->content_type, header->version, header->epoch, ntohs(header->seqnum_hi), ntohs(header->length), header->length);
 
   return ((*buf >= 20) && (*buf <= 64));
 }

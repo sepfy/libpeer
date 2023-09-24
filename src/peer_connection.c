@@ -286,7 +286,7 @@ static void peer_connection_state_new(PeerConnection *pc) {
 
     sdp_append_h264(&pc->local_sdp);
     sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-    sdp_append(&pc->local_sdp, "a=setup:actpass");
+    sdp_append(&pc->local_sdp, "a=setup:passive");
     strcat(pc->local_sdp.content, description);
   }
 
@@ -297,7 +297,7 @@ static void peer_connection_state_new(PeerConnection *pc) {
 
       sdp_append_pcma(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-      sdp_append(&pc->local_sdp, "a=setup:actpass");
+      sdp_append(&pc->local_sdp, "a=setup:passive");
       strcat(pc->local_sdp.content, description);
       break;
 
@@ -305,14 +305,14 @@ static void peer_connection_state_new(PeerConnection *pc) {
 
       sdp_append_pcmu(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-      sdp_append(&pc->local_sdp, "a=setup:actpass");
+      sdp_append(&pc->local_sdp, "a=setup:passive");
       strcat(pc->local_sdp.content, description);
       break;
 
     case CODEC_OPUS:
       sdp_append_opus(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-      sdp_append(&pc->local_sdp, "a=setup:actpass");
+      sdp_append(&pc->local_sdp, "a=setup:passive");
       strcat(pc->local_sdp.content, description);
 
     default:
@@ -322,7 +322,7 @@ static void peer_connection_state_new(PeerConnection *pc) {
   if (pc->config.datachannel) {
     sdp_append_datachannel(&pc->local_sdp);
     sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-    sdp_append(&pc->local_sdp, "a=setup:actpass");
+    sdp_append(&pc->local_sdp, "a=setup:passive");
     strcat(pc->local_sdp.content, description);
   }
 
@@ -409,7 +409,7 @@ int peer_connection_loop(PeerConnection *pc) {
           dtls_srtp_decrypt_rtcp_packet(&pc->dtls_srtp, pc->agent_buf, &pc->agent_ret);
           peer_connection_incoming_rtcp(pc, pc->agent_buf, pc->agent_ret);
 
-        } else if (dtls_srtp_validate(pc->agent_buf)) {
+        } else if (dtls_srtp_probe(pc->agent_buf)) {
 
           int ret = dtls_srtp_read(&pc->dtls_srtp, pc->temp_buf, sizeof(pc->temp_buf));
           LOGD("Got DTLS data %d", ret);

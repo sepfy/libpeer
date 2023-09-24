@@ -7,8 +7,8 @@
 #include "address.h"
 #include "stun.h"
 
-#define ICE_UFRAG_LENGTH 4
-#define ICE_UPWD_LENGTH 24
+#define ICE_UFRAG_LENGTH 256
+#define ICE_UPWD_LENGTH 256
 
 typedef enum IceCandidateState {
 
