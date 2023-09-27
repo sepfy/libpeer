@@ -195,7 +195,7 @@ void agent_get_local_description(Agent *agent, char *description, int length) {
   utils_random_string(agent->local_ufrag, 4);
   utils_random_string(agent->local_upwd, 24);
 
-  snprintf(description, length, "a=ice-ufrag:%s\na=ice-pwd:%s\n", agent->local_ufrag, agent->local_upwd);
+  snprintf(description, length, "a=ice-ufrag:%s\r\na=ice-pwd:%s\r\n", agent->local_ufrag, agent->local_upwd);
   ncandidates = agent->local_candidates_count;
   // add host candidate
   for (i = 0; i < ncandidates; i++) {

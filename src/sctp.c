@@ -223,16 +223,13 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
         data_chunk = (SctpDataChunk*)(buf + pos);
         LOGD("SCTP_DATA. ppid = %ld", ntohl(data_chunk->ppid));
 
+// XXX: not check DATA_CHANNEL_OPEN?
+#if 0
         if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_CONTROL && data_chunk->data[0] == DATA_CHANNEL_OPEN) {
 
-          if (!sctp->connected) {
-            sctp->connected = 1;
-            if(sctp->onopen) {
-              sctp->onopen(sctp->userdata);
-            }
-          }
-
         } else if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_DOMSTRING) {
+#endif
+        if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_DOMSTRING) {
 
           if (sctp->onmessasge) {
             sctp->onmessasge((char*)data_chunk->data, ntohs(data_chunk->length) - sizeof(SctpDataChunk), sctp->userdata);
@@ -247,7 +244,6 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
         sack->a_rwnd = htonl(0x02);
         length = ntohs(sack->common.length) + sizeof(SctpHeader);
         pos = len; // Do not handle other msg
-
         break;
       case SCTP_INIT:
         LOGD("SCTP_INIT");
@@ -275,14 +271,14 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
         length = ntohs(init_ack->common.length) + sizeof(SctpHeader);
         break;
       case SCTP_SACK:
-
+#if 0
         LOGD("SCTP_SACK");
         sack = (SctpSackChunk*)in_packet->chunks;
-        LOGD("cumulative_tsn_ack %ld", ntohl(sack->cumulative_tsn_ack));
-        LOGD("a_rwnd %ld", ntohl(sack->a_rwnd));
+        LOGD("cumulative_tsn_ack %d", ntohl(sack->cumulative_tsn_ack));
+        LOGD("a_rwnd %d", ntohl(sack->a_rwnd));
         LOGD("number_of_gap_ack_blocks %d", sack->number_of_gap_ack_blocks);
         LOGD("number_of_dup_tsns %d", sack->number_of_dup_tsns);
-
+#endif
 // XXX: unordered sequence
 #if 0
         if (sack->number_of_gap_ack_blocks > 0) {
@@ -313,6 +309,14 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
         common->length = htons(4);
         length = ntohs(common->length) + sizeof(SctpHeader);
         pos = len; // Do not handle other msg
+
+        // XXX: Initiate the sctp association
+        if (!sctp->connected) {
+          sctp->connected = 1;
+          if(sctp->onopen) {
+            sctp->onopen(sctp->userdata);
+          }
+        }
         break;
       default:
         LOGI("Unknown chunk type %d", chunk_common->type);
@@ -347,12 +351,6 @@ static int sctp_handle_incoming_data(Sctp *sctp, char *data, size_t len, uint32_
   switch(ppid) {
     case DATA_CHANNEL_PPID_CONTROL:
 
-      sctp->connected = 1;
-
-      if(sctp->onopen) {
-        sctp->onopen(sctp->userdata);
-      }
-
       break;
     case DATA_CHANNEL_PPID_DOMSTRING:
 
@@ -378,18 +376,55 @@ static int sctp_handle_incoming_data(Sctp *sctp, char *data, size_t len, uint32_
 
 
 #ifdef HAVE_USRSCTP
+
+static void sctp_process_notification(Sctp *sctp, union sctp_notification *notification, size_t len) {
+
+
+ if(notification->sn_header.sn_length != (uint32_t)len) {
+   return;
+ }
+
+  switch (notification->sn_header.sn_type) {
+
+    case SCTP_ASSOC_CHANGE:
+
+      switch (notification->sn_assoc_change.sac_state) {
+
+        case SCTP_COMM_UP:
+
+          sctp->connected = 1;
+          if(sctp->onopen) {
+            sctp->onopen(sctp->userdata);
+          }
+
+          break;
+
+        case SCTP_COMM_LOST:
+          sctp->connected = 1;
+          if(sctp->onclose) {
+            sctp->onclose(sctp->userdata);
+          }
+        default:
+          break;
+      }
+      break;
+    default:
+      break;
+  }
+
+}
+
 static int sctp_incoming_data_cb(struct socket *sock, union sctp_sockstore addr,
  void *data, size_t len, struct sctp_rcvinfo recv_info, int flags, void *userdata) {
   Sctp *sctp = (Sctp*)userdata;
-  LOGD("Data of length %u received on stream %u with SSN %u, TSN %u, PPID %u\n",
+  LOGD("Data of length %u received on stream %u with SSN %u, TSN %u, PPID %u",
     (uint32_t)len,
     recv_info.rcv_sid,
     recv_info.rcv_ssn,
     recv_info.rcv_tsn,
     ntohl(recv_info.rcv_ppid));
-
   if(flags & MSG_NOTIFICATION) {
-    LOGI("MSG_NOTIFICATION");
+    sctp_process_notification(sctp, (union sctp_notification *)data, len);
   }
   else {
     sctp_handle_incoming_data(sctp, data, len, ntohl(recv_info.rcv_ppid), recv_info.rcv_sid, flags);
@@ -440,11 +475,32 @@ int sctp_create_socket(Sctp *sctp, DtlsSrtp *dtls_srtp) {
 
     struct sctp_assoc_value av;
     av.assoc_id = SCTP_ALL_ASSOC;
-    av.assoc_value = 1;
+    av.assoc_value = SCTP_ENABLE_RESET_STREAM_REQ | SCTP_ENABLE_CHANGE_ASSOC_REQ;
     usrsctp_setsockopt(sock, IPPROTO_SCTP, SCTP_ENABLE_STREAM_RESET, &av, sizeof(av));
 
     uint32_t nodelay = 1;
     usrsctp_setsockopt(sock, IPPROTO_SCTP, SCTP_NODELAY, &nodelay, sizeof(nodelay));
+
+    static uint16_t event_types[] = {
+      SCTP_ASSOC_CHANGE,
+      SCTP_PEER_ADDR_CHANGE,
+      SCTP_REMOTE_ERROR,
+      SCTP_SHUTDOWN_EVENT,
+      SCTP_ADAPTATION_INDICATION,
+      SCTP_SEND_FAILED_EVENT,
+      SCTP_SENDER_DRY_EVENT,
+      SCTP_STREAM_RESET_EVENT,
+      SCTP_STREAM_CHANGE_EVENT
+    };
+
+    struct sctp_event event;
+    memset(&event, 0, sizeof(event));
+    event.se_assoc_id = SCTP_ALL_ASSOC;
+    event.se_on = 1;
+    for(int i = 0; i < sizeof(event_types)/sizeof(uint16_t); i++) {
+        event.se_type = event_types[i];
+        usrsctp_setsockopt(sock, IPPROTO_SCTP, SCTP_EVENT, &event, sizeof(event));
+    }
 
     struct sctp_initmsg init_msg;
     memset(&init_msg, 0, sizeof init_msg);
