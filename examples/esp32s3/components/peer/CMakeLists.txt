@@ -1,0 +1,25 @@
+
+set(COREMQTT_CMAKE_FILE ${CMAKE_SOURCE_DIR}/../../third_party/coreMQTT/mqttFilePaths.cmake)
+set(COREHTTP_CMAKE_FILE ${CMAKE_SOURCE_DIR}/../../third_party/coreHTTP/httpFilePaths.cmake)
+set(PEER_PROJECT_PATH "../../../..")
+
+if (EXISTS ${COREHTTP_CMAKE_FILE})
+  include(${COREHTTP_CMAKE_FILE})
+endif()
+
+if (EXISTS ${COREMQTT_CMAKE_FILE})
+  include(${COREMQTT_CMAKE_FILE})
+endif()
+
+file(GLOB CODES "${PEER_PROJECT_PATH}/src/*.c")
+file(GLOB TRASNPORTS "${PEER_PROJECT_PATH}/src/transports/*.c")
+
+message({HTTP_INCLUDE_PUBLIC_DIRS} ${HTTP_INCLUDE_PUBLIC_DIRS})
+idf_component_register(
+  SRCS ${CODES} ${TRASNPORTS} ${HTTP_SOURCES} ${MQTT_SOURCES} ${MQTT_SERIALIZER_SOURCES}
+  INCLUDE_DIRS "${PEER_PROJECT_PATH}/src" "${PEER_PROJECT_PATH}/src/transports" ${HTTP_INCLUDE_PUBLIC_DIRS} ${MQTT_INCLUDE_PUBLIC_DIRS} 
+  REQUIRES mbedtls srtp json mdns
+)
+
+add_definitions("-DESP32 -DHTTP_DO_NOT_USE_CUSTOM_CONFIG -DMQTT_DO_NOT_USE_CUSTOM_CONFIG")
+
