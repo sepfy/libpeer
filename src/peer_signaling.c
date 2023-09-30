@@ -1,19 +1,21 @@
 #include <string.h>
 #include <signal.h>
 #include <assert.h>
-#include <cJSON.h>
 #include <unistd.h>
+#include <cJSON.h>
 
-#ifndef WITHOUT_MQTT
-#define MQTT_USE_MBEDTLS
-#include <mqtt.h>
-#include <mbedtls_sockets.h>
-#endif
+#include "core_mqtt.h"
+#include "core_http_client.h"
+#include "plaintext_posix.h"
 
 #include "config.h"
 #include "base64.h"
-#include "peer_signaling.h"
 #include "utils.h"
+#include "peer_signaling.h"
+
+#define KEEP_ALIVE_TIMEOUT_SECONDS 60
+#define CONNACK_RECV_TIMEOUT_MS 1000
+#define TRANSPORT_SEND_RECV_TIMEOUT_MS 1000
 
 #define JRPC_PEER_OFFER "PEER_OFFER"
 #define JRPC_PEER_ANSWER "PEER_ANSWER"
@@ -22,20 +24,27 @@
 #define BUF_SIZE 4096
 #define TOPIC_SIZE 128
 
+struct NetworkContext {
+  PlaintextParams_t *pParams;
+};
+
 typedef struct PeerSignaling {
 
-#ifndef WITHOUT_MQTT
-  struct mqtt_client client;
-  uint8_t sendbuf[BUF_SIZE];
-  uint8_t recvbuf[BUF_SIZE];
-  struct mbedtls_context ctx;
-  mqtt_pal_socket_handle sockfd;
-#endif
+  MQTTContext_t mqtt_ctx;
+  MQTTFixedBuffer_t mqtt_fixed_buf;
 
+  TransportInterface_t transport;
+  NetworkContext_t net_ctx;
+  PlaintextParams_t plaintext_params;
+
+  uint8_t mqtt_buf[BUF_SIZE];
+  uint8_t http_buf[BUF_SIZE];
   char textbuf[BUF_SIZE];
+
   char subtopic[TOPIC_SIZE];
   char pubtopic[TOPIC_SIZE];
 
+  uint16_t packet_id;
   int id;
   PeerConnection *pc;
 
@@ -43,7 +52,7 @@ typedef struct PeerSignaling {
 
 static PeerSignaling g_ps;
 
-void peer_signaling_process_request(const char *msg, size_t size) {
+static void peer_signaling_process_request(const char *msg, size_t size) {
 
   cJSON *json = cJSON_Parse(msg);
   
@@ -83,14 +92,8 @@ void peer_signaling_process_request(const char *msg, size_t size) {
   cJSON_Delete(json);
 }
 
-void peer_signaling_onmessage_cb(void** unused, struct mqtt_response_publish *published) {
 
-#ifndef WITHOUT_MQTT
-  peer_signaling_process_request((const char*)published->application_message, published->application_message_size);
-#endif
-}
-
-char* peer_signaling_create_offer(char *description) {
+static char* peer_signaling_create_offer(char *description) {
 
   char *payload = NULL;
 
@@ -113,68 +116,256 @@ char* peer_signaling_create_offer(char *description) {
   return payload;
 }
 
+int32_t peer_signaling_tcp_connect(NetworkContext_t *net_ctx, const char *host, size_t host_len, const unsigned int port) {
+
+  int32_t ret = EXIT_FAILURE;
+  SocketStatus_t socketStatus;
+  ServerInfo_t serverInfo;
+
+  serverInfo.pHostName = host;
+  serverInfo.hostNameLength = host_len;
+  serverInfo.port = port;
+
+  socketStatus = Plaintext_Connect(net_ctx, &serverInfo, TRANSPORT_SEND_RECV_TIMEOUT_MS, TRANSPORT_SEND_RECV_TIMEOUT_MS);
+
+  if (socketStatus == SOCKETS_SUCCESS) {
+    ret = EXIT_SUCCESS;
+  } else {
+    ret = EXIT_FAILURE;
+  }
+
+  return ret;
+}
+
+HTTPResponse_t peer_signaling_http_request(const TransportInterface_t *pTransportInterface,
+ const char *pMethod, size_t methodLen,
+ const char *pHost, size_t host_len,
+ const char *pPath, size_t pathLen,
+ const char *pBody, size_t bodyLen) {
+
+  HTTPStatus_t httpStatus = HTTPSuccess;
+  HTTPRequestInfo_t requestInfo = {0};
+  HTTPResponse_t response = {0};
+  HTTPRequestHeaders_t requestHeaders = {0};
+
+  requestInfo.pMethod = pMethod;
+  requestInfo.methodLen = methodLen;
+  requestInfo.pHost = pHost;
+  requestInfo.hostLen = host_len;
+  requestInfo.pPath = pPath;
+  requestInfo.pathLen = pathLen;
+  requestInfo.reqFlags = HTTP_REQUEST_KEEP_ALIVE_FLAG;
+
+  requestHeaders.pBuffer = g_ps.http_buf;
+  requestHeaders.bufferLen = sizeof(g_ps.http_buf);
+
+  httpStatus = HTTPClient_InitializeRequestHeaders(&requestHeaders, &requestInfo);
+
+
+  if (httpStatus == HTTPSuccess) {
+
+    HTTPClient_AddHeader(&requestHeaders, "Content-Type", strlen("Content-Type"), "application/sdp", strlen("application/sdp"));
+
+    response.pBuffer = g_ps.http_buf;
+    response.bufferLen = sizeof(g_ps.http_buf);
+
+    httpStatus = HTTPClient_Send( pTransportInterface,
+                                  &requestHeaders,
+                                  (uint8_t*)pBody,
+                                  pBody ? bodyLen : 0,
+                                  &response,
+                                  0 );
+  } else {
+    LOGE("Failed to initialize HTTP request headers: Error=%s.", HTTPClient_strerror(httpStatus));
+  }
+
+  return response;
+}
+
+static int peer_signaling_http_post(const char *hostname, const char *path, int port, const char *body) { 
+
+  int32_t ret = EXIT_SUCCESS;
+
+  TransportInterface_t transportInterface = {0};
+  NetworkContext_t networkContext;
+  PlaintextParams_t plaintextParams;
+  networkContext.pParams = &plaintextParams;
+
+  ret = peer_signaling_tcp_connect(&networkContext, hostname, strlen(hostname), port);
+
+  transportInterface.recv = Plaintext_Recv;
+  transportInterface.send = Plaintext_Send;
+  transportInterface.pNetworkContext = &networkContext;
+
+  HTTPResponse_t response = peer_signaling_http_request(&transportInterface, "POST", 4, hostname, strlen(hostname), path, strlen(path), body, strlen(body));
+
+  LOGD("Received HTTP response from %s%s...\n"
+   "Response Headers: %s\n"
+   "Response Status: %u\n"
+   "Response Body: %s\n",
+   hostname, path,
+   response.pHeaders,
+   response.statusCode,
+   response.pBody);
+
+  Plaintext_Disconnect(&networkContext);
+
+  if (response.statusCode == 201) {
+
+   peer_connection_set_remote_description(g_ps.pc, (const char*)response.pBody);
+  }
+  return 0;
+}
+
+static void peer_signaling_mqtt_cb(MQTTContext_t * mqtt_ctx, MQTTPacketInfo_t * pxPacketInfo,
+ MQTTDeserializedInfo_t * pxDeserializedInfo ) {
+
+  switch (pxPacketInfo->type) {
+
+    case MQTT_PACKET_TYPE_CONNACK:
+      LOGI("MQTT_PACKET_TYPE_CONNACK");
+      break;
+    case MQTT_PACKET_TYPE_PUBLISH:
+      LOGI("MQTT_PACKET_TYPE_PUBLISH");
+      peer_signaling_process_request(pxDeserializedInfo->pPublishInfo->pPayload, pxDeserializedInfo->pPublishInfo->payloadLength);
+      break;
+    default:
+      break;
+  }
+}
+
+static int peer_signaling_mqtt_connect(const char *hostname, int port) {
+
+  MQTTStatus_t status;
+  MQTTConnectInfo_t conn_info;
+  bool session_present;
+
+  g_ps.net_ctx.pParams = &g_ps.plaintext_params;
+
+  if (peer_signaling_tcp_connect(&g_ps.net_ctx, hostname, strlen(hostname), port) < 0) {
+    return -1;
+  }
+
+  g_ps.transport.recv = Plaintext_Recv;
+  g_ps.transport.send = Plaintext_Send;
+  g_ps.transport.pNetworkContext = &g_ps.net_ctx;
+  g_ps.mqtt_fixed_buf.pBuffer = g_ps.mqtt_buf;
+  g_ps.mqtt_fixed_buf.size = sizeof(g_ps.mqtt_buf);
+  status = MQTT_Init(&g_ps.mqtt_ctx, &g_ps.transport, utils_get_timestamp, peer_signaling_mqtt_cb, &g_ps.mqtt_fixed_buf);
+
+  memset(&conn_info, 0, sizeof(conn_info));
+
+  conn_info.cleanSession = true;
+
+  conn_info.pClientIdentifier = "test";
+  conn_info.clientIdentifierLength = ( uint16_t ) strlen("test");
+
+  conn_info.keepAliveSeconds = KEEP_ALIVE_TIMEOUT_SECONDS;
+
+  status = MQTT_Connect(&g_ps.mqtt_ctx,
+    &conn_info,
+    NULL,
+    CONNACK_RECV_TIMEOUT_MS,
+    &session_present);
+
+  if (status != MQTTSuccess) {
+    LOGE("MQTT_Connect failed: Status=%s.", MQTT_Status_strerror(status));
+    return -1;
+  }
+  LOGI("MQTT_Connect succeeded.");
+  return 0;
+}
+
+static int peer_signaling_mqtt_subscribe() {
+
+  MQTTStatus_t status = MQTTSuccess;
+  MQTTSubscribeInfo_t sub_info;
+
+  uint16_t packet_id = MQTT_GetPacketId(&g_ps.mqtt_ctx);
+
+  memset(&sub_info, 0, sizeof(sub_info));
+  sub_info.qos = MQTTQoS0;
+  sub_info.pTopicFilter = g_ps.subtopic;
+  sub_info.topicFilterLength = strlen(g_ps.subtopic);
+
+  status = MQTT_Subscribe(&g_ps.mqtt_ctx, &sub_info, 1, packet_id);
+
+  if (status != MQTTSuccess) {
+    LOGE("MQTT_Subscribe failed: Status=%s.", MQTT_Status_strerror(status));
+    return -1;
+  }
+
+  status = MQTT_ProcessLoop(&g_ps.mqtt_ctx);
+
+  if (status != MQTTSuccess) {
+    LOGE("MQTT_ProcessLoop failed: Status=%s.", MQTT_Status_strerror(status));
+    return -1;
+  }
+  LOGI("MQTT_Subscribe succeeded.");
+  return 0;
+}
+
+static void peer_signaling_mqtt_publish(MQTTContext_t * mqtt_ctx, const char *message) {
+
+  MQTTStatus_t status;
+  MQTTPublishInfo_t pub_info;
+
+  memset(&pub_info, 0, sizeof(pub_info));
+
+  pub_info.qos = MQTTQoS0;
+  pub_info.retain = false;
+  pub_info.pTopicName = g_ps.pubtopic;
+  pub_info.topicNameLength = strlen(g_ps.pubtopic);
+  pub_info.pPayload = message;
+  pub_info.payloadLength = strlen(message);
+
+  status = MQTT_Publish(mqtt_ctx, &pub_info, MQTT_GetPacketId(mqtt_ctx));
+  if (status != MQTTSuccess) {
+    LOGE("MQTT_Publish failed: Status=%s.", MQTT_Status_strerror(status));
+  } else {
+    LOGI("MQTT_Publish succeeded.");
+  }
+}
+
 static void peer_signaling_onicecandidate(char *description, void *userdata) {
 
-  char *payload;
-
-#ifndef WITHOUT_MQTT
+#if defined(HAVE_HTTP)
+  peer_signaling_http_post(WHIP_HOST, WHIP_PATH, WHIP_PORT, description);
+#elif defined(HAVE_MQTT)
+  char *payload = NULL;
   payload = peer_signaling_create_offer(description);
-  mqtt_publish(&g_ps.client, g_ps.pubtopic, payload, strlen(payload), MQTT_PUBLISH_QOS_0);
+  peer_signaling_mqtt_publish(&g_ps.mqtt_ctx, payload);
+  free(payload);
 #endif
 
-  free(payload);
 }
 
 int peer_signaling_join_channel(const char *client_id, PeerConnection *pc, const char *cacert) {
-#ifndef WITHOUT_MQTT
-  uint8_t connect_flags = MQTT_CONNECT_CLEAN_SESSION;
 
+  g_ps.pc = pc;
+#if defined(HAVE_HTTP)
+  peer_connection_onicecandidate(pc, peer_signaling_onicecandidate);
+  peer_connection_create_offer(pc);
+#elif defined(HAVE_MQTT)
   snprintf(g_ps.subtopic, sizeof(g_ps.subtopic), "webrtc/%s/jsonrpc", client_id);
   snprintf(g_ps.pubtopic, sizeof(g_ps.pubtopic), "webrtc/%s/jsonrpc-reply", client_id);
-
-  open_nb_socket(&g_ps.ctx, MQTT_HOST, MQTT_PORT, cacert);
-  g_ps.sockfd = &g_ps.ctx.ssl_ctx;
-
-  LOGI("Connecting to %s", MQTT_HOST);
-
-  if (g_ps.sockfd == NULL) {
-
-    LOGE("error: create socket");
-    return -1;
-  }
-
-  mqtt_init(&g_ps.client, g_ps.sockfd,
-   g_ps.sendbuf, sizeof(g_ps.sendbuf), g_ps.recvbuf, sizeof(g_ps.recvbuf), peer_signaling_onmessage_cb);
-
-  mqtt_connect(&g_ps.client, client_id, NULL, NULL, 0, NULL, NULL, connect_flags, 400);
-
-  LOGI("Subscribing to %s", g_ps.subtopic);
-
-  if (g_ps.client.error != MQTT_OK) {
-
-    LOGE("error: %s\n", mqtt_error_str(g_ps.client.error));
-    return -1;
-  }
-
-  mqtt_subscribe(&g_ps.client, g_ps.subtopic, 0);
-  peer_connection_onicecandidate(pc, peer_signaling_onicecandidate);
+  peer_signaling_mqtt_connect(MQTT_HOST, MQTT_PORT);
+  peer_signaling_mqtt_subscribe();
 #endif
-  g_ps.pc = pc;
   return 0;
 }
 
 int peer_signaling_loop() {
-#ifndef WITHOUT_MQTT
-  return mqtt_sync((struct mqtt_client*) &g_ps.client);
-#else
-  return 0;
+#if defined(HAVE_MQTT)
+  MQTT_ProcessLoop(&g_ps.mqtt_ctx);
+//  LOGI("MQTT_ProcessLoop");
 #endif
-
+  return 0;
 }
 
 void peer_signaling_leave_channel() {
-#ifndef WITHOUT_MQTT
-  mbedtls_ssl_free(g_ps.sockfd);
-#endif
+
+  // TODO: HTTP DELETE with Location?
+  // TODO: MQTT unsubscribe
 }
 

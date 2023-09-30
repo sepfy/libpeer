@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include "sctp.h"
 #include "agent.h"
@@ -481,7 +482,7 @@ void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp_
 
     if ((ssrc_start = strstr(buf, "a=ssrc:")) && ssrc) {
       *ssrc = strtoul(ssrc_start + 7, NULL, 10);
-      LOGD("SSRC: %lu", *ssrc);
+      LOGD("SSRC: %"PRIu32, *ssrc);
     }
 
     start = line + 2;

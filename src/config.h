@@ -9,7 +9,7 @@
 #define VIDEO_RB_DATA_LENGTH (CONFIG_MTU * 64)
 #define AUDIO_RB_DATA_LENGTH (CONFIG_MTU * 64)
 #define DATA_RB_DATA_LENGTH (SCTP_MTU * 128)
-#define AUDIO_LATENCY 50 // ms
+#define AUDIO_LATENCY 40 // ms
 #else
 #define HAVE_USRSCTP
 #define RSA_KEY_LENGTH 2048
@@ -20,10 +20,17 @@
 #endif
 
 // siganling
-#define MQTT_HOST "mqtt.eclipseprojects.io"
-#define MQTT_PORT "8883"
+#define HAVE_HTTP
+#define HAVE_MQTT
 
-#define KEEPALIVE_CONNCHECK 10000
+#define MQTT_HOST "127.0.0.1"
+#define MQTT_PORT 1883
+
+#define WHIP_HOST "192.168.1.113"
+#define WHIP_PATH "/whip/endpoint/ciao"
+#define WHIP_PORT 7080
+
+#define KEEPALIVE_CONNCHECK 0
 
 // default use wifi interface
 #define IFR_NAME "w"

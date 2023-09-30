@@ -13,10 +13,6 @@ void peer_signaling_leave_channel();
 
 int peer_signaling_loop();
 
-void peer_signaling_process_request(const char *msg, size_t size);
-
-char* peer_signaling_create_offer(char *description);
-
 #ifdef __cplusplus
 } 
 #endif

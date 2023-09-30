@@ -55,6 +55,6 @@ void utils_get_hmac_sha1(const char *input, size_t input_len, const char *key, s
 
 void utils_get_md5(const char *input, size_t input_len, unsigned char *output);
 
-uint64_t utils_get_timestamp();
+uint32_t utils_get_timestamp();
 
 #endif // UTILS_H_

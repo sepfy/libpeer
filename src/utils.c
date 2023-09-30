@@ -85,10 +85,10 @@ void utils_get_md5(const char *input, size_t input_len, unsigned char *output) {
   mbedtls_md_free(&ctx);
 }
 
-uint64_t utils_get_timestamp() {
+uint32_t utils_get_timestamp() {
 
   struct timeval tv;
   gettimeofday(&tv, NULL);
-  return (uint64_t) tv.tv_sec * 1000 + tv.tv_usec / 1000;
+  return (uint32_t) tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
