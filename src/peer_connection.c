@@ -159,6 +159,11 @@ const char* peer_connection_state_to_string(PeerConnectionState state) {
   }
 }
 
+PeerConnectionState peer_connection_get_state(PeerConnection *pc) {
+
+  return pc->state;
+}
+
 PeerConnection* peer_connection_create(PeerConfiguration *config) {
 
   PeerConnection *pc = calloc(1, sizeof(PeerConnection));
@@ -217,6 +222,11 @@ void peer_connection_destroy(PeerConnection *pc) {
     free(pc);
     pc = NULL;
   }
+}
+
+void peer_connection_close(PeerConnection *pc) {
+
+  pc->state = PEER_CONNECTION_CLOSED;
 }
 
 int peer_connection_send_audio(PeerConnection *pc, const uint8_t *buf, size_t len) {

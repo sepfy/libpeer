@@ -20,15 +20,13 @@
 #endif
 
 // siganling
-#define HAVE_HTTP
-#define HAVE_MQTT
-
-#define MQTT_HOST "127.0.0.1"
+#define MQTT_HOST "test.mosquitto.org"
 #define MQTT_PORT 1883
 
-#define WHIP_HOST "192.168.1.113"
-#define WHIP_PATH "/whip/endpoint/ciao"
-#define WHIP_PORT 7080
+#define HAVE_MEDIASERVER
+#define WHIP_HOST "127.0.0.1"
+#define WHIP_PATH "/index/api/whip?app=live&stream=test"
+#define WHIP_PORT 8081
 
 #define KEEPALIVE_CONNCHECK 0
 
