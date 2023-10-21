@@ -19,12 +19,19 @@
 #define AUDIO_LATENCY 20 // ms
 #endif
 
+#ifndef CONFIG_MQTT
+#define CONFIG_MQTT 1
+#endif
+
+#ifndef CONFIG_WHIP
+#define CONFIG_WHIP 0
+#endif
+
 // siganling
 #define MQTT_HOST "test.mosquitto.org"
 #define MQTT_PORT 8883
 
-#define HAVE_MEDIASERVER
-#define WHIP_HOST "127.0.0.1"
+#define WHIP_HOST "192.168.1.110"
 #define WHIP_PATH "/index/api/whip?app=live&stream=test"
 #define WHIP_PORT 443
 

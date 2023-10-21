@@ -90,7 +90,7 @@ void app_main(void) {
 
   g_pc = peer_connection_create(&config);
   peer_connection_oniceconnectionstatechange(g_pc, oniceconnectionstatechange);
-  peer_signaling_join_channel(NULL, g_pc, NULL);
+  peer_signaling_join_channel(NULL, g_pc);
 
   xTaskCreatePinnedToCore(audio_task, "audio", 20480, NULL, 5, &xAudioTaskHandle, 0);
 

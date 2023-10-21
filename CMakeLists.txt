@@ -12,7 +12,7 @@ link_directories(dist/lib)
 
 set(DEP_LIBS "srtp2" "usrsctp" "mbedtls" "mbedcrypto" "mbedx509" "cjson" "mqttc")
 
-add_definitions("-Wunused-variable -Werror=sequence-point -Werror=pointer-sign -Werror=return-type -DHTTP_DO_NOT_USE_CUSTOM_CONFIG -DMQTT_DO_NOT_USE_CUSTOM_CONFIG")
+add_definitions("-Wunused-variable -Werror=sequence-point -Werror=pointer-sign -Werror=return-type -Werror=sizeof-pointer-memaccess -Wincompatible-pointer-types -DHTTP_DO_NOT_USE_CUSTOM_CONFIG -DMQTT_DO_NOT_USE_CUSTOM_CONFIG")
 
 add_subdirectory(src)
 add_subdirectory(examples)

@@ -106,7 +106,7 @@ void ssl_transport_disconnect(NetworkContext_t *net_ctx) {
 int ssl_transport_recv(NetworkContext_t *net_ctx, void *buf, size_t len) {
 
   int ret;
-  memset(buf, 0, sizeof(buf));
+  memset(buf, 0, len);
   ret = mbedtls_ssl_read(&net_ctx->ssl, buf, len);
 
   return ret;

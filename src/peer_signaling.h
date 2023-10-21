@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-int peer_signaling_join_channel(const char *client_id, PeerConnection *pc, const char *cacert);
+int peer_signaling_join_channel(const char *client_id, PeerConnection *pc);
 
 void peer_signaling_leave_channel();
 

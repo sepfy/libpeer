@@ -356,9 +356,11 @@ static int peer_signaling_mqtt_subscribe(int subscribed) {
 }
 
 static void peer_signaling_onicecandidate(char *description, void *userdata) {
-#ifdef HAVE_MEDIASERVER
+#if CONFIG_HTTP
   peer_signaling_http_post(WHIP_HOST, WHIP_PATH, WHIP_PORT, description);
-#else
+#endif
+
+#if CONFIG_MQTT
   cJSON *json = peer_signaling_create_response(g_ps.id);
   cJSON_AddStringToObject(json, "result", description);
   peer_signaling_process_response(json);
@@ -366,32 +368,35 @@ static void peer_signaling_onicecandidate(char *description, void *userdata) {
 #endif
 }
 
-int peer_signaling_join_channel(const char *client_id, PeerConnection *pc, const char *cacert) {
+int peer_signaling_join_channel(const char *client_id, PeerConnection *pc) {
 
   g_ps.pc = pc;
   peer_connection_onicecandidate(pc, peer_signaling_onicecandidate);
 
-#ifdef HAVE_MEDIASERVER
+#if CONFIG_HTTP
   peer_connection_create_offer(pc);
 #endif
 
+#if CONFIG_MQTT
   snprintf(g_ps.subtopic, sizeof(g_ps.subtopic), "webrtc/%s/jsonrpc", client_id);
   snprintf(g_ps.pubtopic, sizeof(g_ps.pubtopic), "webrtc/%s/jsonrpc-reply", client_id);
   peer_signaling_mqtt_connect(MQTT_HOST, MQTT_PORT);
   peer_signaling_mqtt_subscribe(1);
+#endif
 
   return 0;
 }
 
 int peer_signaling_loop() {
-
+#if CONFIG_MQTT
   MQTT_ProcessLoop(&g_ps.mqtt_ctx);
+#endif
   return 0;
 }
 
 void peer_signaling_leave_channel() {
-
   // TODO: HTTP DELETE with Location?
+#if CONFIG_MQTT
   MQTTStatus_t status = MQTTSuccess;
 
   if (peer_signaling_mqtt_subscribe(0) == 0) {
@@ -403,5 +408,6 @@ void peer_signaling_leave_channel() {
 
     LOGE("Failed to disconnect with broker: %s", MQTT_Status_strerror(status));
   }
+#endif
 }
 
