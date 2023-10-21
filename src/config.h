@@ -21,12 +21,12 @@
 
 // siganling
 #define MQTT_HOST "test.mosquitto.org"
-#define MQTT_PORT 1883
+#define MQTT_PORT 8883
 
 #define HAVE_MEDIASERVER
 #define WHIP_HOST "127.0.0.1"
 #define WHIP_PATH "/index/api/whip?app=live&stream=test"
-#define WHIP_PORT 8081
+#define WHIP_PORT 443
 
 #define KEEPALIVE_CONNCHECK 0
 

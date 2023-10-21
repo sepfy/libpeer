@@ -4,18 +4,17 @@
 #include <unistd.h>
 #include <cJSON.h>
 
-#include "core_mqtt.h"
-#include "core_http_client.h"
-#include "plaintext_posix.h"
+#include <core_mqtt.h>
+#include <core_http_client.h>
 
 #include "config.h"
 #include "base64.h"
 #include "utils.h"
+#include "ssl_transport.h"
 #include "peer_signaling.h"
 
 #define KEEP_ALIVE_TIMEOUT_SECONDS 60
 #define CONNACK_RECV_TIMEOUT_MS 1000
-#define TRANSPORT_SEND_RECV_TIMEOUT_MS 1000
 
 #define JRPC_PEER_STATE "state"
 #define JRPC_PEER_OFFER "offer"
@@ -25,10 +24,6 @@
 #define BUF_SIZE 4096
 #define TOPIC_SIZE 128
 
-struct NetworkContext {
-  PlaintextParams_t *pParams;
-};
-
 typedef struct PeerSignaling {
 
   MQTTContext_t mqtt_ctx;
@@ -36,7 +31,6 @@ typedef struct PeerSignaling {
 
   TransportInterface_t transport;
   NetworkContext_t net_ctx;
-  PlaintextParams_t plaintext_params;
 
   uint8_t mqtt_buf[BUF_SIZE];
   uint8_t http_buf[BUF_SIZE];
@@ -190,28 +184,6 @@ static void peer_signaling_process_request(const char *msg, size_t size) {
   cJSON_Delete(request);
 }
 
-int32_t peer_signaling_tcp_connect(NetworkContext_t *net_ctx,
- const char *host, size_t host_len, const unsigned int port) {
-
-  int32_t ret = EXIT_FAILURE;
-  SocketStatus_t status;
-  ServerInfo_t server_info;
-
-  server_info.pHostName = host;
-  server_info.hostNameLength = host_len;
-  server_info.port = port;
-
-  status = Plaintext_Connect(net_ctx, &server_info, TRANSPORT_SEND_RECV_TIMEOUT_MS, TRANSPORT_SEND_RECV_TIMEOUT_MS);
-
-  if (status == SOCKETS_SUCCESS) {
-    ret = EXIT_SUCCESS;
-  } else {
-    ret = EXIT_FAILURE;
-  }
-
-  return ret;
-}
-
 HTTPResponse_t peer_signaling_http_request(const TransportInterface_t *transport_interface,
  const char *method, size_t method_len,
  const char *host, size_t host_len,
@@ -256,32 +228,29 @@ HTTPResponse_t peer_signaling_http_request(const TransportInterface_t *transport
 }
 
 static int peer_signaling_http_post(const char *hostname, const char *path, int port, const char *body) { 
-
   int32_t ret = EXIT_SUCCESS;
 
-  TransportInterface_t transportInterface = {0};
-  NetworkContext_t networkContext;
-  PlaintextParams_t plaintextParams;
-  networkContext.pParams = &plaintextParams;
+  TransportInterface_t trans_if = {0};
+  NetworkContext_t net_ctx;
 
-  ret = peer_signaling_tcp_connect(&networkContext, hostname, strlen(hostname), port);
+  trans_if.recv = ssl_transport_recv;
+  trans_if.send = ssl_transport_send;
+  trans_if.pNetworkContext = &net_ctx;
 
-  transportInterface.recv = Plaintext_Recv;
-  transportInterface.send = Plaintext_Send;
-  transportInterface.pNetworkContext = &networkContext;
+  ret = ssl_transport_connect(&net_ctx, hostname, port, NULL);
 
-  HTTPResponse_t response = peer_signaling_http_request(&transportInterface, "POST", 4, hostname, strlen(hostname), path, strlen(path), body, strlen(body));
+  if (ret < 0) {
+    LOGE("Failed to connect to %s:%d", hostname, port);
+    return ret;
+  }
+
+  HTTPResponse_t response = peer_signaling_http_request(&trans_if, "POST", 4, hostname, strlen(hostname), path, strlen(path), body, strlen(body));
 
   LOGI("Received HTTP response from %s%s...\n"
-   "Response Headers: %s\n"
-   "Response Status: %u\n"
-   "Response Body: %s\n",
-   hostname, path,
-   response.pHeaders,
-   response.statusCode,
-   response.pBody);
+   "Response Headers: %s\nResponse Status: %u\nResponse Body: %s\n",
+   hostname, path, response.pHeaders, response.statusCode, response.pBody);
 
-  Plaintext_Disconnect(&networkContext);
+  ssl_transport_disconnect(&net_ctx);
 
   if (response.statusCode == 201) {
 
@@ -317,18 +286,17 @@ static int peer_signaling_mqtt_connect(const char *hostname, int port) {
   MQTTConnectInfo_t conn_info;
   bool session_present;
 
-  g_ps.net_ctx.pParams = &g_ps.plaintext_params;
-
-  if (peer_signaling_tcp_connect(&g_ps.net_ctx, hostname, strlen(hostname), port) < 0) {
+  if (ssl_transport_connect(&g_ps.net_ctx, hostname, port, NULL) < 0) {
     return -1;
   }
 
-  g_ps.transport.recv = Plaintext_Recv;
-  g_ps.transport.send = Plaintext_Send;
+  g_ps.transport.recv = ssl_transport_recv;
+  g_ps.transport.send = ssl_transport_send;
   g_ps.transport.pNetworkContext = &g_ps.net_ctx;
   g_ps.mqtt_fixed_buf.pBuffer = g_ps.mqtt_buf;
   g_ps.mqtt_fixed_buf.size = sizeof(g_ps.mqtt_buf);
-  status = MQTT_Init(&g_ps.mqtt_ctx, &g_ps.transport, utils_get_timestamp, peer_signaling_mqtt_cb, &g_ps.mqtt_fixed_buf);
+  status = MQTT_Init(&g_ps.mqtt_ctx, &g_ps.transport,
+   utils_get_timestamp, peer_signaling_mqtt_cb, &g_ps.mqtt_fixed_buf);
 
   memset(&conn_info, 0, sizeof(conn_info));
 
@@ -343,10 +311,7 @@ static int peer_signaling_mqtt_connect(const char *hostname, int port) {
   conn_info.keepAliveSeconds = KEEP_ALIVE_TIMEOUT_SECONDS;
 
   status = MQTT_Connect(&g_ps.mqtt_ctx,
-   &conn_info,
-   NULL,
-   CONNACK_RECV_TIMEOUT_MS,
-   &session_present);
+   &conn_info, NULL, CONNACK_RECV_TIMEOUT_MS, &session_present);
 
   if (status != MQTTSuccess) {
     LOGE("MQTT_Connect failed: Status=%s.", MQTT_Status_strerror(status));
@@ -414,6 +379,7 @@ int peer_signaling_join_channel(const char *client_id, PeerConnection *pc, const
   snprintf(g_ps.pubtopic, sizeof(g_ps.pubtopic), "webrtc/%s/jsonrpc-reply", client_id);
   peer_signaling_mqtt_connect(MQTT_HOST, MQTT_PORT);
   peer_signaling_mqtt_subscribe(1);
+
   return 0;
 }
 
@@ -424,8 +390,8 @@ int peer_signaling_loop() {
 }
 
 void peer_signaling_leave_channel() {
-  // TODO: HTTP DELETE with Location?
 
+  // TODO: HTTP DELETE with Location?
   MQTTStatus_t status = MQTTSuccess;
 
   if (peer_signaling_mqtt_subscribe(0) == 0) {
