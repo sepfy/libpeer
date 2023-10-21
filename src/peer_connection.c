@@ -386,6 +386,7 @@ int peer_connection_loop(PeerConnection *pc) {
         if (pc->config.datachannel) {
           LOGI("SCTP create socket");
           sctp_create_socket(&pc->sctp, &pc->dtls_srtp);
+          pc->sctp.userdata = pc->config.user_data;
         }
 
         STATE_CHANGED(pc, PEER_CONNECTION_COMPLETED);
@@ -453,7 +454,7 @@ int peer_connection_loop(PeerConnection *pc) {
       if (KEEPALIVE_CONNCHECK > 0 && (utils_get_timestamp() - pc->agent.binding_request_time) > KEEPALIVE_CONNCHECK) {
 
         LOGI("binding request timeout");
-        STATE_CHANGED(pc, PEER_CONNECTION_DISCONNECTED);
+        STATE_CHANGED(pc, PEER_CONNECTION_CLOSED);
       }
 
       break;
