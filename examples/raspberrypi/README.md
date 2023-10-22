@@ -28,12 +28,12 @@ $ cmake -DCMAKE_INSTALL_PREFIX=. ..
 $ make && make install
 $ cd ../examples/raspberrypi
 $ mkdir build && cd build
+$ cmake ..
 $ make
 ```
 
 ### Test
 ```bash
-$ echo "" | openssl s_client -showcerts -connect mqtt.eclipseprojects.io:8883 | sed -n "1,/Root/d; /BEGIN/,/END/p" | openssl x509 -outform PEM >mqtt_eclipse_org.pem
-$ ./raspberrypi mqtt_eclipse_org.pem
+$ ./raspberrypi
 ```
 

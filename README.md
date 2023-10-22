@@ -14,6 +14,8 @@ libpeer is a WebRTC implementation written in C, developed with BSD socket. The 
 - DataChannel
 - STUN/TURN
 - Signaling
+  - [WHIP](https://www.ietf.org/archive/id/draft-ietf-wish-whip-01.html)
+  - MQTT
 
 ### Dependencies
 
@@ -21,7 +23,8 @@ libpeer is a WebRTC implementation written in C, developed with BSD socket. The 
 * [libsrtp](https://github.com/cisco/libsrtp)
 * [usrsctp](https://github.com/sctplab/usrsctp)
 * [cJSON](https://github.com/DaveGamble/cJSON.git)
-* [MQTT-C](https://github.com/LiamBindle/MQTT-C)
+* [coreHTTP](https://github.com/FreeRTOS/coreHTTP)
+* [coreMQTT](https://github.com/FreeRTOS/coreMQTT)
 
 ### Getting Started
 ```bash
@@ -33,12 +36,13 @@ $ mkdir cmake
 $ cd cmake
 $ cmake ..
 $ make
-$ echo "" | openssl s_client -showcerts -connect mqtt.eclipseprojects.io:8883 | sed -n "1,/Root/d; /BEGIN/,/END/p" | openssl x509 -outform PEM >mqtt_eclipse_org.pem # Download certificate for signaling
 $ wget http://www.live555.com/liveMedia/public/264/test.264 # Download test video file
 $ wget https://mauvecloud.net/sounds/alaw08m.wav # Download test audio file
 $ ./examples/sample/sample
 ```
 
-### Supported Platforms
-- [ESP32](https://github.com/sepfy/libpeer/tree/main/examples/esp32)
-- [Raspberry Pi](https://github.com/sepfy/libpeer/tree/main/examples/raspberrypi)
+### Examples
+- [ESP32](https://github.com/sepfy/libpeer/tree/main/examples/esp32): MJPEG over datachannel
+- [ESP32-S3](https://github.com/sepfy/libpeer/tree/main/examples/esp32s3): Push video and audio to media server
+- [Raspberry Pi](https://github.com/sepfy/libpeer/tree/main/examples/raspberrypi): Video and two-way audio stream
+
