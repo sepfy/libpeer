@@ -10,6 +10,9 @@
 [submodule "third_party/mbedtls"]
 	path = third_party/mbedtls
 	url = https://github.com/Mbed-TLS/mbedtls.git
-[submodule "third_party/MQTT-C"]
-	path = third_party/MQTT-C
-	url = https://github.com/LiamBindle/MQTT-C.git
+[submodule "third_party/coreHTTP"]
+	path = third_party/coreHTTP
+	url = https://github.com/FreeRTOS/coreHTTP
+[submodule "third_party/coreMQTT"]
+	path = third_party/coreMQTT
+	url = https://github.com/FreeRTOS/coreMQTT

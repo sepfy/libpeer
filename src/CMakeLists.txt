@@ -4,9 +4,17 @@ file(GLOB SRCS "*.c")
 
 file(GLOB HEADERS "peer.h" "peer_connection.h" "peer_signaling.h")
 
-add_library(peer SHARED ${SRCS})
+add_library(peer SHARED
+  ${SRCS}
+  ${HTTP_SOURCES}
+  ${MQTT_SOURCES}
+  ${MQTT_SERIALIZER_SOURCES}
+)
 
-target_include_directories(peer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(peer PUBLIC
+  ${HTTP_INCLUDE_PUBLIC_DIRS}
+  ${MQTT_INCLUDE_PUBLIC_DIRS}
+)
 
 target_link_libraries(peer ${DEP_LIBS})
 

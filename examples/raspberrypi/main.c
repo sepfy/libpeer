@@ -225,7 +225,7 @@ int main(int argc, char *argv[]) {
   peer_connection_oniceconnectionstatechange(g_pc, onconnectionstatechange);
   peer_connection_ondatachannel(g_pc, onmessasge, onopen, onclose);
 
-  peer_signaling_join_channel(device_id, g_pc, argv[1]);
+  peer_signaling_join_channel(device_id, g_pc);
 
   pthread_create(&peer_connection_thread, NULL, peer_connection_task, NULL);
   pthread_create(&peer_singaling_thread, NULL, peer_singaling_task, NULL);

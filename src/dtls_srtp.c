@@ -168,9 +168,12 @@ int dtls_srtp_init(DtlsSrtp *dtls_srtp, DtlsSrtpRole role, void *user_data) {
 
   dtls_srtp_selfsign_cert(dtls_srtp);
 
+// XXX: Not sure if this is needed
+#if 0
   mbedtls_ssl_conf_verify(&dtls_srtp->conf, dtls_srtp_cert_verify, NULL);
 
   mbedtls_ssl_conf_authmode(&dtls_srtp->conf, MBEDTLS_SSL_VERIFY_REQUIRED);
+#endif
 
   mbedtls_ssl_conf_ca_chain(&dtls_srtp->conf, &dtls_srtp->cert, NULL);
 
@@ -371,7 +374,7 @@ static int dtls_srtp_handshake_server(DtlsSrtp *dtls_srtp) {
 
     } else if (ret != 0) {
 
-      LOGE("failed! mbedtls_ssl_handshake returned -0x%.4x\n\n", (unsigned int) -ret);
+      LOGE("failed! mbedtls_ssl_handshake returned -0x%.4x", (unsigned int) -ret);
 
       break;
 
@@ -423,8 +426,6 @@ int dtls_srtp_handshake(DtlsSrtp *dtls_srtp, Address *addr) {
 
   int ret;
 
-  const mbedtls_x509_crt *remote_crt;
-
   dtls_srtp->remote_addr = addr;
 
   if (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) {
@@ -437,6 +438,9 @@ int dtls_srtp_handshake(DtlsSrtp *dtls_srtp, Address *addr) {
 
   }
 
+// XXX: Not sure if this is needed
+#if 0
+  const mbedtls_x509_crt *remote_crt;
   if ((remote_crt = mbedtls_ssl_get_peer_cert(&dtls_srtp->ssl)) != NULL) {
 
     dtls_srtp_x509_digest(remote_crt, dtls_srtp->remote_fingerprint);
@@ -446,8 +450,8 @@ int dtls_srtp_handshake(DtlsSrtp *dtls_srtp, Address *addr) {
   } else {
 
     LOGE("no remote fingerprint");
-
   }
+#endif
 
   mbedtls_dtls_srtp_info dtls_srtp_negotiation_result;
   mbedtls_ssl_get_dtls_srtp_negotiation_result(&dtls_srtp->ssl, &dtls_srtp_negotiation_result);
@@ -494,12 +498,12 @@ int dtls_srtp_read(DtlsSrtp *dtls_srtp, unsigned char *buf, size_t len) {
   return ret;
 }
 
-int dtls_srtp_validate(uint8_t *buf) {
+int dtls_srtp_probe(uint8_t *buf) {
 
   if(buf == NULL)
     return 0;
 
-  LOGD("DTLS content type: %d, version: %d, epoch: %d, sequence: %d, length: %d (%.4x)", header->content_type, header->version, header->epoch, ntohs(header->seqnum_hi), ntohs(header->length), header->length);
+  //LOGD("DTLS content type: %d, version: %d, epoch: %d, sequence: %d, length: %d (%.4x)", header->content_type, header->version, header->epoch, ntohs(header->seqnum_hi), ntohs(header->length), header->length);
 
   return ((*buf >= 20) && (*buf <= 64));
 }

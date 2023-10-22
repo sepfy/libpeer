@@ -1,3 +1,4 @@
 components/srtp
 build
 dependencies.lock
+managed_components

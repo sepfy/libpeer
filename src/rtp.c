@@ -184,8 +184,8 @@ static int rtp_encoder_encode_generic(RtpEncoder *rtp_encoder, uint8_t *buf, siz
   rtp_header->markerbit = 0;
   rtp_header->type = rtp_encoder->type;
   rtp_header->seq_number = htons(rtp_encoder->seq_number++);
-  rtp_encoder->timestamp += rtp_encoder->timestamp_increment;
   rtp_header->timestamp = htonl(rtp_encoder->timestamp);
+  rtp_encoder->timestamp += rtp_encoder->timestamp_increment;
   rtp_header->ssrc = htonl(rtp_encoder->ssrc);
   memcpy(rtp_encoder->buf + sizeof(RtpHeader), buf, size);
 
@@ -220,11 +220,13 @@ void rtp_encoder_init(RtpEncoder *rtp_encoder, MediaCodec codec, RtpOnPacket on_
       rtp_encoder->ssrc = SSRC_PCMU;
       rtp_encoder->timestamp_increment = AUDIO_LATENCY*8000/1000;
       rtp_encoder->encode_func = rtp_encoder_encode_generic;
+      break;
     case CODEC_OPUS:
       rtp_encoder->type = PT_OPUS;
       rtp_encoder->ssrc = SSRC_OPUS;
       rtp_encoder->timestamp_increment = AUDIO_LATENCY*48000/1000;
       rtp_encoder->encode_func = rtp_encoder_encode_generic;
+      break;
     default:
       break;
   }

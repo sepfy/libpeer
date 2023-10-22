@@ -75,9 +75,13 @@ typedef struct PeerConnection PeerConnection;
 
 const char* peer_connection_state_to_string(PeerConnectionState state);
 
+PeerConnectionState peer_connection_get_state(PeerConnection *pc);
+
 PeerConnection* peer_connection_create(PeerConfiguration *config);
 
 void peer_connection_destroy(PeerConnection *pc);
+
+void peer_connection_close(PeerConnection *pc);
 
 int peer_connection_loop(PeerConnection *pc);
 /**

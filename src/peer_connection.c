@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include "sctp.h"
 #include "agent.h"
@@ -59,7 +60,7 @@ static void peer_connection_outgoing_rtp_packet(uint8_t *data, size_t size, void
 
 static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t len) {
 
-  static const int MAX_RECV = 10000;
+  static const int MAX_RECV = 200;
   int recv_max = 0; 
   int ret; 
   DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx; 
@@ -78,7 +79,7 @@ static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t 
     if (ret > 0) {
       break;
     }
-    usleep(1*1000);
+
     recv_max++;
 
   }
@@ -158,6 +159,11 @@ const char* peer_connection_state_to_string(PeerConnectionState state) {
   }
 }
 
+PeerConnectionState peer_connection_get_state(PeerConnection *pc) {
+
+  return pc->state;
+}
+
 PeerConnection* peer_connection_create(PeerConfiguration *config) {
 
   PeerConnection *pc = calloc(1, sizeof(PeerConnection));
@@ -216,6 +222,11 @@ void peer_connection_destroy(PeerConnection *pc) {
     free(pc);
     pc = NULL;
   }
+}
+
+void peer_connection_close(PeerConnection *pc) {
+
+  pc->state = PEER_CONNECTION_CLOSED;
 }
 
 int peer_connection_send_audio(PeerConnection *pc, const uint8_t *buf, size_t len) {
@@ -286,7 +297,7 @@ static void peer_connection_state_new(PeerConnection *pc) {
 
     sdp_append_h264(&pc->local_sdp);
     sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-    sdp_append(&pc->local_sdp, "a=setup:actpass");
+    sdp_append(&pc->local_sdp, "a=setup:passive");
     strcat(pc->local_sdp.content, description);
   }
 
@@ -297,7 +308,7 @@ static void peer_connection_state_new(PeerConnection *pc) {
 
       sdp_append_pcma(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-      sdp_append(&pc->local_sdp, "a=setup:actpass");
+      sdp_append(&pc->local_sdp, "a=setup:passive");
       strcat(pc->local_sdp.content, description);
       break;
 
@@ -305,14 +316,14 @@ static void peer_connection_state_new(PeerConnection *pc) {
 
       sdp_append_pcmu(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-      sdp_append(&pc->local_sdp, "a=setup:actpass");
+      sdp_append(&pc->local_sdp, "a=setup:passive");
       strcat(pc->local_sdp.content, description);
       break;
 
     case CODEC_OPUS:
       sdp_append_opus(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-      sdp_append(&pc->local_sdp, "a=setup:actpass");
+      sdp_append(&pc->local_sdp, "a=setup:passive");
       strcat(pc->local_sdp.content, description);
 
     default:
@@ -322,7 +333,7 @@ static void peer_connection_state_new(PeerConnection *pc) {
   if (pc->config.datachannel) {
     sdp_append_datachannel(&pc->local_sdp);
     sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-    sdp_append(&pc->local_sdp, "a=setup:actpass");
+    sdp_append(&pc->local_sdp, "a=setup:passive");
     strcat(pc->local_sdp.content, description);
   }
 
@@ -353,7 +364,10 @@ int peer_connection_loop(PeerConnection *pc) {
 
       agent_select_candidate_pair(&pc->agent);
 
-      if (agent_connectivity_check(&pc->agent)) {
+      if (!pc->agent.nominated_pair) {
+        STATE_CHANGED(pc, PEER_CONNECTION_FAILED);
+
+      } else if (agent_connectivity_check(&pc->agent)) {
 
         LOGD("Connectivity check success. pair: %p", pc->agent.nominated_pair);
 
@@ -372,6 +386,7 @@ int peer_connection_loop(PeerConnection *pc) {
         if (pc->config.datachannel) {
           LOGI("SCTP create socket");
           sctp_create_socket(&pc->sctp, &pc->dtls_srtp);
+          pc->sctp.userdata = pc->config.user_data;
         }
 
         STATE_CHANGED(pc, PEER_CONNECTION_COMPLETED);
@@ -409,7 +424,7 @@ int peer_connection_loop(PeerConnection *pc) {
           dtls_srtp_decrypt_rtcp_packet(&pc->dtls_srtp, pc->agent_buf, &pc->agent_ret);
           peer_connection_incoming_rtcp(pc, pc->agent_buf, pc->agent_ret);
 
-        } else if (dtls_srtp_validate(pc->agent_buf)) {
+        } else if (dtls_srtp_probe(pc->agent_buf)) {
 
           int ret = dtls_srtp_read(&pc->dtls_srtp, pc->temp_buf, sizeof(pc->temp_buf));
           LOGD("Got DTLS data %d", ret);
@@ -436,10 +451,10 @@ int peer_connection_loop(PeerConnection *pc) {
 
       }
 
-      if ((utils_get_timestamp() - pc->agent.binding_request_time) > KEEPALIVE_CONNCHECK) {
+      if (KEEPALIVE_CONNCHECK > 0 && (utils_get_timestamp() - pc->agent.binding_request_time) > KEEPALIVE_CONNCHECK) {
 
         LOGI("binding request timeout");
-        STATE_CHANGED(pc, PEER_CONNECTION_DISCONNECTED);
+        STATE_CHANGED(pc, PEER_CONNECTION_CLOSED);
       }
 
       break;
@@ -478,7 +493,7 @@ void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp_
 
     if ((ssrc_start = strstr(buf, "a=ssrc:")) && ssrc) {
       *ssrc = strtoul(ssrc_start + 7, NULL, 10);
-      LOGD("SSRC: %u", *ssrc);
+      LOGD("SSRC: %"PRIu32, *ssrc);
     }
 
     start = line + 2;
