@@ -90,11 +90,6 @@ int main(int argc, char *argv[]) {
    .audio_codec = CODEC_PCMA
   };
 
-  if (argc < 2) {
-    printf("usage: %s <cacert>\n", argv[0]);
-    return 0;
-  }
-
   snprintf((char*)buf, sizeof(buf), "test_%d", getpid());
   printf("open https://sepfy.github.io/webrtc?deviceId=%s\n", buf);
 

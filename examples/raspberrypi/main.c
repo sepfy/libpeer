@@ -194,11 +194,6 @@ int main(int argc, char *argv[]) {
    .on_request_keyframe = on_request_keyframe
   };
 
-  if (argc < 2) {
-    printf("usage: %s <cacert>\n", argv[0]);
-    return 0;
-  }
-
   strcpy(device_id, "rpi-");
   get_hwaddr(device_id + 4, sizeof(device_id) - 4);
   printf("open https://sepfy.github.io/webrtc?deviceId=%s\n", device_id);
