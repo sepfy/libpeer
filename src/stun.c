@@ -68,10 +68,10 @@ void stun_set_mapped_address(char *value, uint8_t *mask, Address *addr) {
   uint8_t *ipv4 = (uint8_t *)(value + 4);
 
   *family = 0x01;
-  *port = htons(addr->port);
+  *port = htons(addr->port) ^ (mask ? *(uint16_t*)mask : 0);
  
   for (i = 0; i < 4; i++) {
-    ipv4[i] = addr->ipv4[i];
+    ipv4[i] = addr->ipv4[i] ^ (mask ? mask[i] : 0);
   }
 
   //LOGD("XOR Mapped Address Family: 0x%02x", *family);
@@ -189,6 +189,9 @@ void stun_parse_msg_buf(StunMessage *msg) {
       case STUN_ATTR_TYPE_ICE_CONTROLLING:
       case STUN_ATTR_TYPE_NETWORK_COST:
         // Do nothing
+        break;
+      case STUN_ATTR_TYPE_ERROR_CODE:
+        LOGE("STUN Error: %u - %.*s", (uint32_t)ntohl(*(uint32_t*)attr->value), attr->length - 4, attr->value + 4);
         break;
       default:
         LOGE("Unknown Attribute Type: 0x%04x", ntohs(attr->type));

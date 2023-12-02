@@ -142,6 +142,22 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp *dtls_srtp) {
   return ret;
 }
 
+#ifdef DTLS_SRTP_DEBUG_MBEDTLS
+static void dtls_srtp_mbedtls_debug_cb(void* ctx, int level, const char* file, int line, const char* str) {
+    const char *p, *basename;
+    (void) ctx;
+
+    /* Extract basename from file */
+    for(p = basename = file; *p != '\0'; p++) {
+        if(*p == '/' || *p == '\\') {
+            basename = p + 1;
+        }
+    }
+
+    printf("mbedtls %s:%04d: |%d| %s", basename, line, level, str);
+}
+#endif
+
 int dtls_srtp_init(DtlsSrtp *dtls_srtp, DtlsSrtpRole role, void *user_data) {
 
   static const mbedtls_ssl_srtp_profile default_profiles[] = {
@@ -167,6 +183,10 @@ int dtls_srtp_init(DtlsSrtp *dtls_srtp, DtlsSrtpRole role, void *user_data) {
   mbedtls_ctr_drbg_init(&dtls_srtp->ctr_drbg);
 
   dtls_srtp_selfsign_cert(dtls_srtp);
+
+#ifdef DTLS_SRTP_DEBUG_MBEDTLS
+  mbedtls_ssl_conf_dbg(&dtls_srtp->conf, dtls_srtp_mbedtls_debug_cb, NULL);
+#endif
 
 // XXX: Not sure if this is needed
 #if 0

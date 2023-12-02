@@ -78,7 +78,7 @@ void ice_candidate_to_description(IceCandidate *candidate, char *description, in
       break;
   }
 
-  snprintf(description, length, "a=candidate:%d %d %s %" PRIu32 " %d.%d.%d.%d %d typ %s\n",
+  snprintf(description, length, "a=candidate:%d %d %s %" PRIu32 " %d.%d.%d.%d %d typ %s\r\n",
    candidate->foundation,
    candidate->component,
    candidate->transport,

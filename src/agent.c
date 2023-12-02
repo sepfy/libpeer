@@ -205,9 +205,10 @@ void agent_get_local_description(Agent *agent, char *description, int length) {
     ice_candidate_to_description(&agent->local_candidates[i], description + strlen(description), length - strlen(description));
   }
 
-  // remove last \n
-  description[strlen(description)] = '\0';
-
+  /*if (ncandidates)
+    // remove last \r\n
+    description[strlen(description)-2] = '\0';
+  }*/
 }
 
 int agent_send(Agent *agent, const uint8_t *buf, int len) {
@@ -239,10 +240,11 @@ void agent_process_stun_request(Agent *agent, StunMessage *stun_msg) {
 
         snprintf(username, sizeof(username), "%s:%s", agent->local_ufrag, agent->remote_ufrag);
 
-        // TODO: XOR-MAPPED-ADDRESS
         char mapped_address[8];
         stun_set_mapped_address(mapped_address, NULL, &agent->nominated_pair->remote->addr);
         stun_msg_write_attr(&msg, STUN_ATTR_TYPE_MAPPED_ADDRESS, 8, mapped_address);
+        stun_set_mapped_address(mapped_address, (uint8_t*)agent->transaction_id, &agent->nominated_pair->remote->addr);
+        stun_msg_write_attr(&msg, STUN_ATTR_TYPE_XOR_MAPPED_ADDRESS, 8, mapped_address);
         stun_msg_write_attr(&msg, STUN_ATTR_TYPE_USERNAME, strlen(username), username);
         stun_msg_finish(&msg, STUN_CREDENTIAL_SHORT_TERM, agent->local_upwd, strlen(agent->local_upwd));
 
