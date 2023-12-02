@@ -14,8 +14,7 @@ void peer_signaling_leave_channel();
 int peer_signaling_loop();
 
 #ifdef __cplusplus
-} 
+}
 #endif
 
 #endif //PEER_SIGNALING_H_
-

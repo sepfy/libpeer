@@ -150,5 +150,3 @@ int ports_resolve_mdns_host(const char *host, Address *addr) {
   return ports_resolve_addr(host, addr);
 #endif
 }
-
-

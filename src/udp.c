@@ -146,7 +146,7 @@ int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, uint8_t *buf, int 
   if (udp_socket->fd < 0) {
 
     LOGE("recvfrom before socket init");
-    return -1; 
+    return -1;
   }
 
   FD_ZERO(&read_set);
@@ -182,4 +182,3 @@ int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, uint8_t *buf, int 
 
   return ret;
 }
-

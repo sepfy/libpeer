@@ -60,4 +60,3 @@ RtcpRr rtcp_parse_rr(uint8_t *packet) {
 
   return rtcp_rr;
 }
-

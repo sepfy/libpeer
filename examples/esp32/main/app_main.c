@@ -55,13 +55,13 @@ static void onmessasge(char *msg, size_t len, void *userdata) {
 }
 
 void onopen(void *userdata) {
- 
+
   ESP_LOGI(TAG, "Datachannel opened");
   gDataChannelOpened = 1;
 }
 
 static void onclose(void *userdata) {
- 
+
 }
 
 void peer_signaling_task(void *arg) {

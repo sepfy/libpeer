@@ -96,4 +96,3 @@ void agent_init(Agent *agent);
 void agent_deinit(Agent *agent);
 
 #endif // AGENT_H_
-

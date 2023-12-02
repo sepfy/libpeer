@@ -13,9 +13,9 @@ typedef struct Sdp {
 } Sdp;
 
 void sdp_append_h264(Sdp *sdp);
-  
+
 void sdp_append_pcma(Sdp *sdp);
-  
+
 void sdp_append_pcmu(Sdp *sdp);
 
 void sdp_append_opus(Sdp *sdp);

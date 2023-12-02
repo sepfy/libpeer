@@ -12,4 +12,3 @@ int ports_resolve_mdns_host(const char *host, Address *addr);
 int ports_get_host_addr(Address *addr);
 
 #endif // PORTS_H_
-

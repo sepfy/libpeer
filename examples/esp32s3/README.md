@@ -3,4 +3,3 @@ Push H.264 video and OPUS audio to the WebRTC media server, such as Janus and ZL
 
 ## Instructions
 Modify the ```WHIP_HOST```, ```WHIP_PATH``` of ```src/config.h```
-

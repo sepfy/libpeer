@@ -232,10 +232,10 @@ void agent_process_stun_request(Agent *agent, StunMessage *stun_msg) {
 
         StunMessage msg;
         stun_msg_create(&msg, STUN_CLASS_RESPONSE | STUN_METHOD_BINDING);
-   
+
         header = (StunHeader *)msg.buf;
         memcpy(header->transaction_id, agent->transaction_id, sizeof(header->transaction_id));
- 
+
         char username[584];
 
         snprintf(username, sizeof(username), "%s:%s", agent->local_ufrag, agent->remote_ufrag);
@@ -434,7 +434,7 @@ void agent_select_candidate_pair(Agent *agent) {
     } else if (agent->candidate_pairs[i].state == ICE_CANDIDATE_STATE_FAILED) {
 
     } else if (agent->candidate_pairs[i].state <= ICE_CANDIDATE_STATE_SUCCEEDED) {
-      // still in progress. wait for it 
+      // still in progress. wait for it
       agent->nominated_pair = &agent->candidate_pairs[i];
       break;
     }
@@ -443,4 +443,3 @@ void agent_select_candidate_pair(Agent *agent) {
 
   //LOGD("nominated_pair: %p", agent->nominated_pair);
 }
-

@@ -144,10 +144,10 @@ static void* peer_connection_task(void *data) {
   while (!g_interrupted) {
 
     peer_connection_loop(g_pc);
-    usleep(1000); 
+    usleep(1000);
   }
 
-  pthread_exit(NULL); 
+  pthread_exit(NULL);
 }
 
 void get_hwaddr(char *buf, size_t size) {

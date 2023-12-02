@@ -34,7 +34,7 @@ $ idf.py menuconfig
 # Choose Example Configuration and change the SSID and password
 ```
 
-### Build 
+### Build
 ```bash
 $ idf.py build
 ```
@@ -52,4 +52,3 @@ I (13246) webrtc: open browser and visit https://sepfy.github.io/webrtc?deviceId
 ```
 Open the browser and visit the website showing by serial port message
 ![image](https://github.com/sepfy/libpeer/assets/22016807/46df15b1-9e28-4a6b-bf0a-4f676778cf7d)
-

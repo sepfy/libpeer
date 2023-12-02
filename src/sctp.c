@@ -165,7 +165,7 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid) {
     memset(chunk->data, 0, payload_max);
     memcpy(chunk->data, buf + pos, len);
     packet->header.checksum = 0;
-    
+
     padding_len = 4 * ((len + sizeof(SctpDataChunk) + sizeof(SctpPacket) + 3) / 4);
 
     packet->header.checksum = sctp_get_checksum(sctp, (const uint8_t*)sctp->buf, padding_len);
@@ -581,4 +581,3 @@ void sctp_onclose(Sctp *sctp, void (*onclose)(void *userdata)) {
 
   sctp->onclose = onclose;
 }
-

@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < 8; i++) {
 
     memset(data, i + '1', MTU);
-    buffer_push_tail(rb, data, g_data_length[i]); 
+    buffer_push_tail(rb, data, g_data_length[i]);
     usleep(1000);
   }
 
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
 
   g_testing = 0;
 
-  pthread_join(thread, NULL);  
+  pthread_join(thread, NULL);
 
   printf("test success\n");
   return 0;

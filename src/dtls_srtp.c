@@ -97,7 +97,7 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp *dtls_srtp) {
   mbedtls_ctr_drbg_seed(&dtls_srtp->ctr_drbg, mbedtls_entropy_func, &dtls_srtp->entropy, (const unsigned char *) pers, strlen(pers));
 
   mbedtls_pk_setup(&dtls_srtp->pkey, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
- 
+
   mbedtls_rsa_gen_key(mbedtls_pk_rsa(dtls_srtp->pkey), mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg, RSA_KEY_LENGTH, 65537);
 
   mbedtls_x509write_crt_init(&crt);
@@ -281,7 +281,7 @@ static void dtls_srtp_key_derivation(void *context, mbedtls_ssl_key_export_type 
   // Export keying material
   if ((ret = mbedtls_ssl_tls_prf(tls_prf_type, secret, secret_len, dtls_srtp_label,
    randbytes, sizeof(randbytes), key_material, sizeof(key_material))) != 0) {
-    
+
     LOGE("mbedtls_ssl_tls_prf failed(%d)", ret);
     return;
   }
@@ -312,7 +312,7 @@ static void dtls_srtp_key_derivation(void *context, mbedtls_ssl_key_export_type 
 
   memset(&dtls_srtp->remote_policy, 0, sizeof(dtls_srtp->remote_policy));
 
-  srtp_crypto_policy_set_rtp_default(&dtls_srtp->remote_policy.rtp); 
+  srtp_crypto_policy_set_rtp_default(&dtls_srtp->remote_policy.rtp);
   srtp_crypto_policy_set_rtcp_default(&dtls_srtp->remote_policy.rtcp);
 
   memcpy(dtls_srtp->remote_policy_key, key_material, SRTP_MASTER_KEY_LENGTH);
@@ -356,15 +356,15 @@ static void dtls_srtp_key_derivation(void *context, mbedtls_ssl_key_export_type 
 static int dtls_srtp_do_handshake(DtlsSrtp *dtls_srtp) {
 
   int ret;
-  
-  static mbedtls_timing_delay_context timer; 
+
+  static mbedtls_timing_delay_context timer;
 
   mbedtls_ssl_set_timer_cb(&dtls_srtp->ssl, &timer, mbedtls_timing_set_delay, mbedtls_timing_get_delay);
 
   mbedtls_ssl_set_export_keys_cb(&dtls_srtp->ssl, dtls_srtp_key_derivation, dtls_srtp);
 
   mbedtls_ssl_set_bio(&dtls_srtp->ssl, dtls_srtp, dtls_srtp->udp_send, dtls_srtp->udp_recv, NULL);
-  
+
   do {
 
     ret = mbedtls_ssl_handshake(&dtls_srtp->ssl);
@@ -384,7 +384,7 @@ static int dtls_srtp_handshake_server(DtlsSrtp *dtls_srtp) {
 
     mbedtls_ssl_session_reset(&dtls_srtp->ssl);
 
-    mbedtls_ssl_set_client_transport_id(&dtls_srtp->ssl, client_ip, sizeof(client_ip)); 
+    mbedtls_ssl_set_client_transport_id(&dtls_srtp->ssl, client_ip, sizeof(client_ip));
 
     ret = dtls_srtp_do_handshake(dtls_srtp);
 
@@ -547,4 +547,3 @@ void dtls_srtp_encrypt_rctp_packet(DtlsSrtp *dtls_srtp, uint8_t *packet, int *by
 
   srtp_protect_rtcp(dtls_srtp->srtp_out, packet, bytes);
 }
-

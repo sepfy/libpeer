@@ -30,7 +30,7 @@ static uint16_t ice_candidate_local_preference(IceCandidate *candidate) {
 
 static void ice_candidate_priority(IceCandidate *candidate) {
 
-  // priority = (2^24)*(type preference) + (2^8)*(local preference) + (256 - component ID) 
+  // priority = (2^24)*(type preference) + (2^8)*(local preference) + (256 - component ID)
   candidate->priority = (1 << 24) * ice_candidate_type_preference(candidate->type) + (1 << 8) * ice_candidate_local_preference(candidate) + (256 - candidate->component);
 }
 
@@ -159,4 +159,3 @@ int ice_candidate_from_description(IceCandidate *candidate, char *description, c
 
   return 0;
 }
-

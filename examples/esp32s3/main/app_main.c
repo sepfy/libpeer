@@ -81,7 +81,7 @@ void app_main(void) {
   ESP_ERROR_CHECK(mdns_init());
 
   wifi_init_sta();
-  
+
   audio_init();
 
   video_init();

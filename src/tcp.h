@@ -26,4 +26,3 @@ int tcp_socket_recv(TcpSocket *tcp_socket, uint8_t *buf, int len);
 void tcp_blocking_timeout(TcpSocket *tcp_socket, long long int ms);
 
 #endif // TCP_SOCKET_H_
-

@@ -20,4 +20,3 @@ idf_component_register(
 )
 
 add_definitions("-DESP32 -DCONFIG_MQTT=0 -DCONFIG_HTTP=1 -DHTTP_DO_NOT_USE_CUSTOM_CONFIG -DMQTT_DO_NOT_USE_CUSTOM_CONFIG")
-

@@ -26,4 +26,3 @@ add_subdirectory(examples)
 if(ENABLE_TESTS)
   add_subdirectory(tests)
 endif()
-

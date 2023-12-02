@@ -12,4 +12,3 @@ foreach(sourcefile ${SRCS})
 endforeach(sourcefile ${TEST_SRCS})
 
 target_link_libraries(test_peer_connection cjson)
-

@@ -58,7 +58,7 @@ int buffer_push_tail(Buffer *rb, const uint8_t *data, int size) {
 
     int *p = (int*)(rb->data + rb->tail);
     *p = size;
-    memcpy(rb->data, data, size);    
+    memcpy(rb->data, data, size);
     rb->tail = size;
 
   } else {
@@ -116,4 +116,3 @@ void buffer_pop_head(Buffer *rb) {
     rb->head = rb->head + align_size;
   }
 }
-

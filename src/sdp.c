@@ -114,4 +114,3 @@ void sdp_create(Sdp *sdp, int b_video, int b_audio, int b_datachannel) {
 
   sdp_append(sdp, "a=ice-options:trickle");
 }
-
