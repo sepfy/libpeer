@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include <arpa/inet.h>
+#include "platform/socket.h"
 
 #include "peer_connection.h"
 #include "rtp.h"

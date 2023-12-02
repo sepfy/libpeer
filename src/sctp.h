@@ -138,7 +138,7 @@ typedef enum SctpDataPpid {
 
 typedef struct Sctp Sctp;
 
-typedef struct Sctp {
+struct Sctp {
 
   struct socket *sock;
 
@@ -156,7 +156,7 @@ typedef struct Sctp {
 
   void *userdata;
   uint8_t buf[CONFIG_MTU];
-} Sctp;
+};
 
 
 Sctp* sctp_create(DtlsSrtp *dtls_srtp);

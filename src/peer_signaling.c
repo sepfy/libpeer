@@ -1,7 +1,6 @@
 #include <string.h>
 #include <signal.h>
 #include <assert.h>
-#include <unistd.h>
 #include <cJSON.h>
 
 #include <core_mqtt.h>

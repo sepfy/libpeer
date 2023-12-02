@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
-#include <arpa/inet.h>
+#include "platform/misc.h"
 
 #include "sctp.h"
 #ifdef HAVE_USRSCTP
@@ -354,7 +354,7 @@ static int sctp_handle_incoming_data(Sctp *sctp, char *data, size_t len, uint32_
       break;
     case DATA_CHANNEL_PPID_DOMSTRING:
 
-      msg = strndup(data, len);
+      msg = platform_strndup(data, len);
       LOGD("Got message %s (size = %ld)", msg, len);
       if(msg && sctp->onmessasge) {
         sctp->onmessasge(msg, len, sctp->userdata);

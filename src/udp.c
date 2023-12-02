@@ -1,14 +1,5 @@
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <string.h>
-#include <sys/types.h>
-#include <errno.h>
-#include <net/if.h>
-#include <sys/ioctl.h>
-#include <netdb.h>
+#include "platform/address.h"
+#include "platform/socket.h"
 
 
 #include "utils.h"
@@ -65,7 +56,7 @@ int udp_socket_bind(UdpSocket *udp_socket, Address *addr) {
 void udp_socket_close(UdpSocket *udp_socket) {
 
   if (udp_socket->fd > 0) {
-    close(udp_socket->fd);
+    closesocket(udp_socket->fd);
   }
 }
 

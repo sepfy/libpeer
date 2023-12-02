@@ -49,7 +49,7 @@ static void* peer_singaling_task(void *data) {
     usleep(1000);
   }
 
-  pthread_exit(NULL);
+  return NULL;
 }
 
 static void* peer_connection_task(void *data) {
@@ -60,7 +60,7 @@ static void* peer_connection_task(void *data) {
     usleep(1000); 
   }
 
-  pthread_exit(NULL); 
+  return NULL;
 }
 
 static uint64_t get_timestamp() {
@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
   pthread_create(&peer_connection_thread, NULL, peer_connection_task, NULL);
   pthread_create(&peer_singaling_thread, NULL, peer_singaling_task, NULL);
 
-  reader_init("./media/");
+  reader_init(/*"./media/"*/);
 
   while (!g_interrupted) {
 

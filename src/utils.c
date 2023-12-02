@@ -1,9 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <sys/time.h>
+#include "platform/misc.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -88,7 +83,7 @@ void utils_get_md5(const char *input, size_t input_len, unsigned char *output) {
 uint32_t utils_get_timestamp() {
 
   struct timeval tv;
-  gettimeofday(&tv, NULL);
+  platform_gettimeofday(&tv, NULL);
   return (uint32_t) tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <inttypes.h>
+#include "platform/socket.h"
 
 #include "sctp.h"
 #include "agent.h"

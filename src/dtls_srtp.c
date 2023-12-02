@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
+#include "platform/socket.h"
+#include "platform/misc.h"
 
 #include "mbedtls/ssl.h"
 #include "dtls_srtp.h"
@@ -46,7 +46,7 @@ int dtls_srtp_udp_recv(void *ctx, uint8_t *buf, size_t len) {
 
   while ((ret = udp_socket_recvfrom(udp_socket, &udp_socket->bind_addr, buf, len)) <= 0) {
 
-    usleep(1000);
+    platform_sleep_ms(1);
   }
 
   LOGD("dtls_srtp_udp_recv (%d)", ret);
