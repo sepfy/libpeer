@@ -45,4 +45,3 @@ $ ./examples/sample/sample
 - [ESP32](https://github.com/sepfy/libpeer/tree/main/examples/esp32): MJPEG over datachannel
 - [ESP32-S3](https://github.com/sepfy/libpeer/tree/main/examples/esp32s3): Push video and audio to media server
 - [Raspberry Pi](https://github.com/sepfy/libpeer/tree/main/examples/raspberrypi): Video and two-way audio stream
-

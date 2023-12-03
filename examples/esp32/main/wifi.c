@@ -138,4 +138,3 @@ void wifi_init_sta(void)
     ESP_LOGE(TAG, "UNEXPECTED EVENT");
   }
 }
-

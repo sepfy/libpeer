@@ -16,9 +16,9 @@ typedef struct StunMessage StunMessage;
 #define STUN_ATTR_BUF_SIZE 256
 #define MAGIC_COOKIE 0x2112A442
 #define STUN_FINGERPRINT_XOR 0x5354554e
-  
+
 typedef enum StunClass {
-  
+
   STUN_CLASS_REQUEST = 0x0000,
   STUN_CLASS_INDICATION = 0x0010,
   STUN_CLASS_RESPONSE = 0x0100,
@@ -38,6 +38,7 @@ typedef enum StunAttrType {
   STUN_ATTR_TYPE_MAPPED_ADDRESS = 0x0001,
   STUN_ATTR_TYPE_USERNAME = 0x0006,
   STUN_ATTR_TYPE_MESSAGE_INTEGRITY = 0x0008,
+  STUN_ATTR_TYPE_ERROR_CODE = 0x0009,
   STUN_ATTR_TYPE_LIFETIME = 0x000d,
   STUN_ATTR_TYPE_REALM = 0x0014,
   STUN_ATTR_TYPE_NONCE = 0x0015,
@@ -69,7 +70,7 @@ struct StunHeader {
   uint32_t magic_cookie;
   uint32_t transaction_id[3];
 };
-    
+
 struct StunAttribute {
 
   uint16_t type;
@@ -91,7 +92,7 @@ struct StunMessage {
   uint8_t buf[STUN_ATTR_BUF_SIZE];
   size_t size;
 
-};  
+};
 
 void stun_msg_create(StunMessage *msg, uint16_t type);
 

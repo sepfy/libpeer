@@ -69,7 +69,7 @@ uint8_t* reader_h264_find_nalu(uint8_t *buf_start, uint8_t *buf_end) {
 
 int reader_get_video_frame(uint8_t *buf, int *size) {
 
-  int ret = -1; 
+  int ret = -1;
   static uint8_t pps_frame[128];
   static uint8_t sps_frame[128];
   static int pps_size = 0;
@@ -116,8 +116,8 @@ int reader_get_video_frame(uint8_t *buf, int *size) {
     memcpy(buf, pstart, nalu_size);
     ret = 0;
   }
- 
-  pstart = pend; 
+
+  pstart = pend;
 
   return ret;
 }
@@ -149,4 +149,3 @@ void reader_deinit() {
     g_audio_buf = NULL;
   }
 }
-

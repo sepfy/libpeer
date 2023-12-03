@@ -26,7 +26,7 @@ static void onclose(void *user_data) {
 
 }
 
-static void onmessasge(char *msg, size_t len, void *user_data) {
+static void onmessage(char *msg, size_t len, void *user_data) {
 
   printf("on message: %s", msg);
 
@@ -49,7 +49,7 @@ static void* peer_singaling_task(void *data) {
     usleep(1000);
   }
 
-  pthread_exit(NULL);
+  return NULL;
 }
 
 static void* peer_connection_task(void *data) {
@@ -57,10 +57,10 @@ static void* peer_connection_task(void *data) {
   while (!g_interrupted) {
 
     peer_connection_loop(g_pc);
-    usleep(1000); 
+    usleep(1000);
   }
 
-  pthread_exit(NULL); 
+  return NULL;
 }
 
 static uint64_t get_timestamp() {
@@ -96,14 +96,14 @@ int main(int argc, char *argv[]) {
   peer_init();
   g_pc = peer_connection_create(&config);
   peer_connection_oniceconnectionstatechange(g_pc, onconnectionstatechange);
-  peer_connection_ondatachannel(g_pc, onmessasge, onopen, onclose);
+  peer_connection_ondatachannel(g_pc, onmessage, onopen, onclose);
 
   peer_signaling_join_channel((const char*)buf, g_pc);
 
   pthread_create(&peer_connection_thread, NULL, peer_connection_task, NULL);
   pthread_create(&peer_singaling_thread, NULL, peer_singaling_task, NULL);
 
-  reader_init("./media/");
+  reader_init(/*"./media/"*/);
 
   while (!g_interrupted) {
 

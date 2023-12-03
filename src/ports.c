@@ -1,17 +1,10 @@
 #include <string.h>
-#include <sys/types.h>
-#include <net/if.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <netdb.h>
+#include "platform/socket.h"
+#include "platform/address.h"
 
 #ifdef ESP32
 #include <mdns.h>
 #include <esp_netif.h>
-#else
-#include <ifaddrs.h>
-#include <sys/ioctl.h>
-#include <errno.h>
 #endif
 
 #include "ports.h"
@@ -21,7 +14,36 @@ int ports_get_host_addr(Address *addr) {
 
   int ret = 0;
 
-#ifdef ESP32
+#ifdef _WIN32
+  char buf[256];
+  if(gethostname(buf, sizeof(buf)))
+  {
+    LOGE("could not get own hostname");
+    return 0;
+  }
+
+  struct hostent* host = gethostbyname(buf);
+  if(!host || !host->h_addr_list[0])
+  {
+    LOGE("could not get host info for self");
+    return 0;
+  }
+
+  addr->family = host->h_addrtype;
+  switch(host->h_addrtype)
+  {
+  case AF_INET:
+    memcpy(addr->ipv4, host->h_addr_list[0], sizeof(addr->ipv4));
+    break;
+  case AF_INET6:
+    memcpy(addr->ipv6, host->h_addr_list[0], sizeof(addr->ipv6));
+    break;
+  default:
+    LOGE("unknown address type for own host info");
+    return 0;
+  }
+  ret = 1;
+#elif defined(ESP32)
 
   esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
 
@@ -81,12 +103,12 @@ int ports_resolve_addr(const char *host, Address *addr) {
   struct addrinfo hints, *res, *p;
   int status;
   memset(&hints, 0, sizeof(hints));
-  hints.ai_family = AF_UNSPEC;
+  hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
 
   if ((status = getaddrinfo(host, NULL, &hints, &res)) != 0) {
-    //LOGE("getaddrinfo error: %s\n", gai_strerror(status));
-    LOGE("getaddrinfo error: %d\n", status);
+    LOGE("getaddrinfo error: `%s` => %s\n", host, gai_strerror(status));
+    //LOGE("getaddrinfo error: %d\n", status);
     return ret;
   }
 
@@ -108,10 +130,10 @@ int ports_resolve_mdns_host(const char *host, Address *addr) {
   int ret = -1;
   struct esp_ip4_addr esp_addr;
   char host_name[64] = {0};
-  char *pos = strstr(host, ".local"); 
+  char *pos = strstr(host, ".local");
   snprintf(host_name, pos - host + 1, "%s", host);
   esp_addr.addr = 0;
-    
+
   esp_err_t err = mdns_query_a(host_name, 2000,  &esp_addr);
   if (err) {
     if (err == ESP_ERR_NOT_FOUND) {
@@ -128,5 +150,3 @@ int ports_resolve_mdns_host(const char *host, Address *addr) {
   return ports_resolve_addr(host, addr);
 #endif
 }
-
-

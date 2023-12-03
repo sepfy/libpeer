@@ -153,4 +153,3 @@ void camera_task(void *pvParameters) {
   }
 
 }
-

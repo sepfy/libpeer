@@ -1,14 +1,5 @@
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <string.h>
-#include <sys/types.h>
-#include <errno.h>
-#include <net/if.h>
-#include <sys/ioctl.h>
-#include <netdb.h>
+#include "platform/address.h"
+#include "platform/socket.h"
 
 #include "utils.h"
 #include "tcp.h"
@@ -44,7 +35,7 @@ int tcp_socket_connect(TcpSocket *tcp_socket, Address *addr) {
   socklen_t sin_len = sizeof(sin);
   sin.sin_family = AF_INET;
   sin.sin_port = htons(addr->port);
-  memcpy(&sin.sin_addr.s_addr, addr->ipv4, 4); 
+  memcpy(&sin.sin_addr.s_addr, addr->ipv4, 4);
   LOGI("port: %d", addr->port);
   LOGI("addr: %s", inet_ntoa(sin.sin_addr));
   if (connect(tcp_socket->fd, (struct sockaddr *)&sin, sin_len) < 0) {
@@ -59,7 +50,7 @@ int tcp_socket_connect(TcpSocket *tcp_socket, Address *addr) {
 void tcp_socket_close(TcpSocket *tcp_socket) {
 
   if (tcp_socket->fd > 0) {
-    close(tcp_socket->fd);
+    closesocket(tcp_socket->fd);
   }
 }
 
@@ -138,7 +129,7 @@ int tcp_socket_recv(TcpSocket *tcp_socket, uint8_t *buf, int len) {
   if (tcp_socket->fd < 0) {
 
     LOGE("recvfrom before socket init");
-    return -1; 
+    return -1;
   }
 
   FD_ZERO(&read_set);
@@ -165,4 +156,3 @@ int tcp_socket_recv(TcpSocket *tcp_socket, uint8_t *buf, int len) {
 
   return ret;
 }
-

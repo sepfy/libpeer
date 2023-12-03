@@ -9,7 +9,7 @@
 #ifndef HAVE_USRSCTP
 
 typedef enum DecpMsgType {
-  
+
   DATA_CHANNEL_OPEN = 0x03,
   DATA_CHANNEL_ACK = 0x02,
 
@@ -34,10 +34,10 @@ typedef enum SctpHeaderType {
   SCTP_DATA = 0,
   SCTP_INIT = 1,
   SCTP_INIT_ACK = 2,
-  SCTP_SACK = 3, 
+  SCTP_SACK = 3,
   SCTP_HEARTBEAT = 4,
   SCTP_HEARTBEAT_ACK = 5,
-  SCTP_ABORT = 6, 
+  SCTP_ABORT = 6,
   SCTP_SHUTDOWN = 7,
   SCTP_SHUTDOWN_ACK = 8,
   SCTP_ERROR = 9,
@@ -46,7 +46,7 @@ typedef enum SctpHeaderType {
   SCTP_ECNE = 12,
   SCTP_CWR = 13,
   SCTP_SHUTDOWN_COMPLETE = 14,
-  SCTP_AUTH = 15, 
+  SCTP_AUTH = 15,
   SCTP_ASCONF_ACK = 128,
   SCTP_ASCONF = 130,
   SCTP_FORWARD_TSN = 192
@@ -138,7 +138,7 @@ typedef enum SctpDataPpid {
 
 typedef struct Sctp Sctp;
 
-typedef struct Sctp {
+struct Sctp {
 
   struct socket *sock;
 
@@ -150,13 +150,13 @@ typedef struct Sctp {
   DtlsSrtp *dtls_srtp;
   Buffer **data_rb;
   /* datachannel */
-  void (*onmessasge)(char *msg, size_t len, void *userdata);
+  void (*onmessage)(char *msg, size_t len, void *userdata);
   void (*onopen)(void *userdata);
   void (*onclose)(void *userdata);
 
   void *userdata;
   uint8_t buf[CONFIG_MTU];
-} Sctp;
+};
 
 
 Sctp* sctp_create(DtlsSrtp *dtls_srtp);
@@ -171,7 +171,7 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len);
 
 int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid);
 
-void sctp_onmessage(Sctp *sctp, void (*onmessasge)(char *msg, size_t len, void *userdata));
+void sctp_onmessage(Sctp *sctp, void (*onmessage)(char *msg, size_t len, void *userdata));
 
 void sctp_onopen(Sctp *sctp, void (*onopen)(void *userdata));
 

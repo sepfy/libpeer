@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include <arpa/inet.h>
+#include "platform/socket.h"
 
 #include "peer_connection.h"
 #include "rtp.h"
@@ -190,7 +190,7 @@ static int rtp_encoder_encode_generic(RtpEncoder *rtp_encoder, uint8_t *buf, siz
   memcpy(rtp_encoder->buf + sizeof(RtpHeader), buf, size);
 
   rtp_encoder->on_packet(rtp_encoder->buf, size + sizeof(RtpHeader), rtp_encoder->user_data);
-  
+
   return 0;
 }
 
@@ -270,4 +270,3 @@ int rtp_decoder_decode(RtpDecoder *rtp_decoder, uint8_t *buf, size_t size) {
     return -1;
   return rtp_decoder->decode_func(rtp_decoder, buf, size);
 }
-

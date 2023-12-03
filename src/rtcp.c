@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <arpa/inet.h>
 #include <string.h>
+#include "platform/socket.h"
 
 #include "rtcp.h"
 #include "rtp.h"
@@ -60,4 +60,3 @@ RtcpRr rtcp_parse_rr(uint8_t *packet) {
 
   return rtcp_rr;
 }
-

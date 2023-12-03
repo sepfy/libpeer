@@ -152,4 +152,3 @@ void audio_task(void *arg) {
     }
   }
 }
-

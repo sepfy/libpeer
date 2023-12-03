@@ -108,7 +108,7 @@ static void onclose(void *user_data) {
 
 }
 
-static void onmessasge(char *msg, size_t len, void *user_data) {
+static void onmessage(char *msg, size_t len, void *user_data) {
 
   printf("on message: %s", msg);
 
@@ -144,10 +144,10 @@ static void* peer_connection_task(void *data) {
   while (!g_interrupted) {
 
     peer_connection_loop(g_pc);
-    usleep(1000); 
+    usleep(1000);
   }
 
-  pthread_exit(NULL); 
+  pthread_exit(NULL);
 }
 
 void get_hwaddr(char *buf, size_t size) {
@@ -218,7 +218,7 @@ int main(int argc, char *argv[]) {
 
   g_pc = peer_connection_create(&config);
   peer_connection_oniceconnectionstatechange(g_pc, onconnectionstatechange);
-  peer_connection_ondatachannel(g_pc, onmessasge, onopen, onclose);
+  peer_connection_ondatachannel(g_pc, onmessage, onopen, onclose);
 
   peer_signaling_join_channel(device_id, g_pc);
 

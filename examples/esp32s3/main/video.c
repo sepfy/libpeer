@@ -183,4 +183,3 @@ void video_task(void *pvParameters) {
   }
 
 }
-

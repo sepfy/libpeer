@@ -4,11 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-
-#include <pthread.h>
 
 #include "udp.h"
 #include "utils.h"
@@ -101,4 +96,3 @@ void agent_init(Agent *agent);
 void agent_deinit(Agent *agent);
 
 #endif // AGENT_H_
-

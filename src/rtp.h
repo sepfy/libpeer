@@ -2,16 +2,10 @@
 #define RTP_H_
 
 #include <stdint.h>
-#include <endian.h>
+#include "platform/endian.h"
 
 #include "peer_connection.h"
 #include "config.h"
-
-#ifdef ESP32
-#define __BIG_ENDIAN 4321
-#define __LITTLE_ENDIAN 1234
-#define __BYTE_ORDER __LITTLE_ENDIAN
-#endif
 
 typedef enum RtpPayloadType {
 
@@ -33,14 +27,14 @@ typedef enum RtpSsrc {
 } RtpSsrc;
 
 typedef struct RtpHeader {
-#if __BYTE_ORDER == __BIG_ENDIAN
+#if PLATFORM_BYTE_ORDER == PLATFORM_BIG_ENDIAN
   uint16_t version:2;
   uint16_t padding:1;
   uint16_t extension:1;
   uint16_t csrccount:4;
   uint16_t markerbit:1;
   uint16_t type:7;
-#elif __BYTE_ORDER == __LITTLE_ENDIAN
+#elif PLATFORM_BYTE_ORDER == PLATFORM_LITTLE_ENDIAN
   uint16_t csrccount:4;
   uint16_t extension:1;
   uint16_t padding:1;

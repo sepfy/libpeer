@@ -29,4 +29,3 @@ int ssl_transport_recv(NetworkContext_t *net_ctx, void *buf, size_t len);
 int ssl_transport_send(NetworkContext_t *net_ctx, const void *buf, size_t len);
 
 #endif // SSL_TRANSPORT_H_
-

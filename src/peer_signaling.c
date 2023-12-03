@@ -1,7 +1,6 @@
 #include <string.h>
 #include <signal.h>
 #include <assert.h>
-#include <unistd.h>
 #include <cJSON.h>
 
 #include <core_mqtt.h>
@@ -112,11 +111,11 @@ static void peer_signaling_process_request(const char *msg, size_t size) {
   do {
 
     method = cJSON_GetObjectItem(request, "method");
-    
+
     id = cJSON_GetObjectItem(request, "id");
-    
+
     if (!id && !cJSON_IsNumber(id)) {
-      
+
       LOGW("Cannot find id");
       break;
     }
@@ -132,7 +131,7 @@ static void peer_signaling_process_request(const char *msg, size_t size) {
 
     if (strcmp(method->valuestring, JRPC_PEER_OFFER) == 0) {
 
-      if (state == PEER_CONNECTION_CLOSED) { 
+      if (state == PEER_CONNECTION_CLOSED) {
 
         g_ps.id = id->valueint;
         peer_connection_create_offer(g_ps.pc);
@@ -149,7 +148,7 @@ static void peer_signaling_process_request(const char *msg, size_t size) {
       if (state == PEER_CONNECTION_NEW) {
 
         cJSON *params = cJSON_GetObjectItem(request, "params");
-        
+
         if (!params && !cJSON_IsString(params)) {
 
           LOGW("Cannot find params");
@@ -227,7 +226,7 @@ HTTPResponse_t peer_signaling_http_request(const TransportInterface_t *transport
   return response;
 }
 
-static int peer_signaling_http_post(const char *hostname, const char *path, int port, const char *body) { 
+static int peer_signaling_http_post(const char *hostname, const char *path, int port, const char *body) {
   int32_t ret = EXIT_SUCCESS;
 
   TransportInterface_t trans_if = {0};
@@ -402,7 +401,7 @@ void peer_signaling_leave_channel() {
   if (peer_signaling_mqtt_subscribe(0) == 0) {
 
     status = MQTT_Disconnect(&g_ps.mqtt_ctx);
-  } 
+  }
 
   if(status != MQTTSuccess) {
 
@@ -410,4 +409,3 @@ void peer_signaling_leave_channel() {
   }
 #endif
 }
-

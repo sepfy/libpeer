@@ -17,4 +17,3 @@ void peer_deinit();
 #endif
 
 #endif // PEER_H_
-

@@ -7,7 +7,7 @@
 void on_agent_state_changed(AgentState state, void *user_data) {
 
   printf("Agent state changed: %d\n", state);
-} 
+}
 
 int main(int argc, char *argv[]) {
 #if 0
@@ -58,4 +58,3 @@ int main(int argc, char *argv[]) {
 #endif
   return 0;
 }
-

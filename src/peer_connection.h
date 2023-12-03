@@ -26,7 +26,7 @@ typedef enum PeerConnectionState {
 
 typedef enum DataChannelType {
 
-  DATA_CHANNEL_NONE = 0, 
+  DATA_CHANNEL_NONE = 0,
   DATA_CHANNEL_STRING,
   DATA_CHANNEL_BINARY,
 
@@ -38,7 +38,7 @@ typedef enum MediaCodec {
 
   /* Video */
   CODEC_H264,
-  CODEC_VP8, // not implemented yet 
+  CODEC_VP8, // not implemented yet
   CODEC_MJPEG, // not implemented yet
 
   /* Audio */
@@ -113,7 +113,7 @@ void peer_connection_on_receiver_packet_loss(PeerConnection *pc,
  * @brief Set the callback function to handle onicecandidate event.
  * @param A PeerConnection.
  * @param A callback function to handle onicecandidate event.
- * @param A userdata which is pass to callback function. 
+ * @param A userdata which is pass to callback function.
  */
 void peer_connection_onicecandidate(PeerConnection *pc, void (*onicecandidate)(char *sdp_text, void *userdata));
 
@@ -121,7 +121,7 @@ void peer_connection_onicecandidate(PeerConnection *pc, void (*onicecandidate)(c
  * @brief Set the callback function to handle oniceconnectionstatechange event.
  * @param A PeerConnection.
  * @param A callback function to handle oniceconnectionstatechange event.
- * @param A userdata which is pass to callback function. 
+ * @param A userdata which is pass to callback function.
  */
 void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
  void (*oniceconnectionstatechange)(PeerConnectionState state, void *userdata));
@@ -134,7 +134,7 @@ void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
  * @param[in] callback function when connection is closed
  */
 void peer_connection_ondatachannel(PeerConnection *pc,
- void (*onmessasge)(char *msg, size_t len, void *userdata),
+ void (*onmessage)(char *msg, size_t len, void *userdata),
  void (*onopen)(void *userdata),
  void (*onclose)(void *userdata));
 
@@ -143,4 +143,3 @@ void peer_connection_ondatachannel(PeerConnection *pc,
 #endif
 
 #endif // PEER_CONNECTION_H_
-

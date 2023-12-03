@@ -84,7 +84,7 @@ int dtls_srtp_handshake(DtlsSrtp *dtls_srtp, Address *addr);
 void dtls_srtp_reset_session(DtlsSrtp *dtls_srtp);
 
 int dtls_srtp_write(DtlsSrtp *dtls_srtp, const uint8_t *buf, size_t len);
-  
+
 int dtls_srtp_read(DtlsSrtp *dtls_srtp, uint8_t *buf, size_t len);
 
 void dtls_srtp_encrypt_rtp_packet(DtlsSrtp *dtls_srtp, uint8_t *packet, int *bytes);
@@ -102,4 +102,3 @@ void dtls_srtp_encrypt_rtp_packet(DtlsSrtp *dtls_srtp, uint8_t *packet, int *byt
 void dtls_srtp_encrypt_rctp_packet(DtlsSrtp *dtls_srtp, uint8_t *packet, int *bytes);
 
 #endif // DTLS_SRTP_H_
-

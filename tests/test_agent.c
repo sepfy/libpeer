@@ -14,7 +14,7 @@ void test_turn(Agent *agent, char *turnserver, char *username, char *credential)
 
   ice_candidate_to_description(&agent->local_candidates[1], description, sizeof(description));
 
-  printf("turn server: %s. ice candidate: %s", turnserver, description); 
+  printf("turn server: %s. ice candidate: %s", turnserver, description);
 }
 
 void test_stun(Agent *agent, char *stunserver) {
@@ -58,4 +58,3 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
-

@@ -32,13 +32,13 @@ typedef enum IceCandidateType {
 typedef struct IceCandidate IceCandidate;
 
 struct IceCandidate {
-   
+
   int foundation;
 
   int component;
 
   uint32_t priority;
- 
+
   char transport[32 + 1];
 
   IceCandidateType type;

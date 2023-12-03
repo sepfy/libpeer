@@ -30,6 +30,7 @@ void sdp_reset(Sdp *sdp) {
 void sdp_append_h264(Sdp *sdp) {
 
   sdp_append(sdp, "m=video 9 UDP/TLS/RTP/SAVPF 96 102");
+  sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtcp-fb:102 nack");
   sdp_append(sdp, "a=rtcp-fb:102 nack pli");
   sdp_append(sdp, "a=fmtp:96 profile-level-id=42e01f;level-asymmetry-allowed=1");
@@ -39,49 +40,48 @@ void sdp_append_h264(Sdp *sdp) {
   sdp_append(sdp, "a=ssrc:1 cname:webrtc-h264");
   sdp_append(sdp, "a=sendrecv");
   sdp_append(sdp, "a=mid:video");
-  sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtcp-mux");
 }
 
 void sdp_append_pcma(Sdp *sdp) {
 
   sdp_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 8");
+  sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtpmap:8 PCMA/8000");
   sdp_append(sdp, "a=ssrc:4 cname:webrtc-pcma");
   sdp_append(sdp, "a=sendrecv");
   sdp_append(sdp, "a=mid:audio");
-  sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtcp-mux");
 }
 
 void sdp_append_pcmu(Sdp *sdp) {
 
   sdp_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 0");
+  sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtpmap:0 PCMU/8000");
   sdp_append(sdp, "a=ssrc:5 cname:webrtc-pcmu");
   sdp_append(sdp, "a=sendrecv");
   sdp_append(sdp, "a=mid:audio");
-  sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtcp-mux");
 }
 
 void sdp_append_opus(Sdp *sdp) {
 
   sdp_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 111");
+  sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtpmap:111 opus/48000/2");
   sdp_append(sdp, "a=ssrc:6 cname:webrtc-opus");
   sdp_append(sdp, "a=sendrecv");
   sdp_append(sdp, "a=mid:audio");
-  sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtcp-mux");
 }
 
 void sdp_append_datachannel(Sdp *sdp) {
 
   sdp_append(sdp, "m=application 50712 UDP/DTLS/SCTP webrtc-datachannel");
+  sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=mid:datachannel");
   sdp_append(sdp, "a=sctp-port:5000");
-  sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=max-message-size:262144");
 }
 
@@ -111,5 +111,6 @@ void sdp_create(Sdp *sdp, int b_video, int b_audio, int b_datachannel) {
   }
 
   sdp_append(sdp, bundle);
-}
 
+  sdp_append(sdp, "a=ice-options:trickle");
+}

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <inttypes.h>
+#include "platform/socket.h"
 
 #include "sctp.h"
 #include "agent.h"
@@ -61,9 +61,9 @@ static void peer_connection_outgoing_rtp_packet(uint8_t *data, size_t size, void
 static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t len) {
 
   static const int MAX_RECV = 200;
-  int recv_max = 0; 
-  int ret; 
-  DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx; 
+  int recv_max = 0;
+  int ret;
+  DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx;
   PeerConnection *pc = (PeerConnection *) dtls_srtp->user_data;
 
   if (pc->agent_ret > 0 && pc->agent_ret <= len) {
@@ -83,17 +83,17 @@ static int peer_connection_dtls_srtp_recv(void *ctx, unsigned char *buf, size_t 
     recv_max++;
 
   }
-  return ret;	
+  return ret;
 }
 
 static int peer_connection_dtls_srtp_send(void *ctx, const uint8_t *buf, size_t len) {
-  
-  DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx; 
+
+  DtlsSrtp *dtls_srtp = (DtlsSrtp *) ctx;
   PeerConnection *pc = (PeerConnection *) dtls_srtp->user_data;
 
-  //LOGD("send %.4x %.4x, %ld", *(uint16_t*)buf, *(uint16_t*)(buf + 2), len); 
+  //LOGD("send %.4x %.4x, %ld", *(uint16_t*)buf, *(uint16_t*)(buf + 2), len);
   return agent_send(&pc->agent, buf, len);
-  
+
 }
 
 static void peer_connection_incoming_rtcp(PeerConnection *pc, uint8_t *buf, size_t len) {
@@ -127,7 +127,7 @@ static void peer_connection_incoming_rtcp(PeerConnection *pc, uint8_t *buf, size
         // PLI and FIR
         if ((fmt == 1 || fmt == 4) && pc->config.on_request_keyframe) {
             pc->config.on_request_keyframe();
-        } 
+        }
       }
       default:
         break;
@@ -514,7 +514,7 @@ int peer_connection_send_rtcp_pil(PeerConnection *pc, uint32_t ssrc) {
   int ret = -1;
   uint8_t plibuf[128];
   rtcp_get_pli(plibuf, 12, ssrc);
- 
+
   //TODO: encrypt rtcp packet
   //guint size = 12;
   //dtls_transport_encrypt_rctp_packet(pc->dtls_transport, plibuf, &size);
@@ -547,7 +547,7 @@ void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
 }
 
 void peer_connection_ondatachannel(PeerConnection *pc,
- void (*onmessasge)(char *msg, size_t len, void *userdata),
+ void (*onmessage)(char *msg, size_t len, void *userdata),
  void (*onopen)(void *userdata),
  void (*onclose)(void *userdata)) {
 
@@ -555,7 +555,6 @@ void peer_connection_ondatachannel(PeerConnection *pc,
 
     sctp_onopen(&pc->sctp, onopen);
     sctp_onclose(&pc->sctp, onclose);
-    sctp_onmessage(&pc->sctp, onmessasge);
+    sctp_onmessage(&pc->sctp, onmessage);
   }
 }
-

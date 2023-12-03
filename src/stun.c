@@ -1,9 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
+#include "platform/socket.h"
 
 #include "utils.h"
 #include "stun.h"
@@ -50,7 +48,7 @@ uint32_t CRC32_TABLE[256] = {
 
 void stun_msg_create(StunMessage *msg, uint16_t type) {
 
-  StunHeader *header = (StunHeader *)msg->buf; 
+  StunHeader *header = (StunHeader *)msg->buf;
   header->type = htons(type);
   header->length = 0;
   header->magic_cookie = htonl(MAGIC_COOKIE);
@@ -70,10 +68,10 @@ void stun_set_mapped_address(char *value, uint8_t *mask, Address *addr) {
   uint8_t *ipv4 = (uint8_t *)(value + 4);
 
   *family = 0x01;
-  *port = htons(addr->port);
- 
+  *port = htons(addr->port) ^ (mask ? *(uint16_t*)mask : 0);
+
   for (i = 0; i < 4; i++) {
-    ipv4[i] = addr->ipv4[i];
+    ipv4[i] = addr->ipv4[i] ^ (mask ? mask[i] : 0);
   }
 
   //LOGD("XOR Mapped Address Family: 0x%02x", *family);
@@ -89,14 +87,14 @@ void stun_get_mapped_address(char *value, uint8_t *mask, Address *addr) {
   if (addr->family == 0x01) {
 
     addr->port = ntohs(*(uint16_t *)(value + 2) ^ *(uint16_t*)mask);
-    *addr32 = (*(uint32_t *)(value + 4) ^ *(uint32_t*)mask); 
+    *addr32 = (*(uint32_t *)(value + 4) ^ *(uint32_t*)mask);
 
-  } else { 
+  } else {
 
     LOGW("Not support IPv6");
   }
 
-  LOGD("XOR Mapped Address Family: 0x%02x", addr->family); 
+  LOGD("XOR Mapped Address Family: 0x%02x", addr->family);
   LOGD("XOR Mapped Address Port: %d", addr->port);
   LOGD("XOR Mapped Address Address: %d.%d.%d.%d", addr->ipv4[0], addr->ipv4[1], addr->ipv4[2], addr->ipv4[3]);
 }
@@ -192,6 +190,9 @@ void stun_parse_msg_buf(StunMessage *msg) {
       case STUN_ATTR_TYPE_NETWORK_COST:
         // Do nothing
         break;
+      case STUN_ATTR_TYPE_ERROR_CODE:
+        LOGE("STUN Error: %u - %.*s", (uint32_t)ntohl(*(uint32_t*)attr->value), attr->length - 4, attr->value + 4);
+        break;
       default:
         LOGE("Unknown Attribute Type: 0x%04x", ntohs(attr->type));
         break;
@@ -221,7 +222,7 @@ void stun_parse_binding_response(char *buf, size_t len, Address *addr) {
       stun_get_mapped_address(attr->value, mask, addr);
 
     } else if (ntohs(attr->type) == STUN_ATTR_TYPE_XOR_MAPPED_ADDRESS) {
- 
+
       *((uint32_t *)mask) = htonl(MAGIC_COOKIE);
 
       stun_get_mapped_address(attr->value, mask, addr);
@@ -269,7 +270,7 @@ void stun_calculate_fingerprint(char *buf, size_t len, uint32_t *fingerprint) {
 
   uint32_t c = 0xFFFFFFFF;
   int i = 0;
- 
+
   for (i = 0; i < len; ++i) {
 
     c = CRC32_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >> 8);
@@ -279,7 +280,7 @@ void stun_calculate_fingerprint(char *buf, size_t len, uint32_t *fingerprint) {
 }
 
 int stun_msg_write_attr(StunMessage *msg, StunAttrType type, uint16_t length, char *value) {
-  
+
   StunHeader *header = (StunHeader *)msg->buf;
 
   StunAttribute *stun_attr = (StunAttribute*)(msg->buf + msg->size);
@@ -315,7 +316,7 @@ int stun_msg_finish(StunMessage *msg, StunCredential credential, const char *pas
 
   StunHeader *header = (StunHeader *)msg->buf;
   StunAttribute *stun_attr;
-  
+
   uint16_t header_length = ntohs(header->length);
   char key[256];
   char hash_key[17];
@@ -406,7 +407,7 @@ int stun_msg_is_valid(uint8_t *buf, size_t size, char *password) {
 
   memcpy(msg.buf, buf, size);
 
-  stun_parse_msg_buf(&msg); 
+  stun_parse_msg_buf(&msg);
 
   StunHeader *header = (StunHeader *)msg.buf;
 
@@ -444,4 +445,3 @@ int stun_msg_is_valid(uint8_t *buf, size_t size, char *password) {
 
   return 0;
 }
-

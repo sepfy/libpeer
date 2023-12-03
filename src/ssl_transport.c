@@ -43,7 +43,7 @@ int ssl_transport_connect(NetworkContext_t *net_ctx,
    MBEDTLS_SSL_IS_CLIENT,
    MBEDTLS_SSL_TRANSPORT_STREAM,
    MBEDTLS_SSL_PRESET_DEFAULT)) != 0) {
-    
+
     LOGE("ssl config error: -0x%x", (unsigned int) -ret);
   }
 
@@ -125,5 +125,3 @@ int ssl_transport_send(NetworkContext_t *net_ctx, const void *buf, size_t len) {
 
   return ret;
 }
-
-
