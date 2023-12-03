@@ -26,7 +26,7 @@ static void onclose(void *user_data) {
 
 }
 
-static void onmessasge(char *msg, size_t len, void *user_data) {
+static void onmessage(char *msg, size_t len, void *user_data) {
 
   printf("on message: %s", msg);
 
@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
   peer_init();
   g_pc = peer_connection_create(&config);
   peer_connection_oniceconnectionstatechange(g_pc, onconnectionstatechange);
-  peer_connection_ondatachannel(g_pc, onmessasge, onopen, onclose);
+  peer_connection_ondatachannel(g_pc, onmessage, onopen, onclose);
 
   peer_signaling_join_channel((const char*)buf, g_pc);
 

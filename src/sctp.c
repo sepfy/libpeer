@@ -231,8 +231,8 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
 #endif
         if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_DOMSTRING) {
 
-          if (sctp->onmessasge) {
-            sctp->onmessasge((char*)data_chunk->data, ntohs(data_chunk->length) - sizeof(SctpDataChunk), sctp->userdata);
+          if (sctp->onmessage) {
+            sctp->onmessage((char*)data_chunk->data, ntohs(data_chunk->length) - sizeof(SctpDataChunk), sctp->userdata);
           }
         }
 
@@ -356,8 +356,8 @@ static int sctp_handle_incoming_data(Sctp *sctp, char *data, size_t len, uint32_
 
       msg = platform_strndup(data, len);
       LOGD("Got message %s (size = %ld)", msg, len);
-      if(msg && sctp->onmessasge) {
-        sctp->onmessasge(msg, len, sctp->userdata);
+      if(msg && sctp->onmessage) {
+        sctp->onmessage(msg, len, sctp->userdata);
         free(msg);
       }
       break;
@@ -567,9 +567,9 @@ void sctp_destroy(Sctp *sctp) {
 #endif
 }
 
-void sctp_onmessage(Sctp *sctp, void (*onmessasge)(char *msg, size_t len, void *userdata)) {
+void sctp_onmessage(Sctp *sctp, void (*onmessage)(char *msg, size_t len, void *userdata)) {
 
-  sctp->onmessasge = onmessasge;
+  sctp->onmessage = onmessage;
 }
 
 void sctp_onopen(Sctp *sctp, void (*onopen)(void *userdata)) {

@@ -49,7 +49,7 @@ static void oniceconnectionstatechange(PeerConnectionState state, void *user_dat
   }
 }
 
-static void onmessasge(char *msg, size_t len, void *userdata) {
+static void onmessage(char *msg, size_t len, void *userdata) {
 
   ESP_LOGI(TAG, "Datachannel message: %.*s, size", len, msg);
 }
@@ -131,7 +131,7 @@ void app_main(void) {
 
   g_pc = peer_connection_create(&config);
   peer_connection_oniceconnectionstatechange(g_pc, oniceconnectionstatechange);
-  peer_connection_ondatachannel(g_pc, onmessasge, onopen, onclose);
+  peer_connection_ondatachannel(g_pc, onmessage, onopen, onclose);
 
   peer_signaling_join_channel(deviceid, g_pc);
 

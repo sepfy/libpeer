@@ -134,7 +134,7 @@ void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
  * @param[in] callback function when connection is closed
  */
 void peer_connection_ondatachannel(PeerConnection *pc,
- void (*onmessasge)(char *msg, size_t len, void *userdata),
+ void (*onmessage)(char *msg, size_t len, void *userdata),
  void (*onopen)(void *userdata),
  void (*onclose)(void *userdata));
 
