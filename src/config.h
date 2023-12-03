@@ -1,11 +1,18 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
+#include "esp_idf_version.h"
+
 #define SCTP_MTU (1200)
 #define CONFIG_MTU (1300)
 
+
 #ifdef ESP32
-#define RSA_KEY_LENGTH 512
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 2)
+    #define RSA_KEY_LENGTH 1024
+#else
+    #define RSA_KEY_LENGTH 512
+#endif
 #define VIDEO_RB_DATA_LENGTH (CONFIG_MTU * 64)
 #define AUDIO_RB_DATA_LENGTH (CONFIG_MTU * 64)
 #define DATA_RB_DATA_LENGTH (SCTP_MTU * 128)
