@@ -8,7 +8,7 @@
 
 
 #ifdef ESP32
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 2)
+#if ESP_IDF_VERSION > ESP_IDF_VERSION_VAL(5, 0, 2)
     #define RSA_KEY_LENGTH 1024
 #else
     #define RSA_KEY_LENGTH 512
