@@ -87,8 +87,12 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp *dtls_srtp) {
   int ret;
 
   mbedtls_x509write_cert crt;
-
-  mbedtls_mpi serial;
+  
+  #if ESP_IDF_VERSION > ESP_IDF_VERSION_VAL(5, 0, 2)
+    char *serial = "peer";
+  #else
+    mbedtls_mpi serial;
+  #endif
 
   unsigned char *cert_buf = (unsigned char *) malloc(RSA_KEY_LENGTH * 2);
 
@@ -116,11 +120,13 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp *dtls_srtp) {
 
   mbedtls_x509write_crt_set_issuer_name(&crt, "CN=dtls_srtp");
 
-  mbedtls_mpi_init(&serial);
-
-  mbedtls_mpi_fill_random(&serial, 16, mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
-
-  mbedtls_x509write_crt_set_serial(&crt, &serial);
+  #if ESP_IDF_VERSION > ESP_IDF_VERSION_VAL(5, 0, 2)
+    mbedtls_x509write_crt_set_serial_raw(&crt, (unsigned char *) serial, strlen(serial));
+  #else
+    mbedtls_mpi_init(&serial);
+    mbedtls_mpi_fill_random(&serial, 16, mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
+    mbedtls_x509write_crt_set_serial(&crt, &serial);
+  #endif
 
   mbedtls_x509write_crt_set_validity(&crt, "20180101000000", "20280101000000");
 
@@ -134,8 +140,11 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp *dtls_srtp) {
   mbedtls_x509_crt_parse(&dtls_srtp->cert, cert_buf, 2*RSA_KEY_LENGTH);
 
   mbedtls_x509write_crt_free(&crt);
-
-  mbedtls_mpi_free(&serial);
+  
+  #if ESP_IDF_VERSION > ESP_IDF_VERSION_VAL(5, 0, 2)
+  #else
+    mbedtls_mpi_free(&serial);
+  #endif
 
   free(cert_buf);
 
