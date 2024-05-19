@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <poll.h>
 
 #include <pthread.h>
 #include "udp.h"
@@ -14,12 +15,49 @@
 #include "agent.h"
 #include "ports.h"
 
-static int agent_create_host_addr(Agent *agent, uint16_t port, Address *host_addr) {
 
-  if (ports_get_host_addr(host_addr)) {
-    host_addr->port = port;
-    return 0;
+static int agent_create_sockets(Agent *agent) {
+
+  int ret = -1;
+  UdpSocket *udp_socket = &agent->udp_sockets[0];
+  ret = udp_socket_create(udp_socket, AF_INET);
+  return ret;
+}
+
+static int agent_socket_recv(Agent *agent, uint8_t *buf, int len) {
+
+  int nfds = 1;
+  int ret = -1;
+  struct pollfd fds[2];
+
+  fds[0].fd = agent->udp_sockets[0].fd;
+  fds[0].events = POLLIN;
+  ret = poll(fds, nfds, 1);
+
+  if (ret < 0) {
+    LOGE("poll error");
+  } else if (ret == 0) {
+    // timeout
+  } else if (fds[0].revents & POLLIN) {
+    ret = udp_socket_recvfrom(&agent->udp_sockets[0], NULL, buf, len);
   }
+  return ret;
+}
+
+static int agent_socket_send(Agent *agent, Address *addr, const uint8_t *buf, int len) {
+
+  return udp_socket_sendto(&agent->udp_sockets[0], addr, buf, len);
+}
+
+static int agent_create_host_addr(Agent *agent) {
+
+  UdpSocket *udp_socket = &agent->udp_sockets[0];
+
+  if (ports_get_host_addr(&udp_socket->bind_addr)) {
+    IceCandidate *ice_candidate = agent->local_candidates + agent->local_candidates_count++;
+    ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_HOST, &udp_socket->bind_addr);
+  }
+
   return -1;
 }
 
@@ -29,38 +67,26 @@ static int agent_create_bind_addr(Agent *agent, Address *serv_addr) {
   Address bind_addr;
   StunMessage send_msg;
   StunMessage recv_msg;
-  UdpSocket udp_socket;
-  udp_socket_open(&udp_socket);
-  // blocking 5s
-  udp_blocking_timeout(&udp_socket, 5000);
-
   memset(&send_msg, 0, sizeof(send_msg));
+  memset(&recv_msg, 0, sizeof(recv_msg));
 
   stun_msg_create(&send_msg, STUN_CLASS_REQUEST | STUN_METHOD_BINDING);
 
-  do {
+  ret = agent_socket_send(agent, serv_addr, send_msg.buf, send_msg.size);
 
-    ret = udp_socket_sendto(&udp_socket, serv_addr, send_msg.buf, send_msg.size);
+  if (ret == -1) {
+    LOGE("Failed to send STUN Binding Request.");
+    return ret;
+  }
 
-    if (ret == -1) {
-      LOGE("Failed to send STUN Binding Request.");
-      break;
-    }
+  ret = agent_socket_recv(agent, recv_msg.buf, sizeof(recv_msg.buf));
+  if (ret <= 0) {
+    LOGD("Failed to receive STUN Binding Response.");
+    return ret;
+  }
 
-    memset(&recv_msg, 0, sizeof(recv_msg));
-    ret = udp_socket_recvfrom(&udp_socket, serv_addr, recv_msg.buf, sizeof(recv_msg.buf));
-
-    if (ret == -1) {
-      LOGD("Failed to receive STUN Binding Response.");
-      break;
-    }
-
-    stun_parse_msg_buf(&recv_msg);
-    memcpy(&bind_addr, &recv_msg.mapped_addr, sizeof(Address));
-
-  } while(0);
-
-  udp_socket_close(&udp_socket);
+  stun_parse_msg_buf(&recv_msg);
+  memcpy(&bind_addr, &recv_msg.mapped_addr, sizeof(Address));
 
   IceCandidate *ice_candidate = agent->local_candidates + agent->local_candidates_count++;
   ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_SRFLX, &bind_addr);
@@ -74,60 +100,62 @@ static int agent_create_turn_addr(Agent *agent, Address *serv_addr, const char *
   Address turn_addr;
   StunMessage send_msg;
   StunMessage recv_msg;
-  UdpSocket udp_socket;
-  udp_socket_open(&udp_socket);
-  // blocking 5s
-  udp_blocking_timeout(&udp_socket, 5000);
+  memset(&recv_msg, 0, sizeof(recv_msg));
   memset(&send_msg, 0, sizeof(send_msg));
   stun_msg_create(&send_msg, STUN_METHOD_ALLOCATE);
   stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REQUESTED_TRANSPORT, sizeof(attr), (char*)&attr); // UDP
   stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_USERNAME, strlen(username), (char*)username);
 
-  do {
+  ret = agent_socket_send(agent, serv_addr, send_msg.buf, send_msg.size);
+  if (ret == -1) {
+    LOGE("Failed to send TURN Binding Request.");
+    return -1;
+  }
 
-    ret = udp_socket_sendto(&udp_socket, serv_addr, send_msg.buf, send_msg.size);
+  ret = agent_socket_recv(agent, recv_msg.buf, sizeof(recv_msg.buf));
+  if (ret <= 0) {
+    LOGD("Failed to receive TURN Binding Response.");
+    return ret;
+  }
 
-    if (ret == -1) {
-      LOGE("Failed to send STUN Binding Request.");
-      break;
-    }
+  stun_parse_msg_buf(&recv_msg);
 
-    memset(&recv_msg, 0, sizeof(recv_msg));
-    ret = udp_socket_recvfrom(&udp_socket, serv_addr, recv_msg.buf, sizeof(recv_msg.buf));
+  if (recv_msg.stunclass == STUN_CLASS_ERROR && recv_msg.stunmethod == STUN_METHOD_ALLOCATE) {
 
-    if (ret <= 0) {
-      LOGE("Failed to receive STUN Binding Response.");
-      break;
-    }
-    stun_parse_msg_buf(&recv_msg);
+    memset(&send_msg, 0, sizeof(send_msg));
+    stun_msg_create(&send_msg, STUN_METHOD_ALLOCATE);
+    stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REQUESTED_TRANSPORT, sizeof(attr), (char*)&attr); // UDP
+    stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_USERNAME, strlen(username), (char*)username);
+    stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_NONCE, strlen(recv_msg.nonce), recv_msg.nonce);
+    stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REALM, strlen(recv_msg.realm), recv_msg.realm);
+    stun_msg_finish(&send_msg, STUN_CREDENTIAL_LONG_TERM, credential, strlen(credential));
+  } else {
+    LOGE("Invalid TURN Binding Response.");
+    return -1;
+  }
 
-    if (recv_msg.stunclass == STUN_CLASS_ERROR && recv_msg.stunmethod == STUN_METHOD_ALLOCATE) {
+  ret = agent_socket_send(agent, serv_addr, send_msg.buf, send_msg.size);
+  if (ret < 0) {
+    LOGE("Failed to send TURN Binding Request.");
+    return -1;
+  }
 
-      memset(&send_msg, 0, sizeof(send_msg));
-      stun_msg_create(&send_msg, STUN_METHOD_ALLOCATE);
-      stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REQUESTED_TRANSPORT, sizeof(attr), (char*)&attr); // UDP
-      stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_USERNAME, strlen(username), (char*)username);
-      stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_NONCE, strlen(recv_msg.nonce), recv_msg.nonce);
-      stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REALM, strlen(recv_msg.realm), recv_msg.realm);
-      stun_msg_finish(&send_msg, STUN_CREDENTIAL_LONG_TERM, credential, strlen(credential));
-      ret = udp_socket_sendto(&udp_socket, serv_addr, send_msg.buf, send_msg.size);
-      memset(&recv_msg, 0, sizeof(recv_msg));
-      ret = udp_socket_recvfrom(&udp_socket, serv_addr, recv_msg.buf, sizeof(recv_msg.buf));
-      stun_parse_msg_buf(&recv_msg);
-    }
-    memcpy(&turn_addr, &recv_msg.relayed_addr, sizeof(Address));
+  memset(&recv_msg, 0, sizeof(recv_msg));
+  ret = agent_socket_recv(agent, recv_msg.buf, sizeof(recv_msg.buf));
+  if (ret <= 0) {
+    LOGD("Failed to receive TURN Binding Response.");
+    return ret;
+  }
 
-  } while(0);
-
-  udp_socket_close(&udp_socket);
-
+  stun_parse_msg_buf(&recv_msg);
+  memcpy(&turn_addr, &recv_msg.relayed_addr, sizeof(Address));
   IceCandidate *ice_candidate = agent->local_candidates + agent->local_candidates_count++;
   ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_RELAY, &turn_addr);
   return ret;
 }
 
 void agent_init(Agent *agent) {
-
+  agent->local_candidates_count = 0;
 }
 
 void agent_deinit(Agent *agent) {
@@ -136,14 +164,20 @@ void agent_deinit(Agent *agent) {
   memset(agent, 0, sizeof(Agent));
 }
 
+/*
+ * gather candidates
+ * create sockets
+ * create host candidate
+ * create server-reflexive candidate or relay candidate
+ */
 void agent_gather_candidate(Agent *agent, const char *urls, const char *username, const char *credential) {
 
   char *port = NULL;
   char hostname[64];
   Address resolved_addr;
   memset(hostname, 0, sizeof(hostname));
-
-  agent->state = AGENT_STATE_GATHERING_STARTED;
+  memset(agent, 0, sizeof(Agent));
+  agent_create_sockets(agent);
 
   do {
 
@@ -164,6 +198,8 @@ void agent_gather_candidate(Agent *agent, const char *urls, const char *username
      resolved_addr.ipv4[0], resolved_addr.ipv4[1], resolved_addr.ipv4[2], resolved_addr.ipv4[3]);
     LOGI("resolved_addr.port: %d", resolved_addr.port);
 
+    agent_create_host_addr(agent);
+
     if (resolved_addr.port <= 0) {
       break;
     }
@@ -183,10 +219,7 @@ void agent_gather_candidate(Agent *agent, const char *urls, const char *username
 
 void agent_get_local_description(Agent *agent, char *description, int length) {
 
-  int i;
   int ncandidates = 0;
-  Address host_addr;
-  IceCandidate *ice_candidate = NULL;
 
   memset(description, 0, length);
   memset(agent->local_ufrag, 0, sizeof(agent->local_ufrag));
@@ -197,12 +230,6 @@ void agent_get_local_description(Agent *agent, char *description, int length) {
 
   snprintf(description, length, "a=ice-ufrag:%s\r\na=ice-pwd:%s\r\n", agent->local_ufrag, agent->local_upwd);
   ncandidates = agent->local_candidates_count;
-  // add host candidate
-  for (i = 0; i < ncandidates; i++) {
-    agent_create_host_addr(agent, agent->local_candidates[i].addr.port, &host_addr);
-    ice_candidate = agent->local_candidates + agent->local_candidates_count++;
-    ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_HOST, &host_addr);
-  }
 
   for (int i = 0; i < agent->local_candidates_count; i++) {
     ice_candidate_to_description(&agent->local_candidates[i], description + strlen(description), length - strlen(description));
@@ -215,10 +242,7 @@ void agent_get_local_description(Agent *agent, char *description, int length) {
 
 int agent_send(Agent *agent, const uint8_t *buf, int len) {
 
-  //printf("send to ip: %d.%d.%d.%d:%d\n", agent->remote_candidates[0].addr.ipv4[0], agent->remote_candidates[0].addr.ipv4[1], agent->remote_candidates[0].addr.ipv4[2], agent->remote_candidates[0].addr.ipv4[3], agent->remote_candidates[0].addr.port);
-
-  //udp_socket_sendto(&agent->udp_socket, &agent->remote_candidates[0].addr, buf, len);
-  return udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, buf, len);
+  return agent_socket_send(agent, &agent->nominated_pair->remote->addr, buf, len);
 }
 
 void agent_process_stun_request(Agent *agent, StunMessage *stun_msg) {
@@ -239,7 +263,6 @@ void agent_process_stun_request(Agent *agent, StunMessage *stun_msg) {
         memcpy(header->transaction_id, agent->transaction_id, sizeof(header->transaction_id));
  
         char username[584];
-
         snprintf(username, sizeof(username), "%s:%s", agent->local_ufrag, agent->remote_ufrag);
 
         // TODO: XOR-MAPPED-ADDRESS
@@ -248,12 +271,9 @@ void agent_process_stun_request(Agent *agent, StunMessage *stun_msg) {
         stun_msg_write_attr(&msg, STUN_ATTR_TYPE_MAPPED_ADDRESS, 8, mapped_address);
         stun_msg_write_attr(&msg, STUN_ATTR_TYPE_USERNAME, strlen(username), username);
         stun_msg_finish(&msg, STUN_CREDENTIAL_SHORT_TERM, agent->local_upwd, strlen(agent->local_upwd));
-
-        udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
+        agent_socket_send(agent, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
         agent->binding_request_time = utils_get_timestamp();
       }
-
-
       break;
     default:
       break;
@@ -280,21 +300,17 @@ void agent_process_stun_response(Agent *agent, StunMessage *stun_msg) {
   }
 }
 
+
 int agent_recv(Agent *agent, uint8_t *buf, int len) {
 
   int ret = -1;
   StunMessage stun_msg;
-
-  ret = udp_socket_recvfrom(&agent->udp_socket, &agent->nominated_pair->local->addr, buf, len);
-
-  if (ret > 0 && stun_probe(buf, ret) == 0) {
+  if ((ret = agent_socket_recv(agent, buf, len)) > 0 && stun_probe(buf, len) == 0) {
 
     memcpy(stun_msg.buf, buf, ret);
     stun_msg.size = ret;
     stun_parse_msg_buf(&stun_msg);
-
     switch (stun_msg.stunclass) {
-
       case STUN_CLASS_REQUEST:
         agent_process_stun_request(agent, &stun_msg);
         break;
@@ -306,16 +322,11 @@ int agent_recv(Agent *agent, uint8_t *buf, int len) {
         break;
       default:
         break;
-
     }
-
     ret = 0;
   }
-
   return ret;
 }
-
-
 
 void agent_set_remote_description(Agent *agent, char *description) {
 
@@ -374,7 +385,6 @@ int agent_connectivity_check(Agent *agent) {
 
   StunMessage msg;
   memset(&msg, 0, sizeof(msg));
-
   if (agent->nominated_pair->state == ICE_CANDIDATE_STATE_WAITING) {
 
     agent_recv(agent, buf, sizeof(buf));
@@ -392,8 +402,7 @@ int agent_connectivity_check(Agent *agent) {
     stun_msg_finish(&msg, STUN_CREDENTIAL_SHORT_TERM, agent->remote_upwd, strlen(agent->remote_upwd));
 
     LOGD("send binding request to remote ip: %d.%d.%d.%d, port: %d", agent->nominated_pair->remote->addr.ipv4[0], agent->nominated_pair->remote->addr.ipv4[1], agent->nominated_pair->remote->addr.ipv4[2], agent->nominated_pair->remote->addr.ipv4[3], agent->nominated_pair->remote->addr.port);
-
-   udp_socket_sendto(&agent->udp_socket, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
+    agent_socket_send(agent, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
 
    agent->nominated_pair->state = ICE_CANDIDATE_STATE_INPROGRESS;
 
@@ -421,9 +430,6 @@ void agent_select_candidate_pair(Agent *agent) {
       agent->nominated_pair = &agent->candidate_pairs[i];
       agent->nominated_pair->state = ICE_CANDIDATE_STATE_WAITING;
       agent->candidate_pairs[i].nominated_time = time(NULL);
-      udp_socket_close(&agent->udp_socket);
-      udp_socket_open(&agent->udp_socket);
-      udp_socket_bind(&agent->udp_socket, &agent->candidate_pairs[i].local->addr);
       break;
 
     } else if (agent->candidate_pairs[i].state == ICE_CANDIDATE_STATE_INPROGRESS

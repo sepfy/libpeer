@@ -54,6 +54,7 @@ struct Agent {
   int remote_candidates_count;
 
   UdpSocket udp_socket;
+  UdpSocket udp_sockets[2];
 
   Address host_addr;
   int b_host_addr;

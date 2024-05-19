@@ -13,7 +13,9 @@ struct UdpSocket {
   long int timeout_usec;
 };
 
-int udp_socket_open(UdpSocket *udp_socket);
+int udp_socket_create(UdpSocket *udp_socket, int family);
+
+int udp_socket_open(UdpSocket *udp_socket, int family);
 
 int udp_socket_bind(UdpSocket *udp_socket, Address *addr);
 

@@ -7,34 +7,21 @@
 void test_turn(Agent *agent, char *turnserver, char *username, char *credential) {
 
   char description[1024];
-
-  agent_gather_candidate(agent, turnserver, username, credential);
-
   memset(&description, 0, sizeof(description));
-
-  ice_candidate_to_description(&agent->local_candidates[1], description, sizeof(description));
-
-  printf("turn server: %s. ice candidate: %s", turnserver, description); 
+  agent_gather_candidate(agent, turnserver, username, credential);
+  agent_get_local_description(agent, description, sizeof(description));
+  printf("turn server: %s\n", turnserver);
+  printf("sdp: %s\n", description);
 }
 
 void test_stun(Agent *agent, char *stunserver) {
 
   char description[1024];
-
-  agent_gather_candidate(agent, stunserver, NULL, NULL);
-
   memset(&description, 0, sizeof(description));
-
-  ice_candidate_to_description(&agent->local_candidates[0], description, sizeof(description));
-
-  printf("stun server: %s. ice candidate: %s", stunserver, description);
-}
-
-void test_local_description(Agent *agent) {
-
-  char description[1024];
+  agent_gather_candidate(agent, stunserver, NULL, NULL);
   agent_get_local_description(agent, description, sizeof(description));
-  printf("local description: %s", description);
+  printf("stun server: %s\n", stunserver);
+  printf("sdp: %s\n", description);
 }
 
 int main(int argc, char *argv[]) {
@@ -49,11 +36,9 @@ int main(int argc, char *argv[]) {
   agent_init(&agent);
 
   test_stun(&agent, stunserver);
-
+#if 0
   test_turn(&agent, turnserver, username, credential);
-
-  test_local_description(&agent);
-
+#endif
   agent_deinit(&agent);
 
   return 0;
