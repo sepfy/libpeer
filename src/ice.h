@@ -56,13 +56,9 @@ typedef struct IceCandidatePair IceCandidatePair;
 struct IceCandidatePair {
 
   IceCandidateState state;
-
   IceCandidate *local;
-
   IceCandidate *remote;
-
-  time_t nominated_time;
-
+  int conncheck;
   uint64_t priority;
 };
 

@@ -46,11 +46,9 @@ struct Agent {
   char local_upwd[ICE_UPWD_LENGTH + 1];
 
   IceCandidate local_candidates[AGENT_MAX_CANDIDATES];
-
   IceCandidate remote_candidates[AGENT_MAX_CANDIDATES];
 
   int local_candidates_count;
-
   int remote_candidates_count;
 
   UdpSocket udp_socket;
@@ -89,7 +87,7 @@ void agent_set_remote_description(Agent *agent, char *description);
 
 void *agent_thread(void *arg);
 
-void agent_select_candidate_pair(Agent *agent);
+int agent_select_candidate_pair(Agent *agent);
 
 void agent_attach_recv_cb(Agent *agent, void (*data_recv_cb)(char *buf, int len, void *user_data));
 

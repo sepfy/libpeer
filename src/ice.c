@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <arpa/inet.h>
 
 #include "ports.h"
 #include "udp.h"
@@ -77,18 +78,31 @@ void ice_candidate_to_description(IceCandidate *candidate, char *description, in
     default:
       break;
   }
-
-  snprintf(description, length, "a=candidate:%d %d %s %" PRIu32 " %d.%d.%d.%d %d typ %s\n",
-   candidate->foundation,
-   candidate->component,
-   candidate->transport,
-   candidate->priority,
-   candidate->addr.ipv4[0],
-   candidate->addr.ipv4[1],
-   candidate->addr.ipv4[2],
-   candidate->addr.ipv4[3],
-   candidate->addr.port,
-   typ_raddr);
+  LOGI("candidate->addr.family: %d", candidate->addr.family);
+  if (candidate->addr.family == AF_INET6) {
+    char ipv6str[INET6_ADDRSTRLEN];
+    inet_ntop(AF_INET6, candidate->addr.ipv6, ipv6str, INET6_ADDRSTRLEN);
+    snprintf(description, length, "a=candidate:%d %d %s %" PRIu32 " %s %d typ %s\n",
+     candidate->foundation,
+     candidate->component,
+     candidate->transport,
+     candidate->priority,
+     ipv6str,
+     candidate->addr.port,
+     typ_raddr);
+  } else {
+    snprintf(description, length, "a=candidate:%d %d %s %" PRIu32 " %d.%d.%d.%d %d typ %s\n",
+     candidate->foundation,
+     candidate->component,
+     candidate->transport,
+     candidate->priority,
+     candidate->addr.ipv4[0],
+     candidate->addr.ipv4[1],
+     candidate->addr.ipv4[2],
+     candidate->addr.ipv4[3],
+     candidate->addr.port,
+     typ_raddr);
+  }
 }
 
 int ice_candidate_from_description(IceCandidate *candidate, char *description, char *end) {
@@ -127,10 +141,14 @@ int ice_candidate_from_description(IceCandidate *candidate, char *description, c
             return -1;
           }
           LOGD("mDNS host: %s, ip: %d.%d.%d.%d", buf, candidate->addr.ipv4[0], candidate->addr.ipv4[1], candidate->addr.ipv4[2], candidate->addr.ipv4[3]);
-        } else if (!addr_ipv4_validate(buf, strlen(buf), &candidate->addr)) {
-          LOGW("Unknow address");
+        } else if (addr_ipv4_validate(buf, strlen(buf), &candidate->addr)) {
+          candidate->addr.family = AF_INET;
+        } else if (addr_ipv6_validate(buf, strlen(buf), &candidate->addr)) {
+	  candidate->addr.family = AF_INET6;
+	} else {
           return -1;
-        }
+	}
+
         break;
       case 5:
         candidate->addr.port = atoi(buf);

@@ -50,6 +50,7 @@ int ports_get_host_addr(Address *addr) {
 	    ret = 1;
 	    break;
 	  case AF_INET6:
+	    LOGI("this is ipv6");
 	    memcpy(addr->ipv6, &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr.s6_addr, 16);
 	    ret = 1;
 	    break;
@@ -117,9 +118,9 @@ LOGI("get_host_address inside while loop");
 }
 
 int ports_resolve_addr(const char *host, Address *addr) {
-
   int ret = -1;
   struct addrinfo hints, *res, *p;
+  int family;
   int status;
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
@@ -131,12 +132,25 @@ int ports_resolve_addr(const char *host, Address *addr) {
     return ret;
   }
 
- for (p = res; p != NULL; p = p->ai_next) {
+  if (addr->family == AF_INET6) {
+    family = AF_INET6;
+  } else {
+    family = AF_INET;
+  }
 
-    if (p->ai_family == AF_INET) {
-      struct sockaddr_in *ipv4 = (struct sockaddr_in *)p->ai_addr;
+ for (p = res; p != NULL; p = p->ai_next) {
+    if (p->ai_family == family) {
+      switch (p->ai_family) {
+	case AF_INET6:
+	  memcpy(addr->ipv6, &((struct sockaddr_in6 *)p->ai_addr)->sin6_addr.s6_addr, 16);
+	  break;
+        case AF_INET:
+	  LOGI("AF_INET");
+	  memcpy(addr->ipv4, &((struct sockaddr_in *)p->ai_addr)->sin_addr.s_addr, 4);
+	default:
+	  break;
+      }
       ret = 0;
-      memcpy(addr->ipv4, &ipv4->sin_addr.s_addr, 4);
     }
   }
 
