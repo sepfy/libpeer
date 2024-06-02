@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 #include "ports.h"
 #include "udp.h"

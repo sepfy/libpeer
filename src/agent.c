@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#include <poll.h>
 
 #include <pthread.h>
 #include "udp.h"
@@ -22,14 +21,14 @@
 static int agent_create_sockets(Agent *agent) {
 
   int ret;
-  if (ret = udp_socket_create(&agent->udp_sockets[0], AF_INET) < 0) {
+  if ((ret = udp_socket_create(&agent->udp_sockets[0], AF_INET)) < 0) {
     LOGE("Failed to create UDP socket.");
     return ret;
   }
   LOGI("create IPv4 UDP socket: %d", agent->udp_sockets[0].fd);
 
 #if CONFIG_IPV6
-  if (ret = udp_socket_create(&agent->udp_sockets[1], AF_INET6) < 0) {
+  if ((ret = udp_socket_create(&agent->udp_sockets[1], AF_INET6)) < 0) {
     LOGE("Failed to create IPv6 UDP socket.");
     return ret;
   }
@@ -40,34 +39,38 @@ static int agent_create_sockets(Agent *agent) {
 
 static int agent_socket_recv(Agent *agent, Address *addr, uint8_t *buf, int len) {
 
-#if CONFIG_IPV6
-  int nfds = 2;
-#else
-  int nfds = 1;
-#endif
   int ret = -1;
-  int i;
-  struct pollfd fds[nfds];
+  int i = 0;
+  int maxfd = 0;
+  fd_set rfds;
+  struct timeval tv;
+  tv.tv_sec = 0;
+  tv.tv_usec = AGENT_POLL_TIMEOUT * 1000;
+  FD_ZERO(&rfds);
 
-  for (i = 0; i < nfds; i++) {
-    fds[i].fd = agent->udp_sockets[i].fd;
-    fds[i].events = POLLIN;
+  for (i = 0; i < 2; i++) {
+    if (agent->udp_sockets[i].fd > maxfd) {
+      maxfd = agent->udp_sockets[i].fd;
+    }
+    if (agent->udp_sockets[i].fd > 0) {
+      FD_SET(agent->udp_sockets[i].fd, &rfds);
+    }
   }
 
-  ret = poll(fds, nfds, AGENT_POLL_TIMEOUT);
+  ret = select(maxfd + 1, &rfds, NULL, NULL, &tv);
   if (ret < 0) {
-    LOGE("poll error");
+    LOGE("select error");
   } else if (ret == 0) {
     // timeout
   } else {
-
-    for (i = 0; i < nfds; i++) {
-      if (fds[i].revents & POLLIN) {
-	ret = udp_socket_recvfrom(&agent->udp_sockets[i], addr, buf, len);
-	break;
+    for (i = 0; i < 2; i++) {
+      if (FD_ISSET(agent->udp_sockets[i].fd, &rfds)) {
+        ret = udp_socket_recvfrom(&agent->udp_sockets[i], addr, buf, len);
+        break;
       }
     }
   }
+
   return ret;
 }
 
@@ -271,7 +274,6 @@ void agent_gather_candidate(Agent *agent, const char *urls, const char *username
         agent_create_turn_addr(agent, &resolved_addr, username, credential);
       }
     }
-
 
   } while (0);
 

@@ -15,6 +15,7 @@
 #include "esp_tls.h"
 #include "esp_ota_ops.h"
 #include "freertos/FreeRTOS.h"
+#include "protocol_examples_common.h"
 
 #include "peer.h"
 
@@ -117,13 +118,12 @@ void app_main(void) {
   ESP_ERROR_CHECK(esp_netif_init());
   ESP_ERROR_CHECK(esp_event_loop_create_default());
   ESP_ERROR_CHECK(mdns_init());
+  ESP_ERROR_CHECK(example_connect());
 
   if (esp_read_mac(mac, ESP_MAC_WIFI_STA) == ESP_OK) {
     sprintf(deviceid, "esp32-%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     ESP_LOGI(TAG, "Device ID: %s", deviceid);
   }
-
-  wifi_init_sta();
 
   peer_init();
 
@@ -143,4 +143,8 @@ void app_main(void) {
 
   ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
   ESP_LOGI(TAG, "open https://sepfy.github.io/webrtc?deviceId=%s", deviceid);
+
+  while (1) {
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
 }

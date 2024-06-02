@@ -22,15 +22,27 @@ int ports_get_host_addr(Address *addr) {
   int ret = 0;
 
 #ifdef ESP32
-
   esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-
   esp_netif_ip_info_t ip_info;
+  esp_ip6_addr_t ip6_info;
 
-  if (esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
-
-    memcpy(addr->ipv4, &ip_info.ip.addr, 4);
-    ret = 1;
+  switch (addr->family) {
+    case AF_INET6:
+      if (esp_netif_get_ip6_global(netif, &ip6_info) == ESP_OK) {
+        memcpy(addr->ipv6, &ip6_info.addr, 16);
+        ret = 1;
+      } else if (esp_netif_get_ip6_linklocal(netif, &ip6_info) == ESP_OK) {
+        memcpy(addr->ipv6, &ip6_info.addr, 16);
+        ret = 1;
+      }
+      break;
+    case AF_INET:
+    default:
+      if (esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
+        memcpy(addr->ipv4, &ip_info.ip.addr, 4);
+        ret = 1;
+      }
+      break;
   }
 #else
 
@@ -50,7 +62,6 @@ int ports_get_host_addr(Address *addr) {
 	    ret = 1;
 	    break;
 	  case AF_INET6:
-	    LOGI("this is ipv6");
 	    memcpy(addr->ipv6, &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr.s6_addr, 16);
 	    ret = 1;
 	    break;
