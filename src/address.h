@@ -10,10 +10,16 @@ struct Address {
   uint8_t family;
   uint16_t port;
   uint8_t ipv4[4];
-  uint8_t ipv6[16];
+  uint16_t ipv6[8];
 
-}__attribute__((packed));
+};
+
+int addr_ipv6_validate(const char *ipv6, size_t len, Address *addr);
 
 int addr_ipv4_validate(const char *ipv4, size_t len, Address *addr);
+
+int addr_to_text(const Address *addr, char *buf, size_t len);
+
+int addr_equal(const Address *a, const Address *b);
 
 #endif // ADDRESS_H_

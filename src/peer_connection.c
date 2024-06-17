@@ -362,19 +362,11 @@ int peer_connection_loop(PeerConnection *pc) {
 
     case PEER_CONNECTION_CHECKING:
 
-      agent_select_candidate_pair(&pc->agent);
-
-      if (!pc->agent.nominated_pair) {
+      if (agent_select_candidate_pair(&pc->agent) < 0) {
         STATE_CHANGED(pc, PEER_CONNECTION_FAILED);
-
-      } else if (agent_connectivity_check(&pc->agent)) {
-
-        LOGD("Connectivity check success. pair: %p", pc->agent.nominated_pair);
-
+      } else if (agent_connectivity_check(&pc->agent) == 0) {
         STATE_CHANGED(pc, PEER_CONNECTION_CONNECTED);
-        pc->agent.selected_pair = pc->agent.nominated_pair;
       }
-
       break;
 
     case PEER_CONNECTION_CONNECTED:
