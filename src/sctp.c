@@ -111,6 +111,7 @@ static int sctp_outgoing_data_cb(void *userdata, void *buf, size_t len, uint8_t 
 int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid) {
 
 #ifdef HAVE_USRSCTP
+  int res;
   struct sctp_sendv_spa spa = {0};
 
   spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
@@ -119,10 +120,10 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid) {
   spa.sendv_sndinfo.snd_flags = SCTP_EOR;
   spa.sendv_sndinfo.snd_ppid = htonl(ppid);
 
-  if(usrsctp_sendv(sctp->sock, buf, len, NULL, 0, &spa, sizeof(spa), SCTP_SENDV_SPA, 0) < 0) {
-    LOGE("sctp sendv error");
-    return -1;
-  }
+  res = usrsctp_sendv(sctp->sock, buf, len, NULL, 0, &spa, sizeof(spa), SCTP_SENDV_SPA, 0);
+  if(res < 0) 
+    LOGE("sctp sendv error %d %s", errno, strerror(errno));
+  return res;
 #else
   size_t padding_len = 0;
   size_t payload_max = SCTP_MTU - sizeof(SctpPacket) - sizeof(SctpDataChunk);

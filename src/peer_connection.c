@@ -256,11 +256,10 @@ int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t l
     return -1;
   }
 
-  if (buffer_push_tail(pc->data_rb, (const uint8_t*)message, len) < 0) {
-    buffer_clear(pc->data_rb);
-  }
-
-  return 0;
+  if (pc->config.datachannel == DATA_CHANNEL_STRING)
+    return sctp_outgoing_data(&pc->sctp, message, len, PPID_STRING);
+  else
+    return sctp_outgoing_data(&pc->sctp, message, len, PPID_BINARY);
 }
 
 static void peer_connection_state_new(PeerConnection *pc) {
