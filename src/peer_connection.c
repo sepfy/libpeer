@@ -3,53 +3,12 @@
 #include <unistd.h>
 #include <inttypes.h>
 
-#include "sctp.h"
-#include "agent.h"
-#include "dtls_srtp.h"
-#include "sdp.h"
 #include "config.h"
-#include "rtp.h"
 #include "rtcp.h"
-#include "buffer.h"
 #include "ports.h"
 #include "peer_connection.h"
 
 #define STATE_CHANGED(pc, curr_state) if(pc->oniceconnectionstatechange && pc->state != curr_state) { pc->oniceconnectionstatechange(curr_state, pc->config.user_data); pc->state = curr_state; }
-
-struct PeerConnection {
-
-  PeerConfiguration config;
-  PeerConnectionState state;
-  Agent agent;
-  DtlsSrtp dtls_srtp;
-  Sctp sctp;
-
-  Sdp local_sdp;
-  Sdp remote_sdp;
-
-  void (*onicecandidate)(char *sdp, void *user_data);
-  void (*oniceconnectionstatechange)(PeerConnectionState state, void *user_data);
-  void (*on_connected)(void *userdata);
-  void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *user_data);
-
-  uint8_t temp_buf[CONFIG_MTU];
-  uint8_t agent_buf[CONFIG_MTU];
-  int agent_ret;
-  int b_offer_created;
-
-  Buffer *audio_rb;
-  Buffer *video_rb;
-  Buffer *data_rb;
-
-  RtpEncoder artp_encoder;
-  RtpEncoder vrtp_encoder;
-  RtpDecoder vrtp_decoder;
-  RtpDecoder artp_decoder;
-
-  uint32_t remote_assrc;
-  uint32_t remote_vssrc;
-
-};
 
 static void peer_connection_outgoing_rtp_packet(uint8_t *data, size_t size, void *user_data) {
 
@@ -344,7 +303,6 @@ static void peer_connection_state_new(PeerConnection *pc) {
 }
 
 int peer_connection_loop(PeerConnection *pc) {
-
   int bytes;
   uint8_t *data = NULL;
   uint32_t ssrc = 0;

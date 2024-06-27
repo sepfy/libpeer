@@ -185,7 +185,6 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
 #ifdef HAVE_USRSCTP
   usrsctp_conninput(sctp, buf, len, 0);
 #else
-
   size_t length = 0;
   size_t pos = sizeof(SctpHeader);
   SctpChunkCommon *chunk_common;
@@ -350,8 +349,8 @@ static int sctp_handle_incoming_data(Sctp *sctp, char *data, size_t len, uint32_
 #ifdef HAVE_USRSCTP
   switch(ppid) {
     case DATA_CHANNEL_PPID_CONTROL:
-
       break;
+
     case DATA_CHANNEL_PPID_DOMSTRING:
     case DATA_CHANNEL_PPID_BINARY:
     case DATA_CHANNEL_PPID_DOMSTRING_PARTIAL:
@@ -362,6 +361,7 @@ static int sctp_handle_incoming_data(Sctp *sctp, char *data, size_t len, uint32_
         sctp->onmessage(data, len, sctp->userdata);
       }
       break;
+
     default:
       break;
   }
@@ -421,8 +421,7 @@ static int sctp_incoming_data_cb(struct socket *sock, union sctp_sockstore addr,
     ntohl(recv_info.rcv_ppid));
   if(flags & MSG_NOTIFICATION) {
     sctp_process_notification(sctp, (union sctp_notification *)data, len);
-  }
-  else {
+  } else {
     sctp_handle_incoming_data(sctp, data, len, ntohl(recv_info.rcv_ppid), recv_info.rcv_sid, flags);
   }
   return 0;
