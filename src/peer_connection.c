@@ -209,6 +209,10 @@ int peer_connection_send_video(PeerConnection *pc, const uint8_t *buf, size_t le
 }
 
 int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len) {
+  return peer_connection_datachannel_send_sid(pc, message, len, 0);
+}
+
+int peer_connection_datachannel_send_sid(PeerConnection *pc, char *message, size_t len, uint16_t sid) {
 
   if(!sctp_is_connected(&pc->sctp)) {
     LOGE("sctp not connected");
@@ -216,9 +220,9 @@ int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t l
   }
 
   if (pc->config.datachannel == DATA_CHANNEL_STRING)
-    return sctp_outgoing_data(&pc->sctp, message, len, PPID_STRING);
+    return sctp_outgoing_data(&pc->sctp, message, len, PPID_STRING, sid);
   else
-    return sctp_outgoing_data(&pc->sctp, message, len, PPID_BINARY);
+    return sctp_outgoing_data(&pc->sctp, message, len, PPID_BINARY, sid);
 }
 
 static void peer_connection_state_new(PeerConnection *pc) {
@@ -359,9 +363,9 @@ int peer_connection_loop(PeerConnection *pc) {
       if (data) {
 
          if (pc->config.datachannel == DATA_CHANNEL_STRING)
-           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_STRING);
+           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_STRING, 0);
          else
-           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_BINARY);
+           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_BINARY, 0);
          buffer_pop_head(pc->data_rb);
       }
 
@@ -496,7 +500,7 @@ void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
 }
 
 void peer_connection_ondatachannel(PeerConnection *pc,
- void (*onmessasge)(char *msg, size_t len, void *userdata),
+ void (*onmessage)(char *msg, size_t len, void *userdata, uint16_t sid),
  void (*onopen)(void *userdata),
  void (*onclose)(void *userdata)) {
 
@@ -504,7 +508,26 @@ void peer_connection_ondatachannel(PeerConnection *pc,
 
     sctp_onopen(&pc->sctp, onopen);
     sctp_onclose(&pc->sctp, onclose);
-    sctp_onmessage(&pc->sctp, onmessasge);
+    sctp_onmessage(&pc->sctp, onmessage);
   }
+}
+
+int peer_connection_lookup_sid(PeerConnection *pc, const char *label, uint16_t *sid) {
+    for (int i = 0; i < pc->sctp.stream_count; i++) {
+        if (strncmp(pc->sctp.stream_table[i].label, label, sizeof(pc->sctp.stream_table[i].label)) == 0) {
+            *sid = pc->sctp.stream_table[i].sid;
+            return 0;
+        }
+    }
+    return -1; // Not found
+}
+
+char *peer_connection_lookup_sid_label(PeerConnection *pc, uint16_t sid) {
+    for (int i = 0; i < pc->sctp.stream_count; i++) {
+        if (pc->sctp.stream_table[i].sid == sid) {
+            return pc->sctp.stream_table[i].label;
+        }
+    }
+    return NULL; // Not found
 }
 

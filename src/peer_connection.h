@@ -116,6 +116,8 @@ int peer_connection_loop(PeerConnection *pc);
  */
 int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len);
 
+int peer_connection_datachannel_send_sid(PeerConnection *pc, char *message, size_t len, uint16_t sid);
+
 int peer_connection_send_audio(PeerConnection *pc, const uint8_t *packet, size_t bytes);
 
 int peer_connection_send_video(PeerConnection *pc, const uint8_t *packet, size_t bytes);
@@ -158,9 +160,13 @@ void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
  * @param[in] callback function when connection is closed
  */
 void peer_connection_ondatachannel(PeerConnection *pc,
- void (*onmessasge)(char *msg, size_t len, void *userdata),
+ void (*onmessage)(char *msg, size_t len, void *userdata, uint16_t sid),
  void (*onopen)(void *userdata),
  void (*onclose)(void *userdata));
+
+int peer_connection_lookup_sid(PeerConnection *pc, const char *label, uint16_t *sid);
+
+char *peer_connection_lookup_sid_label(PeerConnection *pc, uint16_t sid);
 
 #ifdef __cplusplus
 }
