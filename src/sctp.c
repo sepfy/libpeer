@@ -468,7 +468,7 @@ static void sctp_process_notification(Sctp *sctp, union sctp_notification *notif
     default:
       break;
   }
-
+  free(notification); // we need to free the memory that usrsctp allocates
 }
 
 static int sctp_incoming_data_cb(struct socket *sock, union sctp_sockstore addr,
