@@ -7,6 +7,13 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include "sctp.h"
+#include "agent.h"
+#include "dtls_srtp.h"
+#include "sdp.h"
+#include "mediacodec.h"
+#include "rtp.h"
+#include "buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,22 +39,6 @@ typedef enum DataChannelType {
 
 } DataChannelType;
 
-typedef enum MediaCodec {
-
-  CODEC_NONE = 0,
-
-  /* Video */
-  CODEC_H264,
-  CODEC_VP8, // not implemented yet 
-  CODEC_MJPEG, // not implemented yet
-
-  /* Audio */
-  CODEC_OPUS, // not implemented yet
-  CODEC_PCMA,
-  CODEC_PCMU,
-
-} MediaCodec;
-
 typedef struct IceServer {
 
   const char *urls;
@@ -71,7 +62,40 @@ typedef struct PeerConfiguration {
 
 } PeerConfiguration;
 
-typedef struct PeerConnection PeerConnection;
+typedef struct PeerConnection {
+
+  PeerConfiguration config;
+  PeerConnectionState state;
+  Agent agent;
+  DtlsSrtp dtls_srtp;
+  Sctp sctp;
+
+  Sdp local_sdp;
+  Sdp remote_sdp;
+
+  void (*onicecandidate)(char *sdp, void *user_data);
+  void (*oniceconnectionstatechange)(PeerConnectionState state, void *user_data);
+  void (*on_connected)(void *userdata);
+  void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void *user_data);
+
+  uint8_t temp_buf[CONFIG_MTU];
+  uint8_t agent_buf[CONFIG_MTU];
+  int agent_ret;
+  int b_offer_created;
+
+  Buffer *audio_rb;
+  Buffer *video_rb;
+  Buffer *data_rb;
+
+  RtpEncoder artp_encoder;
+  RtpEncoder vrtp_encoder;
+  RtpDecoder vrtp_decoder;
+  RtpDecoder artp_decoder;
+
+  uint32_t remote_assrc;
+  uint32_t remote_vssrc;
+
+} PeerConnection;
 
 const char* peer_connection_state_to_string(PeerConnectionState state);
 
