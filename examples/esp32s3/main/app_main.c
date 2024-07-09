@@ -15,7 +15,7 @@
 #include "esp_tls.h"
 #include "esp_ota_ops.h"
 #include "freertos/FreeRTOS.h"
-
+#include "protocol_examples_common.h"
 #include "peer.h"
 
 static const char *TAG = "webrtc";
@@ -28,7 +28,6 @@ extern esp_err_t audio_init();
 extern esp_err_t video_init();
 extern void audio_task(void *pvParameters);
 extern void video_task(void *pvParameters);
-extern void wifi_init_sta();
 
 PeerConnection *g_pc;
 PeerConnectionState eState = PEER_CONNECTION_CLOSED;
@@ -80,7 +79,7 @@ void app_main(void) {
   ESP_ERROR_CHECK(esp_event_loop_create_default());
   ESP_ERROR_CHECK(mdns_init());
 
-  wifi_init_sta();
+  ESP_ERROR_CHECK(example_connect());
   
   audio_init();
 
