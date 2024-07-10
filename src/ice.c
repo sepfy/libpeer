@@ -142,6 +142,7 @@ int ice_candidate_from_description(IceCandidate *candidate, char *description, c
           if (ports_resolve_mdns_host(buf, &candidate->addr) < 0) {
             return -1;
           }
+          candidate->addr.family = AF_INET;
           LOGD("mDNS host: %s, ip: %d.%d.%d.%d", buf, candidate->addr.ipv4[0], candidate->addr.ipv4[1], candidate->addr.ipv4[2], candidate->addr.ipv4[3]);
         } else if (addr_ipv4_validate(buf, strlen(buf), &candidate->addr)) {
           candidate->addr.family = AF_INET;
