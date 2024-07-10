@@ -4,6 +4,8 @@ dependencies:
   espressif/esp_h264: "^0.1.1"
   espressif/mdns: "*"
   espressif/esp32-camera: "^2.0.4"
+  protocol_examples_common:
+    path: ${IDF_PATH}/examples/common_components/protocol_examples_common
   ## Required IDF version
   idf:
     version: ">=4.1.0"
