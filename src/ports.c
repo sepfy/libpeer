@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <sys/time.h>
 
 #ifdef ESP32
 #include <mdns.h>
@@ -139,7 +140,7 @@ int ports_resolve_addr(const char *host, Address *addr) {
 
   if ((status = getaddrinfo(host, NULL, &hints, &res)) != 0) {
     //LOGE("getaddrinfo error: %s\n", gai_strerror(status));
-    LOGE("getaddrinfo error: %d\n", status);
+    LOGE("getaddrinfo %s error: %d\n", host, status);
     return ret;
   }
 
@@ -195,4 +196,10 @@ int ports_resolve_mdns_host(const char *host, Address *addr) {
 #endif
 }
 
+uint32_t ports_get_epoch_time() {
+
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (uint32_t) tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
 

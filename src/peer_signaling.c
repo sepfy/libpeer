@@ -10,6 +10,7 @@
 #include "config.h"
 #include "base64.h"
 #include "utils.h"
+#include "ports.h"
 #include "ssl_transport.h"
 #include "peer_signaling.h"
 
@@ -140,7 +141,6 @@ static void peer_signaling_process_request(const char *msg, size_t size) {
         response = NULL;
 
       } else {
-
         cJSON_AddStringToObject(response, "result", "busy");
       }
 
@@ -296,7 +296,7 @@ static int peer_signaling_mqtt_connect(const char *hostname, int port) {
   g_ps.mqtt_fixed_buf.pBuffer = g_ps.mqtt_buf;
   g_ps.mqtt_fixed_buf.size = sizeof(g_ps.mqtt_buf);
   status = MQTT_Init(&g_ps.mqtt_ctx, &g_ps.transport,
-   utils_get_timestamp, peer_signaling_mqtt_cb, &g_ps.mqtt_fixed_buf);
+   ports_get_epoch_time, peer_signaling_mqtt_cb, &g_ps.mqtt_fixed_buf);
 
   memset(&conn_info, 0, sizeof(conn_info));
 

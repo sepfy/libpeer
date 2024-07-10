@@ -349,6 +349,7 @@ void agent_process_stun_request(Agent *agent, StunMessage *stun_msg, Address *ad
         memcpy(agent->transaction_id, header->transaction_id, sizeof(header->transaction_id));
         agent_create_binding_response(agent, &msg, addr);
         agent_socket_send(agent, addr, msg.buf, msg.size);
+        agent->binding_request_time = ports_get_epoch_time();
       }
       break;
     default:
