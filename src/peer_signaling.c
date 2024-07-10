@@ -307,6 +307,7 @@ static int peer_signaling_mqtt_connect(const char *hostname, int port) {
   bool session_present;
 
   if (ssl_transport_connect(&g_ps.net_ctx, hostname, port, NULL) < 0) {
+    LOGE("ssl transport connect failed");
     return -1;
   }
 
@@ -446,7 +447,11 @@ int peer_signaling_join_channel() {
     return -1;
   }
 
-  peer_signaling_mqtt_connect(g_ps.mqtt_host, g_ps.mqtt_port);
+  if (peer_signaling_mqtt_connect(g_ps.mqtt_host, g_ps.mqtt_port) < 0) {
+    LOGW("Connect MQTT server failed");
+    return -1;
+  }
+
   peer_signaling_mqtt_subscribe(1);
   return 0;
 }
