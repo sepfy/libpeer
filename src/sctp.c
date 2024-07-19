@@ -15,7 +15,6 @@
 #define DATA_CHANNEL_PPID_BINARY_PARTIAL    52
 #define DATA_CHANNEL_PPID_BINARY            53
 #define DATA_CHANNEL_PPID_DOMSTRING_PARTIAL 54
-#define DCEP_PPID                           0x32
 #define DATA_CHANNEL_OPEN                   0x03
 
 static const uint32_t crc32c_table[256] = {
@@ -179,7 +178,7 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid, uin
   return len;
 }
 
-void add_stream_mapping(Sctp *sctp, const char *label, uint16_t sid) {
+void sctp_add_stream_mapping(Sctp *sctp, const char *label, uint16_t sid) {
   if (sctp->stream_count<SCTP_MAX_STREAMS) {
     strncpy(sctp->stream_table[sctp->stream_count].label, label, sizeof(sctp->stream_table[sctp->stream_count].label));
     sctp->stream_table[sctp->stream_count].sid = sid;
@@ -188,7 +187,7 @@ void add_stream_mapping(Sctp *sctp, const char *label, uint16_t sid) {
       LOGE("Stream table full. Cannot add more streams.");    
 }
 
-void parse_data_channel_open(Sctp *sctp, uint16_t sid, char *data, size_t length) {
+void sctp_parse_data_channel_open(Sctp *sctp, uint16_t sid, char *data, size_t length) {
   if (length < 12) 
     return;  // Not enough data for a DATA_CHANNEL_OPEN message
     
@@ -211,11 +210,11 @@ void parse_data_channel_open(Sctp *sctp, uint16_t sid, char *data, size_t length
     printf("DATA_CHANNEL_OPEN: Label=%s, sid=%d\n", label_str, sid);
 
     // Add stream mapping
-    add_stream_mapping(sctp, label_str, sid);
+    sctp_add_stream_mapping(sctp, label_str, sid);
   }
 }
 
-void handle_sctp_packet(Sctp *sctp, char *buf, size_t len) {
+void sctp_handle_sctp_packet(Sctp *sctp, char *buf, size_t len) {
     if (len<=29)
         return;
   
@@ -225,16 +224,8 @@ void handle_sctp_packet(Sctp *sctp, char *buf, size_t len) {
     uint16_t sid = ntohs(*(uint16_t *)(buf + 20));
     uint32_t ppid = ntohl(*(uint32_t *)(buf + 24));
 
-    if (ppid==DCEP_PPID) 
-        parse_data_channel_open(sctp, sid, buf + 28, len - 28);
-}
-
-void print_hex_buffer(uint8_t *buf, int len) {
-    printf("data (%d): ", len);
-    for (int i = 0; i < len; i++) {
-        printf("%02X ", buf[i]);
-    }
-    printf("\n");
+    if (ppid==DATA_CHANNEL_PPID_CONTROL) 
+        sctp_parse_data_channel_open(sctp, sid, buf + 28, len - 28);
 }
 
 void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
@@ -243,8 +234,7 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
     return;
 
 #ifdef HAVE_USRSCTP
-  //print_hex_buffer((uint8_t *)buf, len);
-  handle_sctp_packet(sctp, buf, len);
+  sctp_handle_sctp_packet(sctp, buf, len);
   usrsctp_conninput(sctp, buf, len, 0);
 #else
   size_t length = 0;

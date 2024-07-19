@@ -141,7 +141,7 @@ typedef enum SctpDataPpid {
 typedef struct {
     char label[32];   // Stream label
     uint16_t sid;     // Stream ID
-} Stream_entry;
+} SctpStreamEntry;
 
 typedef struct Sctp {
 
@@ -155,7 +155,7 @@ typedef struct Sctp {
   DtlsSrtp *dtls_srtp;
   Buffer **data_rb;
   int stream_count;
-  Stream_entry stream_table[SCTP_MAX_STREAMS];
+  SctpStreamEntry stream_table[SCTP_MAX_STREAMS];
 
   /* datachannel */
   void (*onmessage)(char *msg, size_t len, void *userdata, uint16_t sid);
