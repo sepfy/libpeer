@@ -11,9 +11,9 @@ Stream JPEG over WebRTC datachannel with ESP32.
 ## Instructions
 
 ### Install esp-idf
-at lease v5.0.0
+at lease v5.2
 ```bash
-$ git clone -b v5.0.2 https://github.com/espressif/esp-idf.git
+$ git clone -b v5.2.2 https://github.com/espressif/esp-idf.git
 $ cd esp-idf
 $ source install.sh
 $ source export.sh
@@ -31,7 +31,7 @@ $ git clone --recursive https://github.com/sepfy/esp_ports.git components/srtp
 ### Configure
 ```bash
 $ idf.py menuconfig
-# Choose Example Configuration and change the SSID and password
+# Choose Example Connection Configuration and change the SSID and password
 ```
 
 ### Build 
@@ -45,10 +45,11 @@ $ idf.py flash
 ```
 Check the serial port message:
 ```
-I (12936) webrtc: MQTT_EVENT_CONNECTED
-I (12946) webrtc: sent subscribe successful, msg_id=5876
-I (13246) webrtc: MQTT_EVENT_SUBSCRIBED, msg_id=5876
-I (13246) webrtc: open browser and visit https://sepfy.github.io/webrtc?deviceId=esp32-xxxxxxxxxxxx
+I (10813) Camera: Camera Task Started
+I (10813) webrtc: peer_signaling_task started
+I (10813) webrtc: peer_connection_task started
+I (10823) webrtc: [APP] Free memory: 3882160 bytes
+I (10823) webrtc: open https://sepfy.github.io/webrtc?deviceId=esp32-xxxxxxxxxxxx
 ```
 Open the browser and visit the website showing by serial port message
 ![image](https://github.com/sepfy/libpeer/assets/22016807/46df15b1-9e28-4a6b-bf0a-4f676778cf7d)
