@@ -15,6 +15,7 @@
 #define DATA_CHANNEL_PPID_BINARY_PARTIAL    52
 #define DATA_CHANNEL_PPID_BINARY            53
 #define DATA_CHANNEL_PPID_DOMSTRING_PARTIAL 54
+#define DATA_CHANNEL_OPEN                   0x03
 
 static const uint32_t crc32c_table[256] = {
     0x00000000L, 0xF26B8303L, 0xE13B70F7L, 0x1350F3F4L,
@@ -108,21 +109,22 @@ static int sctp_outgoing_data_cb(void *userdata, void *buf, size_t len, uint8_t 
   return 0;
 }
 
-int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid) {
+int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid, uint16_t sid) {
 
 #ifdef HAVE_USRSCTP
+  int res;
   struct sctp_sendv_spa spa = {0};
 
   spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
 
-  spa.sendv_sndinfo.snd_sid = 0;
+  spa.sendv_sndinfo.snd_sid = sid;
   spa.sendv_sndinfo.snd_flags = SCTP_EOR;
   spa.sendv_sndinfo.snd_ppid = htonl(ppid);
 
-  if(usrsctp_sendv(sctp->sock, buf, len, NULL, 0, &spa, sizeof(spa), SCTP_SENDV_SPA, 0) < 0) {
-    LOGE("sctp sendv error");
-    return -1;
-  }
+  res = usrsctp_sendv(sctp->sock, buf, len, NULL, 0, &spa, sizeof(spa), SCTP_SENDV_SPA, 0);
+  if(res < 0) 
+    LOGE("sctp sendv error %d %s", errno, strerror(errno));
+  return res;
 #else
   size_t padding_len = 0;
   size_t payload_max = SCTP_MTU - sizeof(SctpPacket) - sizeof(SctpDataChunk);
@@ -176,15 +178,65 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid) {
   return len;
 }
 
+void sctp_add_stream_mapping(Sctp *sctp, const char *label, uint16_t sid) {
+  if (sctp->stream_count<SCTP_MAX_STREAMS) {
+    strncpy(sctp->stream_table[sctp->stream_count].label, label, sizeof(sctp->stream_table[sctp->stream_count].label));
+    sctp->stream_table[sctp->stream_count].sid = sid;
+    sctp->stream_count++;
+  } else 
+      LOGE("Stream table full. Cannot add more streams.");    
+}
+
+void sctp_parse_data_channel_open(Sctp *sctp, uint16_t sid, char *data, size_t length) {
+  if (length < 12) 
+    return;  // Not enough data for a DATA_CHANNEL_OPEN message
+    
+  if (data[0]==DATA_CHANNEL_OPEN) {
+    uint16_t label_length = ntohs(*(uint16_t *)(data + 8));
+    uint16_t protocol_length = ntohs(*(uint16_t *)(data + 10));
+
+    // Ensure we have enough data for the label and protocol
+    if (length < 12 + label_length + protocol_length) 
+      return;
+
+    char *label = (char *)(data + 12);
+
+    // copy and null-terminate 
+    char label_str[label_length + 1];
+    memcpy(label_str, label, label_length);
+    label_str[label_length] = '\0';
+
+    // Log or process the DATA_CHANNEL_OPEN message
+    printf("DATA_CHANNEL_OPEN: Label=%s, sid=%d\n", label_str, sid);
+
+    // Add stream mapping
+    sctp_add_stream_mapping(sctp, label_str, sid);
+  }
+}
+
+void sctp_handle_sctp_packet(Sctp *sctp, char *buf, size_t len) {
+    if (len<=29)
+        return;
+  
+    if (buf[12]!=0) // if chunk_type is no zero, it's not data
+        return;
+  
+    uint16_t sid = ntohs(*(uint16_t *)(buf + 20));
+    uint32_t ppid = ntohl(*(uint32_t *)(buf + 24));
+
+    if (ppid==DATA_CHANNEL_PPID_CONTROL) 
+        sctp_parse_data_channel_open(sctp, sid, buf + 28, len - 28);
+}
+
 void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
 
   if(!sctp)
     return;
 
 #ifdef HAVE_USRSCTP
+  sctp_handle_sctp_packet(sctp, buf, len);
   usrsctp_conninput(sctp, buf, len, 0);
 #else
-
   size_t length = 0;
   size_t pos = sizeof(SctpHeader);
   SctpChunkCommon *chunk_common;
@@ -220,6 +272,7 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
     switch (chunk_common->type) {
 
       case SCTP_DATA:
+
         data_chunk = (SctpDataChunk*)(buf + pos);
         LOGD("SCTP_DATA. ppid = %ld", ntohl(data_chunk->ppid));
 
@@ -231,8 +284,8 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
 #endif
         if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_DOMSTRING) {
 
-          if (sctp->onmessasge) {
-            sctp->onmessasge((char*)data_chunk->data, ntohs(data_chunk->length) - sizeof(SctpDataChunk), sctp->userdata);
+          if (sctp->onmessage) {
+            sctp->onmessage((char*)data_chunk->data, ntohs(data_chunk->length) - sizeof(SctpDataChunk), sctp->userdata, ntohs(data_chunk->sid));
           }
         }
 
@@ -343,30 +396,23 @@ void sctp_incoming_data(Sctp *sctp, char *buf, size_t len) {
 
 }
 
-static int sctp_handle_incoming_data(Sctp *sctp, char *data, size_t len, uint32_t ppid, uint16_t stream, int flags) {
-
+static int sctp_handle_incoming_data(Sctp *sctp, char *data, size_t len, uint32_t ppid, uint16_t sid, int flags) {
 #ifdef HAVE_USRSCTP
-  char *msg = NULL;
-
   switch(ppid) {
     case DATA_CHANNEL_PPID_CONTROL:
-
       break;
-    case DATA_CHANNEL_PPID_DOMSTRING:
 
-      msg = strndup(data, len);
-      LOGD("Got message %s (size = %ld)", msg, len);
-      if(msg && sctp->onmessasge) {
-        sctp->onmessasge(msg, len, sctp->userdata);
-        free(msg);
+    case DATA_CHANNEL_PPID_DOMSTRING:
+    case DATA_CHANNEL_PPID_BINARY:
+    case DATA_CHANNEL_PPID_DOMSTRING_PARTIAL:
+    case DATA_CHANNEL_PPID_BINARY_PARTIAL:
+
+      LOGD("Got message (size = %ld)", len);
+      if(sctp->onmessage) {
+        sctp->onmessage(data, len, sctp->userdata, sid);
       }
       break;
-    case DATA_CHANNEL_PPID_BINARY:
-      break;
-    case DATA_CHANNEL_PPID_DOMSTRING_PARTIAL:
-      break;
-    case DATA_CHANNEL_PPID_BINARY_PARTIAL:
-      break;
+
     default:
       break;
   }
@@ -400,7 +446,8 @@ static void sctp_process_notification(Sctp *sctp, union sctp_notification *notif
           break;
 
         case SCTP_COMM_LOST:
-          sctp->connected = 1;
+        case SCTP_SHUTDOWN_COMP:
+          sctp->connected = 0;
           if(sctp->onclose) {
             sctp->onclose(sctp->userdata);
           }
@@ -411,7 +458,7 @@ static void sctp_process_notification(Sctp *sctp, union sctp_notification *notif
     default:
       break;
   }
-
+  free(notification); // we need to free the memory that usrsctp allocates
 }
 
 static int sctp_incoming_data_cb(struct socket *sock, union sctp_sockstore addr,
@@ -425,8 +472,7 @@ static int sctp_incoming_data_cb(struct socket *sock, union sctp_sockstore addr,
     ntohl(recv_info.rcv_ppid));
   if(flags & MSG_NOTIFICATION) {
     sctp_process_notification(sctp, (union sctp_notification *)data, len);
-  }
-  else {
+  } else {
     sctp_handle_incoming_data(sctp, data, len, ntohl(recv_info.rcv_ppid), recv_info.rcv_sid, flags);
   }
   return 0;
@@ -567,9 +613,9 @@ void sctp_destroy(Sctp *sctp) {
 #endif
 }
 
-void sctp_onmessage(Sctp *sctp, void (*onmessasge)(char *msg, size_t len, void *userdata)) {
+void sctp_onmessage(Sctp *sctp, void (*onmessage)(char *msg, size_t len, void *userdata, uint16_t sid)) {
 
-  sctp->onmessasge = onmessasge;
+  sctp->onmessage = onmessage;
 }
 
 void sctp_onopen(Sctp *sctp, void (*onopen)(void *userdata)) {

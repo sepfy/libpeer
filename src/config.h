@@ -35,7 +35,7 @@
 #define WHIP_PORT 443
 
 #define KEEPALIVE_CONNCHECK 0
-#define CONFIG_IPV6 0
+#define CONFIG_IPV6 1 
 // default use wifi interface
 #define IFR_NAME "w"
 
