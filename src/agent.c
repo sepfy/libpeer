@@ -6,7 +6,7 @@
 #include <sys/socket.h>
 
 #include <pthread.h>
-#include "udp.h"
+#include "socket.h"
 #include "utils.h"
 #include "stun.h"
 #include "ice.h"
@@ -21,14 +21,14 @@
 static int agent_create_sockets(Agent *agent) {
 
   int ret;
-  if ((ret = udp_socket_create(&agent->udp_sockets[0], AF_INET)) < 0) {
+  if ((ret = udp_socket_open(&agent->udp_sockets[0], AF_INET, 0)) < 0) {
     LOGE("Failed to create UDP socket.");
     return ret;
   }
   LOGI("create IPv4 UDP socket: %d", agent->udp_sockets[0].fd);
 
 #if CONFIG_IPV6
-  if ((ret = udp_socket_create(&agent->udp_sockets[1], AF_INET6)) < 0) {
+  if ((ret = udp_socket_open(&agent->udp_sockets[1], AF_INET6, 0)) < 0) {
     LOGE("Failed to create IPv6 UDP socket.");
     return ret;
   }
@@ -92,7 +92,7 @@ static int agent_create_host_addr(Agent *agent) {
 
   udp_socket = &agent->udp_sockets[0];
   if (ports_get_host_addr(&udp_socket->bind_addr)) {
-    LOGD("addr: %d.%d.%d.%d", udp_socket->bind_addr.ipv4[0], udp_socket->bind_addr.ipv4[1], udp_socket->bind_addr.ipv4[2], udp_socket->bind_addr.ipv4[3]);
+    //LOGD("addr: %d.%d.%d.%d", udp_socket->bind_addr.ipv4[0], udp_socket->bind_addr.ipv4[1], udp_socket->bind_addr.ipv4[2], udp_socket->bind_addr.ipv4[3]);
     IceCandidate *ice_candidate = agent->local_candidates + agent->local_candidates_count++;
     ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_HOST, &udp_socket->bind_addr);
   }
@@ -100,7 +100,7 @@ static int agent_create_host_addr(Agent *agent) {
 #if CONFIG_IPV6
   udp_socket = &agent->udp_sockets[1];
   if (ports_get_host_addr(&udp_socket->bind_addr)) {
-    LOGD("addr: %x:%x:%x:%x:%x:%x:%x:%x", udp_socket->bind_addr.ipv6[0], udp_socket->bind_addr.ipv6[1], udp_socket->bind_addr.ipv6[2], udp_socket->bind_addr.ipv6[3], udp_socket->bind_addr.ipv6[4], udp_socket->bind_addr.ipv6[5], udp_socket->bind_addr.ipv6[6], udp_socket->bind_addr.ipv6[7]);
+    //LOGD("addr: %x:%x:%x:%x:%x:%x:%x:%x", udp_socket->bind_addr.ipv6[0], udp_socket->bind_addr.ipv6[1], udp_socket->bind_addr.ipv6[2], udp_socket->bind_addr.ipv6[3], udp_socket->bind_addr.ipv6[4], udp_socket->bind_addr.ipv6[5], udp_socket->bind_addr.ipv6[6], udp_socket->bind_addr.ipv6[7]);
     IceCandidate *ice_candidate = agent->local_candidates + agent->local_candidates_count++;
     ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_HOST, &udp_socket->bind_addr);
   }
@@ -234,8 +234,10 @@ void agent_deinit(Agent *agent) {
  */
 void agent_gather_candidate(Agent *agent, const char *urls, const char *username, const char *credential) {
 
-  char *port = NULL;
+  char *pos;
+  int port;
   char hostname[64];
+  char addr_string[ADDRSTRLEN];
   int i;
   int addr_type[1] = {AF_INET}; // ipv6 no need stun
   Address resolved_addr;
@@ -247,24 +249,27 @@ void agent_gather_candidate(Agent *agent, const char *urls, const char *username
 
   do {
 
-    if ((port = strstr(urls + 5, ":")) == NULL) {
+    if ((pos = strstr(urls + 5, ":")) == NULL) {
       break;
     }
 
-    resolved_addr.port = atoi(port + 1);
-    if (resolved_addr.port <= 0) {
+    port = atoi(pos + 1);
+    if (port <= 0) {
       break;
+      LOGE("Cannot parse port");
     }
-    LOGI("resolved_addr.port: %d", resolved_addr.port);
 
-    snprintf(hostname, port - urls - 5 + 1, "%s", urls + 5);
+    snprintf(hostname, pos - urls - 5 + 1, "%s", urls + 5);
 
     for (i = 0; i < sizeof(addr_type) / sizeof(addr_type[0]); i++) {
-      resolved_addr.family = addr_type[i];
-      if (ports_resolve_addr(hostname, &resolved_addr) == 0) {
-	LOGI("resolved_addr.ipv4: %d.%d.%d.%d",
-	  resolved_addr.ipv4[0], resolved_addr.ipv4[1], resolved_addr.ipv4[2], resolved_addr.ipv4[3]);
+
+      if (ports_resolve_addr(hostname, &resolved_addr) != 0) {
+        continue;
       }
+ 
+      addr_set_port(&resolved_addr, port);
+      addr_to_string(&resolved_addr, addr_string, sizeof(addr_string));
+      LOGI("stun/turn server %s:%d", addr_string, port);
 
       if (strncmp(urls, "stun:", 5) == 0) {
         LOGD("create stun addr");
@@ -453,6 +458,7 @@ a=candidate:1 1 UDP 1 36.231.28.50 38143 typ srflx
 
 int agent_connectivity_check(Agent *agent) {
 
+  char addr_string[ADDRSTRLEN];
   uint8_t buf[1400];
   StunMessage msg;
 
@@ -465,13 +471,8 @@ int agent_connectivity_check(Agent *agent) {
 
   if (agent->nominated_pair->conncheck % AGENT_CONNCHECK_PERIOD == 0) {
 
-    if (agent->nominated_pair->remote->addr.family == AF_INET) {
-      LOGD("send binding request to remote ip: %d.%d.%d.%d, port: %d", agent->nominated_pair->remote->addr.ipv4[0], agent->nominated_pair->remote->addr.ipv4[1], agent->nominated_pair->remote->addr.ipv4[2], agent->nominated_pair->remote->addr.ipv4[3], agent->nominated_pair->remote->addr.port);
-    } else {
-      char astring[INET6_ADDRSTRLEN];
-      addr_to_text(&(agent->nominated_pair->remote->addr), astring, INET6_ADDRSTRLEN);
-      LOGD("send binding request to remote ip: %s, port: %d", astring, agent->nominated_pair->remote->addr.port);
-    }
+    addr_to_string(&agent->nominated_pair->remote->addr, addr_string, sizeof(addr_string));
+    LOGD("send binding request to remote ip: %s, port: %d", addr_string, agent->nominated_pair->remote->addr.port);
     agent_create_binding_request(agent, &msg);
     agent_socket_send(agent, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
   }

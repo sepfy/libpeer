@@ -73,14 +73,9 @@ int ssl_transport_connect(NetworkContext_t *net_ctx,
     return -1;
   }
 
-  tcp_socket_open(&net_ctx->tcp_socket);
-  tcp_blocking_timeout(&net_ctx->tcp_socket, 1000);
-  if (ports_resolve_addr(host, &resolved_addr) < 0) {
-    LOGE("Failed to connect tcp server");
-    return -1;
-  }
-
-  resolved_addr.port = port;
+  tcp_socket_open(&net_ctx->tcp_socket, AF_INET);
+  ports_resolve_addr(host, &resolved_addr);
+  addr_set_port(&resolved_addr, port);
   tcp_socket_connect(&net_ctx->tcp_socket, &resolved_addr);
 
   mbedtls_ssl_set_bio(&net_ctx->ssl, &net_ctx->tcp_socket,

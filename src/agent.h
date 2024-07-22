@@ -10,7 +10,7 @@
 
 #include <pthread.h>
 
-#include "udp.h"
+#include "socket.h"
 #include "utils.h"
 #include "stun.h"
 #include "ice.h"

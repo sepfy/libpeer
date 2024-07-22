@@ -278,7 +278,7 @@ static void peer_connection_state_new(PeerConnection *pc) {
   for (int i = 0; i < sizeof(pc->config.ice_servers)/sizeof(pc->config.ice_servers[0]); ++i) {
 
     if (pc->config.ice_servers[i].urls) {
-      LOGI("ice_servers: %s\n", pc->config.ice_servers[i].urls);
+      LOGI("ice_servers: %s", pc->config.ice_servers[i].urls);
       agent_gather_candidate(&pc->agent, pc->config.ice_servers[i].urls, pc->config.ice_servers[i].username, pc->config.ice_servers[i].credential);
     }
   }

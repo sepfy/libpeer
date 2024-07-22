@@ -7,7 +7,7 @@
 #include "mbedtls/ssl.h"
 #include "dtls_srtp.h"
 #include "address.h"
-#include "udp.h"
+#include "socket.h"
 #include "config.h"
 #include "utils.h"
 

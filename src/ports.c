@@ -30,17 +30,17 @@ int ports_get_host_addr(Address *addr) {
   switch (addr->family) {
     case AF_INET6:
       if (esp_netif_get_ip6_global(netif, &ip6_info) == ESP_OK) {
-        memcpy(addr->ipv6, &ip6_info.addr, 16);
+        memcpy(&addr->sin6.sin6_addr, &ip6_info.addr, 16);
         ret = 1;
       } else if (esp_netif_get_ip6_linklocal(netif, &ip6_info) == ESP_OK) {
-        memcpy(addr->ipv6, &ip6_info.addr, 16);
+        memcpy(&addr->sin6.sin6_addr, &ip6_info.addr, 16);
         ret = 1;
       }
       break;
     case AF_INET:
     default:
       if (esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
-        memcpy(addr->ipv4, &ip_info.ip.addr, 4);
+        memcpy(&addr->sin.sin_addr, &ip_info.ip.addr, 4);
         ret = 1;
       }
       break;
@@ -59,11 +59,11 @@ int ports_get_host_addr(Address *addr) {
       if (ifa->ifa_addr->sa_family == addr->family) {
         switch (ifa->ifa_addr->sa_family) {
 	  case AF_INET:
-	    memcpy(addr->ipv4, &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr, 4);
+	    memcpy(&addr->sin, ifa->ifa_addr, sizeof(struct sockaddr_in));
 	    ret = 1;
 	    break;
 	  case AF_INET6:
-	    memcpy(addr->ipv6, &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr.s6_addr, 16);
+	    memcpy(&addr->sin6, ifa->ifa_addr, sizeof(struct sockaddr_in6));
 	    ret = 1;
 	    break;
 	  default:
@@ -130,70 +130,41 @@ LOGI("get_host_address inside while loop");
 }
 
 int ports_resolve_addr(const char *host, Address *addr) {
+
+  char addr_string[ADDRSTRLEN];
   int ret = -1;
   struct addrinfo hints, *res, *p;
-  int family;
   int status;
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
 
   if ((status = getaddrinfo(host, NULL, &hints, &res)) != 0) {
-    //LOGE("getaddrinfo error: %s\n", gai_strerror(status));
-    LOGE("getaddrinfo %s error: %d\n", host, status);
+    LOGE("getaddrinfo error: %d\n", status);
     return ret;
   }
 
-  if (addr->family == AF_INET6) {
-    family = AF_INET6;
-  } else {
-    family = AF_INET;
-  }
-
- for (p = res; p != NULL; p = p->ai_next) {
-    if (p->ai_family == family) {
-      switch (p->ai_family) {
+  // TODO: Support for IPv6
+  addr_set_family(addr, AF_INET);
+  for (p = res; p != NULL; p = p->ai_next) {
+    if (p->ai_family == addr->family) {
+      switch (addr->family) {
 	case AF_INET6:
-	  memcpy(addr->ipv6, &((struct sockaddr_in6 *)p->ai_addr)->sin6_addr.s6_addr, 16);
+	  memcpy(&addr->sin6, p->ai_addr, sizeof(struct sockaddr_in6));
 	  break;
         case AF_INET:
-	  LOGI("AF_INET");
-	  memcpy(addr->ipv4, &((struct sockaddr_in *)p->ai_addr)->sin_addr.s_addr, 4);
 	default:
+	  memcpy(&addr->sin, p->ai_addr, sizeof(struct sockaddr_in));
 	  break;
       }
       ret = 0;
     }
   }
 
+  addr_to_string(addr, addr_string, sizeof(addr_string));
+  LOGI("Resolved %s -> %s", host, addr_string);
   freeaddrinfo(res);
   return ret;
-}
-
-int ports_resolve_mdns_host(const char *host, Address *addr) {
-#ifdef ESP32
-  int ret = -1;
-  struct esp_ip4_addr esp_addr;
-  char host_name[64] = {0};
-  char *pos = strstr(host, ".local"); 
-  snprintf(host_name, pos - host + 1, "%s", host);
-  esp_addr.addr = 0;
-    
-  esp_err_t err = mdns_query_a(host_name, 2000,  &esp_addr);
-  if (err) {
-    if (err == ESP_ERR_NOT_FOUND) {
-      LOGW("%s: Host was not found!", esp_err_to_name(err));
-      return ret;
-    }
-    LOGE("Query Failed: %s", esp_err_to_name(err));
-      return ret;
-  }
-
-  memcpy(addr->ipv4, &esp_addr.addr, 4);
-  return ret;
-#else
-  return ports_resolve_addr(host, addr);
-#endif
 }
 
 uint32_t ports_get_epoch_time() {
@@ -202,4 +173,3 @@ uint32_t ports_get_epoch_time() {
   gettimeofday(&tv, NULL);
   return (uint32_t) tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
-

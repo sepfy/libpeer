@@ -6,70 +6,60 @@
 #include <arpa/inet.h>
 #include <string.h>
 
+#include "utils.h"
 #include "address.h"
 
-int addr_ipv4_validate(const char *ipv4, size_t len, Address *addr) {
-
-  int start = 0;
-  int index = 0;
-  for (int i = 0; i < len; i++) {
-
-    if (ipv4[i] != '.' && (ipv4[i] < '0' || ipv4[i] > '9')) {
-      return 0;
-    } else if (ipv4[i] == '.') {
-
-      addr->ipv4[index++] = atoi(ipv4 + start);
-      start = i + 1;
-    } else if (i == (len - 1)) {
-
-      addr->ipv4[index++] = atoi(ipv4 + start);
-    } else if (index == 4) {
-      return 0;
-    }
+void addr_set_family(Address *addr, int family) {
+  switch (family) {
+    case AF_INET6:
+      addr->family = AF_INET6;
+      break;
+    case AF_INET:
+    default:
+      addr->family = AF_INET;
+      break;
   }
-  addr->family = AF_INET;
-  return 1;
 }
 
-int addr_ipv6_validate(const char *ipv6, size_t len, Address *addr) {
-  int ret;
-  struct sockaddr_in6 sa6;
-  char astring[INET6_ADDRSTRLEN];
-  ret = inet_pton(AF_INET6, ipv6, &(sa6.sin6_addr));
-  inet_ntop(AF_INET6, &(sa6.sin6_addr), astring, INET6_ADDRSTRLEN);
-  memcpy(addr->ipv6, sa6.sin6_addr.s6_addr, 16);
-  return ret;
-}
-
-int addr_to_text(const Address *addr, char *buf, size_t len) {
-
+void addr_set_port(Address *addr, uint16_t port) {
+  addr->port = port;
   switch (addr->family) {
-   case AF_INET:
-    return inet_ntop(AF_INET, addr->ipv4, buf, len) != NULL;
-    break;
+    case AF_INET6:
+      addr->sin6.sin6_port = htons(port);
+      break;
+    case AF_INET:
+    default:
+      addr->sin.sin_port = htons(port);
+      break;
+  }
+}
+
+
+int addr_from_string(const char *buf, Address *addr) {
+  if (inet_pton(AF_INET, buf, &(addr->sin.sin_addr)) == 1) {
+    addr_set_family(addr, AF_INET);
+    return 1;
+  } else if (inet_pton(AF_INET6, buf, &(addr->sin6.sin6_addr)) == 1) {
+    addr_set_family(addr, AF_INET6);
+    return 1;
+  }
+  return 0;
+}
+
+int addr_to_string(const Address *addr, char *buf, size_t len) {
+
+  memset(buf, 0, sizeof(len));
+  switch (addr->family) {
    case AF_INET6:
-    return inet_ntop(AF_INET6, addr->ipv6, buf, len) != NULL;
-    break;
+    return inet_ntop(AF_INET6, &addr->sin6.sin6_addr, buf, len) != NULL;
+   case AF_INET:
+   default:
+    return inet_ntop(AF_INET, &addr->sin.sin_addr, buf, len) != NULL;
   }
   return 0;
 }
 
 int addr_equal(const Address *a, const Address *b) {
-  if (a->family != b->family) {
-    return 0;
-  }
-
-  switch (a->family) {
-   case AF_INET:
-    for (int i = 0; i < 4; i++) {
-      if (a->ipv4[i] != b->ipv4[i]) {
-	return 0;
-      }
-    }
-    break;
-   case AF_INET6:
-    break;
-  }
-
+  // TODO
   return 1;
 }
