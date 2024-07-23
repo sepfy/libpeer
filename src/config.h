@@ -27,7 +27,7 @@
 #endif
 
 // siganling
-#define MQTT_HOST "test.mosquitto.org"
+#define MQTT_HOST "broker.emqx.io"
 #define MQTT_PORT 8883
 
 #define WHIP_HOST "192.168.1.110"
