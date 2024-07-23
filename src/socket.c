@@ -102,11 +102,13 @@ int udp_socket_sendto(UdpSocket *udp_socket, Address *addr, const uint8_t *buf, 
 
   switch (addr->family) {
     case AF_INET6:
+      addr->sin6.sin6_family = AF_INET6;
       sa = (struct sockaddr *)&addr->sin6;
       sock_len = sizeof(struct sockaddr_in6);
       break;
     case AF_INET:
     default:
+      addr->sin.sin_family = AF_INET;
       sa = (struct sockaddr *)&addr->sin;
       sock_len = sizeof(struct sockaddr_in);
       break;
@@ -203,11 +205,13 @@ int tcp_socket_connect(TcpSocket *tcp_socket, Address *addr) {
 
   switch (addr->family) {
     case AF_INET6:
+      addr->sin6.sin6_family = AF_INET6;
       sa = (struct sockaddr *)&addr->sin6;
       sock_len = sizeof(struct sockaddr_in6);
       break;
     case AF_INET:
     default:
+      addr->sin.sin_family = AF_INET;
       sa = (struct sockaddr *)&addr->sin;
       sock_len = sizeof(struct sockaddr_in);
       break;

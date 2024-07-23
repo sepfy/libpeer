@@ -49,9 +49,7 @@ int ssl_transport_connect(NetworkContext_t *net_ctx,
     return -1;
   }
 
-
   mbedtls_ssl_conf_authmode(&net_ctx->conf, MBEDTLS_SSL_VERIFY_OPTIONAL);
-
   /*
   XXX: not sure if this is needed
   ret = mbedtls_x509_crt_parse(&net_ctx->cacert, (const unsigned char *) cacert, strlen(cacert) + 1);
@@ -73,10 +71,13 @@ int ssl_transport_connect(NetworkContext_t *net_ctx,
     return -1;
   }
 
+  memset(&resolved_addr, 0, sizeof(resolved_addr));
   tcp_socket_open(&net_ctx->tcp_socket, AF_INET);
   ports_resolve_addr(host, &resolved_addr);
   addr_set_port(&resolved_addr, port);
-  tcp_socket_connect(&net_ctx->tcp_socket, &resolved_addr);
+  if ((ret = tcp_socket_connect(&net_ctx->tcp_socket, &resolved_addr) < 0)) {
+    return -1;
+  }
 
   mbedtls_ssl_set_bio(&net_ctx->ssl, &net_ctx->tcp_socket,
    ssl_transport_mbedlts_send, ssl_transport_mbedtls_recv, NULL);
