@@ -117,7 +117,6 @@ void app_main(void) {
   ESP_ERROR_CHECK(nvs_flash_init());
   ESP_ERROR_CHECK(esp_netif_init());
   ESP_ERROR_CHECK(esp_event_loop_create_default());
-  ESP_ERROR_CHECK(mdns_init());
   ESP_ERROR_CHECK(example_connect());
 
   if (esp_read_mac(mac, ESP_MAC_WIFI_STA) == ESP_OK) {
@@ -132,6 +131,12 @@ void app_main(void) {
   g_pc = peer_connection_create(&config);
   peer_connection_oniceconnectionstatechange(g_pc, oniceconnectionstatechange);
   peer_connection_ondatachannel(g_pc, onmessasge, onopen, onclose);
+
+  ServiceConfiguration service_config = SERVICE_CONFIG_DEFAULT();
+  service_config.client_id = deviceid;
+  service_config.pc = g_pc;
+  peer_signaling_set_config(&service_config);
+  peer_signaling_join_channel();
 
   peer_signaling_join_channel(deviceid, g_pc);
 

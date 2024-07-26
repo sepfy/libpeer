@@ -19,7 +19,7 @@ typedef struct ServiceConfiguration {
 } ServiceConfiguration;
 
 #define SERVICE_CONFIG_DEFAULT() { \
- .mqtt_url = "test.mosquitto.org", \
+ .mqtt_url = "broker.emqx.io", \
  .mqtt_port = 8883,                \
  .client_id = "peer",              \
  .http_url = "",                   \

@@ -137,11 +137,13 @@ int udp_socket_recvfrom(UdpSocket *udp_socket, Address *addr, uint8_t *buf, int 
 
   switch (udp_socket->bind_addr.family) {
     case AF_INET6:
+      sin6.sin6_family = AF_INET6;
       sa = (struct sockaddr *)&sin6;
       sock_len = sizeof(struct sockaddr_in6);
       break;
     case AF_INET:
     default:
+      sin.sin_family = AF_INET;
       sa = (struct sockaddr *)&sin;
       sock_len = sizeof(struct sockaddr_in);
       break;

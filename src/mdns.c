@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <inttypes.h>
 #include "utils.h"
 #include "address.h"
 #include "socket.h"
@@ -55,7 +56,6 @@ static int mdns_parse_answer(uint8_t *buf, int size, Address *addr) {
 
   buf += sizeof(DnsHeader);
   pos = strstr((char*)buf, "local");
-  LOGI("\nbuf=>%s\n", buf);
   if (pos == NULL) {
     LOGI("not a mDNS response");
     return -1;
@@ -64,10 +64,7 @@ static int mdns_parse_answer(uint8_t *buf, int size, Address *addr) {
 
   pos += 6;
   answer = (DnsAnswer *)pos;
-  LOGI("lenght: %d\n", answer->length);
-  uint8_t *debug = (uint8_t*)&answer->ttl;
-  printf("%.2x %.2x %.2x %.2x\n", debug[0], debug[1], debug[2], debug[3]);
-  printf("type: %d, class: %d, ttl: %lu, length: %d\n", ntohs(answer->type), ntohs(answer->class), ntohl(answer->ttl), ntohs(answer->length));
+  LOGD("type: %"PRIu16", class: %"PRIu16", ttl: %"PRIu32", length: %"PRIu16"", ntohs(answer->type), ntohs(answer->class), ntohl(answer->ttl), ntohs(answer->length));
   if (ntohs(answer->length) != 4) {
     LOGI("invalid length");
     return -1;
@@ -84,7 +81,7 @@ static int mdns_build_query(const char *hostname, uint8_t *buf, int size) {
   DnsHeader *dns_header;
   DnsQuery *dns_query;
 
-  total_size = sizeof(dns_header) + strlen(hostname) + sizeof(dns_query) + 2;
+  total_size = sizeof(DnsHeader) + strlen(hostname) + sizeof(DnsQuery) + 2;
   if (size < total_size) {
     printf("buf size is not enough");
     return -1;
@@ -118,23 +115,14 @@ static int mdns_build_query(const char *hostname, uint8_t *buf, int size) {
 }
 
 int mdns_resolve_addr(const char *hostname, Address *addr) {
-
-  Address mcast_addr;
+  Address mcast_addr = {0};
   UdpSocket udp_socket;
   uint8_t buf[256];
   char addr_string[ADDRSTRLEN];
-  int send_retry = 3;
-  int recv_retry = 5;
-  int ret = -1;
-  int resolved = 0;
-  int size;
-  struct timeval tv;
-  int maxfd = 0;
+  struct timeval tv = {1, 0};
   fd_set rfds;
-  tv.tv_sec = 1;
-  tv.tv_usec = 0;
+  int maxfd, send_retry, recv_retry, size, ret;
 
-  memset(&mcast_addr, 0, sizeof(mcast_addr));
   addr_from_string(MDNS_GROUP, &mcast_addr);
   addr_set_port(&mcast_addr, MDNS_PORT);
 
@@ -143,37 +131,33 @@ int mdns_resolve_addr(const char *hostname, Address *addr) {
     return -1;
   }
 
-  FD_ZERO(&rfds);
   maxfd = udp_socket.fd;
+  FD_ZERO(&rfds);
 
-  while (!resolved && send_retry--) {
-    LOGI("sendto");
+  for (send_retry = 3; send_retry > 0; send_retry--) {
     size = mdns_build_query(hostname, buf, sizeof(buf));
     udp_socket_sendto(&udp_socket, &mcast_addr, buf, size);
-    recv_retry = 5;
-    while (!resolved && recv_retry--) {
-      LOGI("select %d", recv_retry);
+    for (recv_retry = 5; recv_retry > 0; recv_retry--) {
       FD_SET(udp_socket.fd, &rfds);
       ret = select(maxfd + 1, &rfds, NULL, NULL, &tv);
+
       if (ret < 0) {
         LOGE("select error");
-      } else if (ret == 0) {
-        // timeout
-      } else {
-        if (FD_ISSET(udp_socket.fd, &rfds)) {
-          ret = udp_socket_recvfrom(&udp_socket, &mcast_addr, buf, sizeof(buf));
-          if (!mdns_parse_answer(buf, ret, addr)) {
-            addr_to_string(addr, addr_string, sizeof(addr_string));
-	    addr_set_family(addr, AF_INET);
-	    resolved = 1;
-            break;
-          }
+        break;
+      } else if (ret > 0 && FD_ISSET(udp_socket.fd, &rfds)) {
+        ret = udp_socket_recvfrom(&udp_socket, &mcast_addr, buf, sizeof(buf));
+        if (!mdns_parse_answer(buf, ret, addr)) {
+          addr_to_string(addr, addr_string, sizeof(addr_string));
+          addr_set_family(addr, AF_INET);
+          LOGI("Resolved %s -> %s", hostname, addr_string);
+          udp_socket_close(&udp_socket);
+          return 1;
         }
       }
     }
   }
-  LOGI("Resolve:%d", resolved);
-  udp_socket_close(&udp_socket);
-  return resolved;
-}
 
+  LOGI("Failed to resolve hostname");
+  udp_socket_close(&udp_socket);
+  return 0;
+}
