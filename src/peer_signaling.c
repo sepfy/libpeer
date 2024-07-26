@@ -127,14 +127,18 @@ static void peer_signaling_on_pub_event(const char *msg, size_t size) {
     }
 
     if (strcmp(item->valuestring, RPC_METHOD_OFFER) == 0) {
-
-      if (state == PEER_CONNECTION_CLOSED) { 
-        g_ps.id = id;
-        peer_connection_create_offer(g_ps.pc);
-      } else {
-        error = cJSON_CreateRaw(RPC_ERROR_INTERNAL_ERROR);
+      switch (state) {
+        case PEER_CONNECTION_NEW:
+        case PEER_CONNECTION_DISCONNECTED:
+        case PEER_CONNECTION_FAILED:
+        case PEER_CONNECTION_CLOSED: {
+          g_ps.id = id;
+          peer_connection_create_offer(g_ps.pc);
+        } break;
+        default: {
+          error = cJSON_CreateRaw(RPC_ERROR_INTERNAL_ERROR);
+        } break;
       }
-
     } else if (strcmp(item->valuestring, RPC_METHOD_ANSWER) == 0) {
 
       item = cJSON_GetObjectItem(req, "params");
