@@ -407,7 +407,7 @@ static int sctp_handle_incoming_data(Sctp *sctp, char *data, size_t len, uint32_
     case DATA_CHANNEL_PPID_DOMSTRING_PARTIAL:
     case DATA_CHANNEL_PPID_BINARY_PARTIAL:
 
-      LOGD("Got message (size = %ld)", len);
+      LOGD("Got message (size = %d)", len);
       if(sctp->onmessage) {
         sctp->onmessage(data, len, sctp->userdata, sid);
       }
@@ -464,12 +464,12 @@ static void sctp_process_notification(Sctp *sctp, union sctp_notification *notif
 static int sctp_incoming_data_cb(struct socket *sock, union sctp_sockstore addr,
  void *data, size_t len, struct sctp_rcvinfo recv_info, int flags, void *userdata) {
   Sctp *sctp = (Sctp*)userdata;
-  LOGD("Data of length %u received on stream %u with SSN %u, TSN %u, PPID %u",
-    (uint32_t)len,
-    recv_info.rcv_sid,
-    recv_info.rcv_ssn,
-    recv_info.rcv_tsn,
-    ntohl(recv_info.rcv_ppid));
+  LOGD("Data of length %d received on stream %"PRIu16" with SSN %"PRIu16", TSN %"PRIu32", PPID %"PRIu32"",
+   len,
+   recv_info.rcv_sid,
+   recv_info.rcv_ssn,
+   recv_info.rcv_tsn,
+   ntohl(recv_info.rcv_ppid));
   if(flags & MSG_NOTIFICATION) {
     sctp_process_notification(sctp, (union sctp_notification *)data, len);
   } else {

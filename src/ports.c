@@ -185,11 +185,12 @@ int ports_resolve_mdns_host(const char *host, Address *addr) {
       return ret;
     }
     LOGE("Query Failed: %s", esp_err_to_name(err));
-      return ret;
+    return ret;
   }
 
+  addr->family = AF_INET;
   memcpy(addr->ipv4, &esp_addr.addr, 4);
-  return ret;
+  return 0;
 #else
   return ports_resolve_addr(host, addr);
 #endif

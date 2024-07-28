@@ -1,4 +1,5 @@
 components/srtp
+components/usrsctp
 build
 dependencies.lock
 managed_components

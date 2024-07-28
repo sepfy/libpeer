@@ -26,6 +26,7 @@ $ cd libpeer/examples/esp32
 $ idf.py add-dependency "espressif/esp32-camera^2.0.4"
 $ idf.py add-dependency "mdns"
 $ git clone --recursive https://github.com/sepfy/esp_ports.git components/srtp
+$ git clone -b components https://github.com/sepfy/usrsctp-esp32.git components/usrtsctp
 ```
 
 ### Configure
