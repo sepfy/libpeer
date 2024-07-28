@@ -123,11 +123,15 @@ int mdns_resolve_addr(const char *hostname, Address *addr) {
   fd_set rfds;
   int maxfd, send_retry, recv_retry, size, ret;
 
-  addr_from_string(MDNS_GROUP, &mcast_addr);
-  addr_set_port(&mcast_addr, MDNS_PORT);
-
   if (udp_socket_open(&udp_socket, AF_INET, MDNS_PORT) < 0) {
     LOGE("Failed to create socket");
+    return -1;
+  }
+
+  addr_from_string(MDNS_GROUP, &mcast_addr);
+  addr_set_port(&mcast_addr, MDNS_PORT);
+  if (udp_socket_add_multicast_group(&udp_socket, &mcast_addr) < 0) {
+    LOGE("Failed to add multicast group");
     return -1;
   }
 
@@ -145,13 +149,15 @@ int mdns_resolve_addr(const char *hostname, Address *addr) {
         LOGE("select error");
         break;
       } else if (ret > 0 && FD_ISSET(udp_socket.fd, &rfds)) {
-        ret = udp_socket_recvfrom(&udp_socket, &mcast_addr, buf, sizeof(buf));
+        ret = udp_socket_recvfrom(&udp_socket, NULL, buf, sizeof(buf));
         if (!mdns_parse_answer(buf, ret, addr)) {
           addr_to_string(addr, addr_string, sizeof(addr_string));
           addr_set_family(addr, AF_INET);
           LOGI("Resolved %s -> %s", hostname, addr_string);
           udp_socket_close(&udp_socket);
           return 1;
+        } else {
+          LOGD("timeout");
         }
       }
     }

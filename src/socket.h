@@ -23,6 +23,8 @@ int udp_socket_sendto(UdpSocket *udp_socket, Address *bind_addr, const uint8_t *
 
 int udp_socket_recvfrom(UdpSocket *udp_sock, Address *bind_addr, uint8_t *buf, int len);
 
+int udp_socket_add_multicast_group(UdpSocket *udp_socket, Address *mcast_addr);
+
 int tcp_socket_open(TcpSocket *tcp_socket, int family);
 
 int tcp_socket_connect(TcpSocket *tcp_socket, Address *addr);

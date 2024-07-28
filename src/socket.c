@@ -13,6 +13,29 @@
 #include "utils.h"
 #include "socket.h"
 
+int udp_socket_add_multicast_group(UdpSocket *udp_socket, Address *mcast_addr) {
+
+  int ret = 0;
+  struct ip_mreq imreq = {0};
+  struct in_addr iaddr = {0};
+
+  imreq.imr_interface.s_addr = INADDR_ANY;
+  // IPV4 only
+  imreq.imr_multiaddr.s_addr = mcast_addr->sin.sin_addr.s_addr;
+
+  if ((ret = setsockopt(udp_socket->fd, IPPROTO_IP, IP_MULTICAST_IF, &iaddr, sizeof(struct in_addr))) < 0) {
+    LOGE("Failed to set IP_MULTICAST_IF: %d", ret);
+    return ret;
+  }
+
+  if ((ret = setsockopt(udp_socket->fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &imreq, sizeof(struct ip_mreq))) < 0) {
+    LOGE("Failed to set IP_ADD_MEMBERSHIP: %d", ret);
+    return ret;
+  }
+
+  return 0;
+}
+
 int udp_socket_open(UdpSocket *udp_socket, int family, int port) {
 
   int ret;
