@@ -105,7 +105,7 @@ typedef struct SctpDataChunk {
   uint8_t iube;
   uint16_t length;
   uint32_t tsn;
-  uint16_t si;
+  uint16_t sid;
   uint16_t sqn;
   uint32_t ppid;
   uint8_t data[0];
@@ -136,7 +136,12 @@ typedef enum SctpDataPpid {
 
 } SctpDataPpid;
 
-typedef struct Sctp Sctp;
+#define SCTP_MAX_STREAMS           5
+
+typedef struct {
+    char label[32];   // Stream label
+    uint16_t sid;     // Stream ID
+} SctpStreamEntry;
 
 typedef struct Sctp {
 
@@ -149,8 +154,11 @@ typedef struct Sctp {
   uint32_t tsn;
   DtlsSrtp *dtls_srtp;
   Buffer **data_rb;
+  int stream_count;
+  SctpStreamEntry stream_table[SCTP_MAX_STREAMS];
+
   /* datachannel */
-  void (*onmessasge)(char *msg, size_t len, void *userdata);
+  void (*onmessage)(char *msg, size_t len, void *userdata, uint16_t sid);
   void (*onopen)(void *userdata);
   void (*onclose)(void *userdata);
 
@@ -169,9 +177,9 @@ int sctp_is_connected(Sctp *sctp);
 
 void sctp_incoming_data(Sctp *sctp, char *buf, size_t len);
 
-int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid);
+int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid, uint16_t sid);
 
-void sctp_onmessage(Sctp *sctp, void (*onmessasge)(char *msg, size_t len, void *userdata));
+void sctp_onmessage(Sctp *sctp, void (*onmessage)(char *msg, size_t len, void *userdata, uint16_t sid));
 
 void sctp_onopen(Sctp *sctp, void (*onopen)(void *userdata));
 

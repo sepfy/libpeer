@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include "sctp.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -77,6 +78,8 @@ const char* peer_connection_state_to_string(PeerConnectionState state);
 
 PeerConnectionState peer_connection_get_state(PeerConnection *pc);
 
+Sctp *peer_connection_get_sctp(PeerConnection *pc);
+
 PeerConnection* peer_connection_create(PeerConfiguration *config);
 
 void peer_connection_destroy(PeerConnection *pc);
@@ -91,6 +94,8 @@ int peer_connection_loop(PeerConnection *pc);
  * @param[in] length of message
  */
 int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len);
+
+int peer_connection_datachannel_send_sid(PeerConnection *pc, char *message, size_t len, uint16_t sid);
 
 int peer_connection_send_audio(PeerConnection *pc, const uint8_t *packet, size_t bytes);
 
@@ -134,9 +139,13 @@ void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
  * @param[in] callback function when connection is closed
  */
 void peer_connection_ondatachannel(PeerConnection *pc,
- void (*onmessasge)(char *msg, size_t len, void *userdata),
+ void (*onmessage)(char *msg, size_t len, void *userdata, uint16_t sid),
  void (*onopen)(void *userdata),
  void (*onclose)(void *userdata));
+
+int peer_connection_lookup_sid(PeerConnection *pc, const char *label, uint16_t *sid);
+
+char *peer_connection_lookup_sid_label(PeerConnection *pc, uint16_t sid);
 
 #ifdef __cplusplus
 }

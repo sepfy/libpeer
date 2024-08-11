@@ -26,12 +26,12 @@ static void onclose(void *user_data) {
 
 }
 
-static void onmessage(char *msg, size_t len, void *user_data) {
+static void onmessage(char *msg, size_t len, void *user_data, uint16_t sid) {
 
-  printf("on message: %s\n", msg);
+  printf("on message: %d %s", sid, msg);
 
   if (strncmp(msg, "ping", 4) == 0) {
-    printf("send pong\n");
+    printf(", send pong\n");
     peer_connection_datachannel_send(g_pc, "pong", 4);
   }
 }
