@@ -1,4 +1,4 @@
 project(examples)
 
-add_subdirectory(sample)
+add_subdirectory(generic)
 

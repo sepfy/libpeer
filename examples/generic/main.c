@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
   pthread_create(&peer_connection_thread, NULL, peer_connection_task, NULL);
   pthread_create(&peer_singaling_thread, NULL, peer_singaling_task, NULL);
 
-  reader_init("./media/");
+  reader_init();
 
   while (!g_interrupted) {
 
