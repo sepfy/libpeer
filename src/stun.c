@@ -63,18 +63,14 @@ void stun_msg_create(StunMessage *msg, uint16_t type) {
 
 void stun_set_mapped_address(char *value, uint8_t *mask, Address *addr) {
 
-  int i;
-
   uint8_t *family = (uint8_t *)(value + 1);
   uint16_t *port = (uint16_t *)(value + 2);
   uint8_t *ipv4 = (uint8_t *)(value + 4);
 
   *family = 0x01;
   *port = htons(addr->port);
- 
-  for (i = 0; i < 4; i++) {
-    ipv4[i] = addr->ipv4[i];
-  }
+
+  memcpy(ipv4, &addr->sin.sin_addr, 4);
 
   //LOGD("XOR Mapped Address Family: 0x%02x", *family);
   //LOGD("XOR Mapped Address Port: %d", *port);
@@ -84,26 +80,26 @@ void stun_set_mapped_address(char *value, uint8_t *mask, Address *addr) {
 void stun_get_mapped_address(char *value, uint8_t *mask, Address *addr) {
 
   int i;
-  uint32_t *addr32 = (uint32_t *)addr->ipv4;
-  uint16_t *addr16 = (uint16_t *)addr->ipv6;
-  addr->family = value[1];
-  addr->port = ntohs(*(uint16_t *)(value + 2) ^ *(uint16_t*)mask);
-  LOGD("family: %d, %d", AF_INET, AF_INET6);
-  LOGD("XOR Mapped Address Family: 0x%02x", addr->family); 
-  LOGD("XOR Mapped Address Port: %d", addr->port);
-  if (addr->family == 0x02) {
-    addr->family = AF_INET6;
+  char addr_string[ADDRSTRLEN];
+  uint32_t *addr32 = (uint32_t *)&addr->sin.sin_addr;
+  uint16_t *addr16 = (uint16_t *)&addr->sin6.sin6_addr;
+  uint8_t family = value[1];
+  if (family == 0x02) {
+    addr_set_family(addr, AF_INET6);
     for (i = 0; i < 8; i++) {
       addr16[i] = (*(uint16_t *)(value + 4 + 2*i) ^ *(uint16_t*)(mask + 2*i));
     }
-    LOGD("XOR Mapped Address Address: %x:%x:%x:%x:%x:%x:%x:%x", addr->ipv6[0], addr->ipv6[1], addr->ipv6[2], addr->ipv6[3], addr->ipv6[4], addr->ipv6[5], addr->ipv6[6], addr->ipv6[7]);
-
-  } else if (addr->family == 0x01) {
-    addr->family = AF_INET;
-    *addr32 = (*(uint32_t *)(value + 4) ^ *(uint32_t*)mask); 
-    LOGD("XOR Mapped Address Address: %d.%d.%d.%d", addr->ipv4[0], addr->ipv4[1], addr->ipv4[2], addr->ipv4[3]);
+  } else if (family == 0x01) {
+    addr_set_family(addr, AF_INET);
+    *addr32 = (*(uint32_t *)(value + 4) ^ *(uint32_t*)mask);
   }
 
+  addr_to_string(addr, addr_string, sizeof(addr_string));
+  addr_set_port(addr, ntohs(*(uint16_t *)(value + 2) ^ *(uint16_t*)mask));
+
+  LOGD("XOR Mapped Address Family: 0x%02x", addr->family);
+  LOGD("XOR Mapped Address Port: %d", addr->port);
+  LOGD("XOR Mapped Address Address: %s", addr_string);
 }
 
 void stun_parse_msg_buf(StunMessage *msg) {

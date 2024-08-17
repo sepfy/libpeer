@@ -37,6 +37,7 @@ int ssl_transport_connect(NetworkContext_t *net_ctx,
 
   if ((ret = mbedtls_ctr_drbg_seed(&net_ctx->ctr_drbg, mbedtls_entropy_func, &net_ctx->entropy,
    (const unsigned char *) pers, strlen(pers))) != 0) {
+    return -1;
   }
 
   if ((ret = mbedtls_ssl_config_defaults(&net_ctx->conf,
@@ -45,11 +46,10 @@ int ssl_transport_connect(NetworkContext_t *net_ctx,
    MBEDTLS_SSL_PRESET_DEFAULT)) != 0) {
     
     LOGE("ssl config error: -0x%x", (unsigned int) -ret);
+    return -1;
   }
 
-
   mbedtls_ssl_conf_authmode(&net_ctx->conf, MBEDTLS_SSL_VERIFY_OPTIONAL);
-
   /*
   XXX: not sure if this is needed
   ret = mbedtls_x509_crt_parse(&net_ctx->cacert, (const unsigned char *) cacert, strlen(cacert) + 1);
@@ -63,18 +63,21 @@ int ssl_transport_connect(NetworkContext_t *net_ctx,
 
   if ((ret = mbedtls_ssl_setup(&net_ctx->ssl, &net_ctx->conf)) != 0) {
     LOGE("ssl setup error: -0x%x", (unsigned int) -ret);
+    return -1;
   }
 
   if ((ret = mbedtls_ssl_set_hostname(&net_ctx->ssl, host)) != 0) {
     LOGE("ssl set hostname error: -0x%x", (unsigned int) -ret);
+    return -1;
   }
 
-  tcp_socket_open(&net_ctx->tcp_socket);
-  tcp_blocking_timeout(&net_ctx->tcp_socket, 1000);
+  memset(&resolved_addr, 0, sizeof(resolved_addr));
+  tcp_socket_open(&net_ctx->tcp_socket, AF_INET);
   ports_resolve_addr(host, &resolved_addr);
-
-  resolved_addr.port = port;
-  tcp_socket_connect(&net_ctx->tcp_socket, &resolved_addr);
+  addr_set_port(&resolved_addr, port);
+  if ((ret = tcp_socket_connect(&net_ctx->tcp_socket, &resolved_addr) < 0)) {
+    return -1;
+  }
 
   mbedtls_ssl_set_bio(&net_ctx->ssl, &net_ctx->tcp_socket,
    ssl_transport_mbedlts_send, ssl_transport_mbedtls_recv, NULL);

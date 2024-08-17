@@ -7,8 +7,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include "mdns.h"
 #include "ports.h"
-#include "udp.h"
+#include "socket.h"
 #include "utils.h"
 #include "ice.h"
 
@@ -52,59 +53,34 @@ void ice_candidate_create(IceCandidate *candidate, int foundation, IceCandidateT
 
 void ice_candidate_to_description(IceCandidate *candidate, char *description, int length) {
 
-  char typ_raddr[64];
+  char addr_string[ADDRSTRLEN];
+  char typ_raddr[128];
 
   memset(typ_raddr, 0, sizeof(typ_raddr));
+  addr_to_string(&candidate->raddr, addr_string, sizeof(addr_string));
 
   switch (candidate->type) {
-
     case ICE_CANDIDATE_TYPE_HOST:
       snprintf(typ_raddr, sizeof(typ_raddr), "host");
       break;
-
     case ICE_CANDIDATE_TYPE_SRFLX:
-      snprintf(typ_raddr, sizeof(typ_raddr), "srflx raddr %d.%d.%d.%d rport %d",
-       candidate->raddr.ipv4[0],
-       candidate->raddr.ipv4[1],
-       candidate->raddr.ipv4[2],
-       candidate->raddr.ipv4[3],
-       candidate->raddr.port);
+      snprintf(typ_raddr, sizeof(typ_raddr), "srflx raddr %s rport %d", addr_string, candidate->raddr.port);
       break;
     case ICE_CANDIDATE_TYPE_RELAY:
-      snprintf(typ_raddr, sizeof(typ_raddr), "relay raddr %d.%d.%d.%d rport %d",
-       candidate->raddr.ipv4[0],
-       candidate->raddr.ipv4[1],
-       candidate->raddr.ipv4[2],
-       candidate->raddr.ipv4[3],
-       candidate->raddr.port);
+      snprintf(typ_raddr, sizeof(typ_raddr), "relay raddr %s rport %d", addr_string, candidate->raddr.port);
     default:
       break;
   }
-  LOGI("candidate->addr.family: %d", candidate->addr.family);
-  if (candidate->addr.family == AF_INET6) {
-    char ipv6str[INET6_ADDRSTRLEN];
-    inet_ntop(AF_INET6, candidate->addr.ipv6, ipv6str, INET6_ADDRSTRLEN);
-    snprintf(description, length, "a=candidate:%d %d %s %" PRIu32 " %s %d typ %s\n",
-     candidate->foundation,
-     candidate->component,
-     candidate->transport,
-     candidate->priority,
-     ipv6str,
-     candidate->addr.port,
-     typ_raddr);
-  } else {
-    snprintf(description, length, "a=candidate:%d %d %s %" PRIu32 " %d.%d.%d.%d %d typ %s\n",
-     candidate->foundation,
-     candidate->component,
-     candidate->transport,
-     candidate->priority,
-     candidate->addr.ipv4[0],
-     candidate->addr.ipv4[1],
-     candidate->addr.ipv4[2],
-     candidate->addr.ipv4[3],
-     candidate->addr.port,
-     typ_raddr);
-  }
+
+  addr_to_string(&candidate->addr, addr_string, sizeof(addr_string));
+  snprintf(description, length, "a=candidate:%d %d %s %" PRIu32 " %s %d typ %s\n",
+   candidate->foundation,
+   candidate->component,
+   candidate->transport,
+   candidate->priority,
+   addr_string,
+   candidate->addr.port,
+   typ_raddr);
 }
 
 int ice_candidate_from_description(IceCandidate *candidate, char *description, char *end) {
@@ -120,7 +96,6 @@ int ice_candidate_from_description(IceCandidate *candidate, char *description, c
     memset(buf, 0, sizeof(buf));
     strncpy(buf, split_start, split_end - split_start);
     switch (index) {
-
       case 0:
         candidate->foundation = atoi(buf);
         break;
@@ -139,21 +114,15 @@ int ice_candidate_from_description(IceCandidate *candidate, char *description, c
         break;
       case 4:
         if (strstr(buf, "local") != 0) {
-          if (ports_resolve_mdns_host(buf, &candidate->addr) < 0) {
+          if (mdns_resolve_addr(buf, &candidate->addr) == 0) {
             return -1;
           }
-          LOGD("mDNS host: %s, ip: %d.%d.%d.%d", buf, candidate->addr.ipv4[0], candidate->addr.ipv4[1], candidate->addr.ipv4[2], candidate->addr.ipv4[3]);
-        } else if (addr_ipv4_validate(buf, strlen(buf), &candidate->addr)) {
-          candidate->addr.family = AF_INET;
-        } else if (addr_ipv6_validate(buf, strlen(buf), &candidate->addr)) {
-	  candidate->addr.family = AF_INET6;
-	} else {
-          return -1;
-	}
-
+        } else if (addr_from_string(buf, &candidate->addr) == 0) {
+	  return -1;
+	} 
         break;
       case 5:
-        candidate->addr.port = atoi(buf);
+	addr_set_port(&candidate->addr, atoi(buf));
         break;
       case 7:
 

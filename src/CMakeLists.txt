@@ -16,6 +16,8 @@ include_directories(peer PUBLIC
   ${MQTT_INCLUDE_PUBLIC_DIRS}
 )
 
+add_dependencies(peer cjson mbedtls usrsctp srtp2)
+
 target_link_libraries(peer ${DEP_LIBS})
 
 set_target_properties(peer PROPERTIES PUBLIC_HEADER "${HEADERS}")

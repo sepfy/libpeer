@@ -286,7 +286,7 @@ static void peer_connection_state_new(PeerConnection *pc) {
   for (int i = 0; i < sizeof(pc->config.ice_servers)/sizeof(pc->config.ice_servers[0]); ++i) {
 
     if (pc->config.ice_servers[i].urls) {
-      LOGI("ice_servers: %s\n", pc->config.ice_servers[i].urls);
+      LOGI("ice_servers: %s", pc->config.ice_servers[i].urls);
       agent_gather_candidate(&pc->agent, pc->config.ice_servers[i].urls, pc->config.ice_servers[i].username, pc->config.ice_servers[i].credential);
     }
   }
@@ -451,7 +451,7 @@ int peer_connection_loop(PeerConnection *pc) {
 
       }
 
-      if (KEEPALIVE_CONNCHECK > 0 && (utils_get_timestamp() - pc->agent.binding_request_time) > KEEPALIVE_CONNCHECK) {
+      if (KEEPALIVE_CONNCHECK > 0 && (ports_get_epoch_time() - pc->agent.binding_request_time) > KEEPALIVE_CONNCHECK) {
 
         LOGI("binding request timeout");
         STATE_CHANGED(pc, PEER_CONNECTION_CLOSED);

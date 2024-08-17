@@ -15,7 +15,6 @@
 
 #include <srtp2/srtp.h>
 
-#include "udp.h"
 #include "address.h"
 
 #define SRTP_MASTER_KEY_LENGTH  16
