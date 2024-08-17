@@ -14,6 +14,7 @@
 extern PeerConnection *g_pc;
 extern int gDataChannelOpened;
 extern PeerConnectionState eState;
+extern SemaphoreHandle_t xSemaphore;
 extern int get_timestamp();
 static const char *TAG = "Camera";
 
@@ -134,7 +135,10 @@ void camera_task(void *pvParameters) {
       }
 
       //ESP_LOGI(TAG, "Camera captured. size=%zu, timestamp=%llu", fb->len, fb->timestamp);
-      peer_connection_datachannel_send(g_pc, (char*)fb->buf, fb->len);
+      if (xSemaphoreTake(xSemaphore, portMAX_DELAY)) {
+        peer_connection_datachannel_send(g_pc, (char*)fb->buf, fb->len);
+        xSemaphoreGive(xSemaphore);
+      }
 
       fps++;
 
@@ -148,8 +152,7 @@ void camera_task(void *pvParameters) {
       esp_camera_fb_return(fb);
     }
 
-    // 10 FPS
-    vTaskDelay(pdMS_TO_TICKS(1000/10));
+    vTaskDelay(pdMS_TO_TICKS(1000/20));
   }
 
 }

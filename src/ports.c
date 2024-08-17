@@ -7,7 +7,6 @@
 #include <sys/time.h>
 
 #ifdef ESP32
-#include <mdns.h>
 #include <esp_netif.h>
 #else
 #include <ifaddrs.h>
