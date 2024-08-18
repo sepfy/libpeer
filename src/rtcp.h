@@ -2,7 +2,12 @@
 #define RTCP_H_
 
 #include <stdint.h>
+#ifdef __APPLE__
+#include <machine/endian.h>
+#else
 #include <endian.h>
+#endif
+
 
 typedef enum RtcpType {
 
