@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 
 #include <pthread.h>
 #include "socket.h"
@@ -266,7 +267,7 @@ void agent_gather_candidate(Agent *agent, const char *urls, const char *username
       if (ports_resolve_addr(hostname, &resolved_addr) != 0) {
         continue;
       }
- 
+
       addr_set_port(&resolved_addr, port);
       addr_to_string(&resolved_addr, addr_string, sizeof(addr_string));
       LOGI("stun/turn server %s:%d", addr_string, port);
