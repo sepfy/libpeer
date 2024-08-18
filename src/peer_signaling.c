@@ -271,11 +271,21 @@ static int peer_signaling_http_post(const char *hostname, const char *path, int 
   res = peer_signaling_http_request(&trans_if, "POST", 4, hostname, strlen(hostname), path,
    strlen(path), auth, strlen(auth), body, strlen(body));
 
+  ssl_transport_disconnect(&net_ctx);
+
+  if (res.pHeaders == NULL) {
+     LOGE("Response headers are NULL");
+     return -1;
+  }
+
+  if (res.pBody == NULL) {
+     LOGE("Response body is NULL");
+     return -1;
+  }
+
   LOGI("Received HTTP response from %s%s\n"
    "Response Headers: %s\nResponse Status: %u\nResponse Body: %s\n",
    hostname, path, res.pHeaders, res.statusCode, res.pBody);
-
-  ssl_transport_disconnect(&net_ctx);
 
   if (res.statusCode == 201) {
    peer_connection_set_remote_description(g_ps.pc, (const char*)res.pBody);
