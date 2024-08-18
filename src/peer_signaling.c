@@ -428,7 +428,7 @@ static void peer_signaling_onicecandidate(char *description, void *userdata) {
       LOGD("Basic Auth: %s", cred_base64);
       peer_signaling_http_post(g_ps.http_host, g_ps.http_path, g_ps.http_port, cred_base64, description);
     } else {
-      peer_signaling_http_post(g_ps.http_host, g_ps.http_path, g_ps.http_port, NULL, description);
+      peer_signaling_http_post(g_ps.http_host, g_ps.http_path, g_ps.http_port, "", description);
     }
   }
 }
@@ -458,7 +458,11 @@ int peer_signaling_join_channel() {
     return -1;
   } else if (g_ps.mqtt_port <= 0) {
     LOGW("Invalid MQTT port number: %d", g_ps.mqtt_port);
-    return -1;
+    if (peer_signaling_whip_connect() < 0) {
+      LOGW("Tried MQTT and WHIP, connect failed");
+      return -1;
+    }
+    return 0;
   }
 
   if (peer_signaling_mqtt_connect(g_ps.mqtt_host, g_ps.mqtt_port) < 0) {
