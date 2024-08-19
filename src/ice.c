@@ -34,7 +34,7 @@ static uint16_t ice_candidate_local_preference(IceCandidate *candidate) {
 
 static void ice_candidate_priority(IceCandidate *candidate) {
 
-  // priority = (2^24)*(type preference) + (2^8)*(local preference) + (256 - component ID) 
+  // priority = (2^24)*(type preference) + (2^8)*(local preference) + (256 - component ID)
   candidate->priority = (1 << 24) * ice_candidate_type_preference(candidate->type) + (1 << 8) * ice_candidate_local_preference(candidate) + (256 - candidate->component);
 }
 
@@ -73,7 +73,7 @@ void ice_candidate_to_description(IceCandidate *candidate, char *description, in
   }
 
   addr_to_string(&candidate->addr, addr_string, sizeof(addr_string));
-  snprintf(description, length, "a=candidate:%d %d %s %" PRIu32 " %s %d typ %s\n",
+  snprintf(description, length, "a=candidate:%d %d %s %" PRIu32 " %s %d typ %s\r\n",
    candidate->foundation,
    candidate->component,
    candidate->transport,
@@ -119,7 +119,7 @@ int ice_candidate_from_description(IceCandidate *candidate, char *description, c
           }
         } else if (addr_from_string(buf, &candidate->addr) == 0) {
 	  return -1;
-	} 
+	}
         break;
       case 5:
 	addr_set_port(&candidate->addr, atoi(buf));
