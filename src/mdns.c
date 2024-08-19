@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 #include <netinet/in.h>
 #include <inttypes.h>
 #include "utils.h"
@@ -70,7 +71,7 @@ static int mdns_parse_answer(uint8_t *buf, int size, Address *addr) {
     return -1;
   }
 
-  memcpy(&addr->sin.sin_addr, answer->data, 4); 
+  memcpy(&addr->sin.sin_addr, answer->data, 4);
   return 0;
 }
 
