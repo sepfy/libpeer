@@ -7,7 +7,6 @@
 
 #include <stdlib.h>
 #include <stdint.h>
-#include "sctp.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,7 +77,7 @@ const char* peer_connection_state_to_string(PeerConnectionState state);
 
 PeerConnectionState peer_connection_get_state(PeerConnection *pc);
 
-Sctp *peer_connection_get_sctp(PeerConnection *pc);
+void* peer_connection_get_sctp(PeerConnection *pc);
 
 PeerConnection* peer_connection_create(PeerConfiguration *config);
 

@@ -164,7 +164,7 @@ PeerConnectionState peer_connection_get_state(PeerConnection *pc) {
   return pc->state;
 }
 
-Sctp *peer_connection_get_sctp(PeerConnection *pc) {
+void* peer_connection_get_sctp(PeerConnection *pc) {
 
   return &pc->sctp;
 }
