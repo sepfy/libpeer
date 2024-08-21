@@ -16,9 +16,17 @@
 #include "ice.h"
 #include "base64.h"
 
+#ifndef AGENT_MAX_DESCRIPTION
 #define AGENT_MAX_DESCRIPTION 40960
+#endif
+
+#ifndef AGENT_MAX_CANDIDATES
 #define AGENT_MAX_CANDIDATES 10
+#endif
+
+#ifndef AGENT_MAX_CANDIDATE_PAIRS
 #define AGENT_MAX_CANDIDATE_PAIRS 100
+#endif
 
 typedef enum AgentState {
 
