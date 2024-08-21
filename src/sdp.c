@@ -93,8 +93,9 @@ void sdp_create(Sdp *sdp, int b_video, int b_audio, int b_datachannel) {
   sdp_append(sdp, "s=-");
   sdp_append(sdp, "t=0 0");
   sdp_append(sdp, "a=msid-semantic: iot");
+#if ICE_LITE
   sdp_append(sdp, "a=ice-lite");
-
+#endif
   memset(bundle, 0, sizeof(bundle));
 
   strcat(bundle, "a=group:BUNDLE");
