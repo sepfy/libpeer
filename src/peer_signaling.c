@@ -16,7 +16,11 @@
 
 #define KEEP_ALIVE_TIMEOUT_SECONDS 60
 #define CONNACK_RECV_TIMEOUT_MS 1000
+
+#ifndef BUF_SIZE
 #define BUF_SIZE 4096
+#endif
+
 #define TOPIC_SIZE 128
 
 #define HOST_LEN 64
