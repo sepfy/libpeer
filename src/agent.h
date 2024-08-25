@@ -59,7 +59,6 @@ struct Agent {
   int local_candidates_count;
   int remote_candidates_count;
 
-  UdpSocket udp_socket;
   UdpSocket udp_sockets[2];
 
   Address host_addr;
@@ -75,9 +74,7 @@ struct Agent {
   IceCandidatePair *nominated_pair;
 
   int candidate_pairs_num;
-
   int use_candidate;
-
   uint32_t transaction_id[3];
 };
 
@@ -85,27 +82,21 @@ void agent_gather_candidate(Agent *agent, const char *urls, const char *username
 
 void agent_get_local_description(Agent *agent, char *description, int length);
 
-int agent_loop(Agent *agent);
-
 int agent_send(Agent *agent, const uint8_t *buf, int len);
 
 int agent_recv(Agent *agent, uint8_t *buf, int len);
 
 void agent_set_remote_description(Agent *agent, char *description);
 
-void *agent_thread(void *arg);
-
 int agent_select_candidate_pair(Agent *agent);
-
-void agent_attach_recv_cb(Agent *agent, void (*data_recv_cb)(char *buf, int len, void *user_data));
-
-void agent_set_host_address(Agent *agent, Address *addr);
 
 int agent_connectivity_check(Agent *agent);
 
-void agent_init(Agent *agent);
+void agent_clear_candidates(Agent *agent);
 
-void agent_deinit(Agent *agent);
+int agent_create(Agent *agent);
+
+void agent_destroy(Agent *agent);
 
 #endif // AGENT_H_
 
