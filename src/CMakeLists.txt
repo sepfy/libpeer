@@ -4,7 +4,7 @@ file(GLOB SRCS "*.c")
 
 file(GLOB HEADERS "peer.h" "peer_connection.h" "peer_signaling.h")
 
-add_library(peer SHARED
+add_library(peer
   ${SRCS}
   ${HTTP_SOURCES}
   ${MQTT_SOURCES}

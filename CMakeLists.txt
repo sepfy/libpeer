@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.1)
 project(peer)
 
 option(ENABLE_TESTS "Enable tests" OFF)
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 include(ExternalProject)
 include(third_party/coreHTTP/httpFilePaths.cmake)
