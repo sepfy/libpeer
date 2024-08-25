@@ -20,9 +20,8 @@ $ source export.sh
 
 ### Download Required Libraries
 ```bash
-$ git clone --recursive https://github.com/sepfy/libpeer
+$ git clone https://github.com/sepfy/libpeer
 $ cd libpeer/examples/esp32
-$ git clone --recursive https://github.com/sepfy/esp_ports.git components/srtp
 ```
 
 ### Configure Your Build

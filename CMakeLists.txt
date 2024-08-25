@@ -1,12 +1,25 @@
 cmake_minimum_required(VERSION 3.1)
+
+include(${CMAKE_CURRENT_LIST_DIR}/third_party/coreHTTP/httpFilePaths.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/third_party/coreMQTT/mqttFilePaths.cmake)
+
+if (DEFINED ENV{IDF_PATH})
+  file(GLOB ESP32_CODES "./src/*.c")
+  idf_component_register(
+   SRCS ${ESP32_CODES} ${HTTP_SOURCES} ${MQTT_SOURCES} ${MQTT_SERIALIZER_SOURCES}
+   INCLUDE_DIRS "./src" ${HTTP_INCLUDE_PUBLIC_DIRS} ${MQTT_INCLUDE_PUBLIC_DIRS}
+   REQUIRES mbedtls srtp json esp_netif
+  )
+  add_definitions("-DESP32 -DHTTP_DO_NOT_USE_CUSTOM_CONFIG -DMQTT_DO_NOT_USE_CUSTOM_CONFIG")
+  return()
+endif()
+
 project(peer)
 
 option(ENABLE_TESTS "Enable tests" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 include(ExternalProject)
-include(third_party/coreHTTP/httpFilePaths.cmake)
-include(third_party/coreMQTT/mqttFilePaths.cmake)
 
 include_directories(${CMAKE_BINARY_DIR}/dist/include ${CMAKE_BINARY_DIR}/dist/include/cjson)
 
