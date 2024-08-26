@@ -1,6 +1,7 @@
 # libpeer - Portable WebRTC Library for IoT/Embedded Device
 
 ![build](https://github.com/sepfy/pear/actions/workflows/build.yml/badge.svg)
+[![Discord](https://img.shields.io/discord/1265486725967253667?logo=discord)](https://discord.gg/AsPgabeS67)
 
 libpeer is a WebRTC implementation written in C, developed with BSD socket. The library aims to integrate IoT/Embedded device video/audio streaming with WebRTC, such as ESP32 and Raspberry Pi
 
