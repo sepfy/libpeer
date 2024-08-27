@@ -3,10 +3,10 @@
 #include "esp_log.h"
 #include "driver/i2s_pdm.h"
 
+#include "esp_audio_enc_default.h"
+#include "esp_audio_enc_reg.h"
+#include "esp_g711_enc.h"
 #include "esp_audio_enc.h"
-#include "esp_audio_enc_def.h"
-#include "esp_audio_def.h"
-#include "esp_opus_enc.h"
 
 #include "peer_connection.h"
 
@@ -24,51 +24,55 @@ i2s_chan_handle_t rx_handle = NULL;
 esp_audio_enc_handle_t enc_handle = NULL;
 esp_audio_enc_in_frame_t aenc_in_frame = { 0 };
 esp_audio_enc_out_frame_t aenc_out_frame = { 0 };
+esp_g711_enc_config_t g711_cfg;
+esp_audio_enc_config_t enc_cfg;
 
 esp_err_t audio_codec_init() {
 
-  uint8_t *inbuf = NULL;
-  uint8_t *outbuf = NULL;
-  int aenc_in_frame_size = 0;
-  int aenc_out_frame_size = 0;
+  uint8_t *read_buf = NULL;
+  uint8_t *write_buf = NULL;
+  int read_size = 0;
+  int out_size = 0;
 
   esp_audio_err_t ret = ESP_AUDIO_ERR_OK;
 
-  esp_opus_enc_config_t config = ESP_OPUS_ENC_CONFIG_DEFAULT();
-  config.sample_rate = ESP_AUDIO_SAMPLE_RATE_8K;
-  config.channel = ESP_AUDIO_MONO;
-  config.bitrate = 18000;
-  config.frame_duration = ESP_OPUS_ENC_FRAME_DURATION_40_MS;
+  esp_audio_enc_register_default();
 
-  ret = esp_opus_enc_open(&config, sizeof(esp_opus_enc_config_t), &enc_handle);
+  g711_cfg.sample_rate = ESP_AUDIO_SAMPLE_RATE_8K;
+  g711_cfg.channel = ESP_AUDIO_MONO;
+  g711_cfg.bits_per_sample = ESP_AUDIO_BIT16;
+
+  enc_cfg.type = ESP_AUDIO_TYPE_G711A;
+  enc_cfg.cfg = &g711_cfg;
+  enc_cfg.cfg_sz = sizeof(g711_cfg);
+
+  ret = esp_audio_enc_open(&enc_cfg, &enc_handle);
   if (ret != ESP_AUDIO_ERR_OK) {
     ESP_LOGE(TAG, "audio encoder open failed");
     return ESP_FAIL;
   }
 
-  ret = esp_opus_enc_get_frame_size(enc_handle, &aenc_in_frame_size, &aenc_out_frame_size);
-  if (ret != ESP_AUDIO_ERR_OK) {
-    ESP_LOGE(TAG, "audio encoder get frame size failed");
+  int frame_size = (g711_cfg.bits_per_sample * g711_cfg.channel) >> 3;
+  // Get frame_size
+  esp_audio_enc_get_frame_size(enc_handle, &read_size, &out_size);
+  ESP_LOGI(TAG, "audio codec init. frame size: %d, read size: %d, out size: %d", frame_size, read_size, out_size);
+  // 8000HZ duration 20ms
+  if (frame_size == read_size) {
+    read_size *= 8000 / 1000 * 20;
+    out_size *= 8000 / 1000 * 20;
+  }
+  read_buf = malloc(read_size);
+  write_buf = malloc(out_size);
+  if (read_buf == NULL || write_buf == NULL) {
     return ESP_FAIL;
   }
 
-  inbuf = calloc(1, aenc_in_frame_size*2);
-  if (!inbuf) {
-    ESP_LOGE(TAG, "inbuf malloc failed");
-    return ESP_FAIL;
-  }
+  aenc_in_frame.buffer = read_buf;
+  aenc_in_frame.len = read_size;
+  aenc_out_frame.buffer = write_buf;
+  aenc_out_frame.len = out_size;
 
-  outbuf = calloc(1, aenc_out_frame_size);
-  if (!outbuf) {
-    ESP_LOGE(TAG, "outbuf malloc failed");
-    return ESP_FAIL;
-  }
-
-  aenc_in_frame.buffer = inbuf;
-  aenc_in_frame.len = aenc_in_frame_size;
-  aenc_out_frame.buffer = outbuf;
-  aenc_out_frame.len = aenc_out_frame_size;
-  ESP_LOGI(TAG, "audio codec init done. in_frame_size=%d, out_frame_size=%d", aenc_in_frame_size, aenc_out_frame_size);
+  ESP_LOGI(TAG, "audio codec init done. in buffer size: %d, out buffer size: %d", read_size, out_size);
   return 0;
 }
 
@@ -130,7 +134,7 @@ void audio_task(void *arg) {
 
       if (ret == aenc_in_frame.len) {
 
-        if (esp_opus_enc_process(enc_handle, &aenc_in_frame, &aenc_out_frame) == ESP_AUDIO_ERR_OK) {
+        if (esp_audio_enc_process(enc_handle, &aenc_in_frame, &aenc_out_frame) == ESP_AUDIO_ERR_OK) {
 
           peer_connection_send_audio(g_pc, aenc_out_frame.buffer, aenc_out_frame.encoded_bytes);
 

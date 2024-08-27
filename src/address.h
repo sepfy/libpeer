@@ -1,19 +1,31 @@
 #ifndef ADDRESS_H_
 #define ADDRESS_H_
 
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <stdint.h>
 
-typedef struct Address Address;
+#define ADDRSTRLEN INET6_ADDRSTRLEN
 
-struct Address {
-
+typedef struct Address {
   uint8_t family;
+  struct sockaddr_in sin;
+  struct sockaddr_in6 sin6;
   uint16_t port;
-  uint8_t ipv4[4];
-  uint8_t ipv6[16];
+} Address;
 
-}__attribute__((packed));
+void addr_set_family(Address *addr, int family);
 
-int addr_ipv4_validate(const char *ipv4, size_t len, Address *addr);
+void addr_set_port(Address *addr, uint16_t port);
+
+int addr_inet6_validate(const char *ipv6, size_t len, Address *addr);
+
+int addr_inet_validate(const char *ipv4, size_t len, Address *addr);
+
+int addr_to_string(const Address *addr, char *buf, size_t len);
+
+int addr_from_string(const char *str, Address *addr);
+
+int addr_equal(const Address *a, const Address *b);
 
 #endif // ADDRESS_H_

@@ -6,6 +6,10 @@
 #define SDP_CONTENT_LENGTH 10240
 #define SDP_ATTR_LENGTH 128
 
+#ifndef ICE_LITE
+#define ICE_LITE 0
+#endif
+
 typedef struct Sdp {
 
   char content[SDP_CONTENT_LENGTH];
@@ -13,9 +17,9 @@ typedef struct Sdp {
 } Sdp;
 
 void sdp_append_h264(Sdp *sdp);
-  
+
 void sdp_append_pcma(Sdp *sdp);
-  
+
 void sdp_append_pcmu(Sdp *sdp);
 
 void sdp_append_opus(Sdp *sdp);

@@ -15,7 +15,7 @@ Build a home camera with Raspberry Pi. Support camera video streaming and two-wa
 * Install dependencies
 ```bash
 $ sudo apt update
-$ sudo apt install -y gstreamer1.0-alsa gstreamer1.0-tools gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-plugins-good libgstreamer1.0-dev git
+$ sudo apt install -y gstreamer1.0-alsa gstreamer1.0-tools gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-plugins-good libgstreamer1.0-dev git cmake
 ```
 
 ### Build
@@ -23,7 +23,7 @@ $ sudo apt install -y gstreamer1.0-alsa gstreamer1.0-tools gstreamer1.0-plugins-
 $ git clone --recursive https://github.com/sepfy/libpeer
 $ cd libpeer
 $ ./build-third-party.sh
-$ mkdir cmake && cd camke
+$ mkdir cmake && cd cmake
 $ cmake -DCMAKE_INSTALL_PREFIX=. ..
 $ make && make install
 $ cd ../examples/raspberrypi

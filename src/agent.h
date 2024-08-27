@@ -10,15 +10,23 @@
 
 #include <pthread.h>
 
-#include "udp.h"
+#include "socket.h"
 #include "utils.h"
 #include "stun.h"
 #include "ice.h"
 #include "base64.h"
 
+#ifndef AGENT_MAX_DESCRIPTION
 #define AGENT_MAX_DESCRIPTION 40960
+#endif
+
+#ifndef AGENT_MAX_CANDIDATES
 #define AGENT_MAX_CANDIDATES 10
+#endif
+
+#ifndef AGENT_MAX_CANDIDATE_PAIRS
 #define AGENT_MAX_CANDIDATE_PAIRS 100
+#endif
 
 typedef enum AgentState {
 
@@ -46,14 +54,13 @@ struct Agent {
   char local_upwd[ICE_UPWD_LENGTH + 1];
 
   IceCandidate local_candidates[AGENT_MAX_CANDIDATES];
-
   IceCandidate remote_candidates[AGENT_MAX_CANDIDATES];
 
   int local_candidates_count;
-
   int remote_candidates_count;
 
   UdpSocket udp_socket;
+  UdpSocket udp_sockets[2];
 
   Address host_addr;
   int b_host_addr;
@@ -88,7 +95,7 @@ void agent_set_remote_description(Agent *agent, char *description);
 
 void *agent_thread(void *arg);
 
-void agent_select_candidate_pair(Agent *agent);
+int agent_select_candidate_pair(Agent *agent);
 
 void agent_attach_recv_cb(Agent *agent, void (*data_recv_cb)(char *buf, int len, void *user_data));
 

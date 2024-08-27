@@ -1,8 +1,11 @@
 ## IDF Component Manager Manifest File
 dependencies:
-  espressif/mdns: "*"
+  sepfy/libpeer: ">=0.0.2"
+  espressif/esp_audio_codec: "^2.0.0"
   espressif/esp32-camera: "^2.0.4"
-  ## Required IDF version
+  protocol_examples_common:
+    path: ${IDF_PATH}/examples/common_components/protocol_examples_common
+    ## Required IDF version
   idf:
     version: ">=4.1.0"
   # # Put list of dependencies here

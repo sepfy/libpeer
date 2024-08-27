@@ -1,0 +1,6 @@
+dependencies:
+  sepfy/srtp: ^2.0.4
+description: libpeer
+license: MIT
+url: https://github.com/sepfy/libpeer
+version: 0.0.2

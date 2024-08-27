@@ -7,7 +7,7 @@
 #include "mbedtls/ssl.h"
 #include "dtls_srtp.h"
 #include "address.h"
-#include "udp.h"
+#include "socket.h"
 #include "config.h"
 #include "utils.h"
 
@@ -88,11 +88,16 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp *dtls_srtp) {
 
   mbedtls_x509write_cert crt;
 
-  mbedtls_mpi serial;
-
-  unsigned char *cert_buf = (unsigned char *) malloc(RSA_KEY_LENGTH * 2);
-
+  unsigned char *cert_buf = NULL;
+  const char *serial = "peer";
   const char *pers = "dtls_srtp";
+
+  cert_buf = (unsigned char *)malloc(RSA_KEY_LENGTH * 2);
+  if (cert_buf == NULL) {
+
+    LOGE("malloc failed");
+    return -1;
+  }
 
   mbedtls_ctr_drbg_seed(&dtls_srtp->ctr_drbg, mbedtls_entropy_func, &dtls_srtp->entropy, (const unsigned char *) pers, strlen(pers));
 
@@ -116,11 +121,7 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp *dtls_srtp) {
 
   mbedtls_x509write_crt_set_issuer_name(&crt, "CN=dtls_srtp");
 
-  mbedtls_mpi_init(&serial);
-
-  mbedtls_mpi_fill_random(&serial, 16, mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
-
-  mbedtls_x509write_crt_set_serial(&crt, &serial);
+  mbedtls_x509write_crt_set_serial_raw(&crt, (unsigned char*)serial, strlen(serial));
 
   mbedtls_x509write_crt_set_validity(&crt, "20180101000000", "20280101000000");
 
@@ -128,14 +129,12 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp *dtls_srtp) {
 
   if (ret < 0) {
 
-    printf("mbedtls_x509write_crt_pem failed\n");
+    LOGE("mbedtls_x509write_crt_pem failed");
   }
 
   mbedtls_x509_crt_parse(&dtls_srtp->cert, cert_buf, 2*RSA_KEY_LENGTH);
 
   mbedtls_x509write_crt_free(&crt);
-
-  mbedtls_mpi_free(&serial);
 
   free(cert_buf);
 

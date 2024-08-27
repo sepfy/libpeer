@@ -1,5 +1,5 @@
 idf_component_register(SRCS
-  "app_main.c" "wifi.c" "camera.c"
+  "app_main.c" "camera.c" "audio.c"
   INCLUDE_DIRS "."
 )
 

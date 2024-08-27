@@ -164,6 +164,11 @@ PeerConnectionState peer_connection_get_state(PeerConnection *pc) {
   return pc->state;
 }
 
+void* peer_connection_get_sctp(PeerConnection *pc) {
+
+  return &pc->sctp;
+}
+
 PeerConnection* peer_connection_create(PeerConfiguration *config) {
 
   PeerConnection *pc = calloc(1, sizeof(PeerConnection));
@@ -250,17 +255,20 @@ int peer_connection_send_video(PeerConnection *pc, const uint8_t *buf, size_t le
 }
 
 int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len) {
+  return peer_connection_datachannel_send_sid(pc, message, len, 0);
+}
+
+int peer_connection_datachannel_send_sid(PeerConnection *pc, char *message, size_t len, uint16_t sid) {
 
   if(!sctp_is_connected(&pc->sctp)) {
     LOGE("sctp not connected");
     return -1;
   }
 
-  if (buffer_push_tail(pc->data_rb, (const uint8_t*)message, len) < 0) {
-    buffer_clear(pc->data_rb);
-  }
-
-  return 0;
+  if (pc->config.datachannel == DATA_CHANNEL_STRING)
+    return sctp_outgoing_data(&pc->sctp, message, len, PPID_STRING, sid);
+  else
+    return sctp_outgoing_data(&pc->sctp, message, len, PPID_BINARY, sid);
 }
 
 static void peer_connection_state_new(PeerConnection *pc) {
@@ -278,7 +286,7 @@ static void peer_connection_state_new(PeerConnection *pc) {
   for (int i = 0; i < sizeof(pc->config.ice_servers)/sizeof(pc->config.ice_servers[0]); ++i) {
 
     if (pc->config.ice_servers[i].urls) {
-      LOGI("ice_servers: %s\n", pc->config.ice_servers[i].urls);
+      LOGI("ice_servers: %s", pc->config.ice_servers[i].urls);
       agent_gather_candidate(&pc->agent, pc->config.ice_servers[i].urls, pc->config.ice_servers[i].username, pc->config.ice_servers[i].credential);
     }
   }
@@ -362,19 +370,11 @@ int peer_connection_loop(PeerConnection *pc) {
 
     case PEER_CONNECTION_CHECKING:
 
-      agent_select_candidate_pair(&pc->agent);
-
-      if (!pc->agent.nominated_pair) {
+      if (agent_select_candidate_pair(&pc->agent) < 0) {
         STATE_CHANGED(pc, PEER_CONNECTION_FAILED);
-
-      } else if (agent_connectivity_check(&pc->agent)) {
-
-        LOGD("Connectivity check success. pair: %p", pc->agent.nominated_pair);
-
+      } else if (agent_connectivity_check(&pc->agent) == 0) {
         STATE_CHANGED(pc, PEER_CONNECTION_CONNECTED);
-        pc->agent.selected_pair = pc->agent.nominated_pair;
       }
-
       break;
 
     case PEER_CONNECTION_CONNECTED:
@@ -410,9 +410,9 @@ int peer_connection_loop(PeerConnection *pc) {
       if (data) {
 
          if (pc->config.datachannel == DATA_CHANNEL_STRING)
-           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_STRING);
+           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_STRING, 0);
          else
-           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_BINARY);
+           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_BINARY, 0);
          buffer_pop_head(pc->data_rb);
       }
 
@@ -451,7 +451,7 @@ int peer_connection_loop(PeerConnection *pc) {
 
       }
 
-      if (KEEPALIVE_CONNCHECK > 0 && (utils_get_timestamp() - pc->agent.binding_request_time) > KEEPALIVE_CONNCHECK) {
+      if (KEEPALIVE_CONNCHECK > 0 && (ports_get_epoch_time() - pc->agent.binding_request_time) > KEEPALIVE_CONNCHECK) {
 
         LOGI("binding request timeout");
         STATE_CHANGED(pc, PEER_CONNECTION_CLOSED);
@@ -547,7 +547,7 @@ void peer_connection_oniceconnectionstatechange(PeerConnection *pc,
 }
 
 void peer_connection_ondatachannel(PeerConnection *pc,
- void (*onmessasge)(char *msg, size_t len, void *userdata),
+ void (*onmessage)(char *msg, size_t len, void *userdata, uint16_t sid),
  void (*onopen)(void *userdata),
  void (*onclose)(void *userdata)) {
 
@@ -555,7 +555,26 @@ void peer_connection_ondatachannel(PeerConnection *pc,
 
     sctp_onopen(&pc->sctp, onopen);
     sctp_onclose(&pc->sctp, onclose);
-    sctp_onmessage(&pc->sctp, onmessasge);
+    sctp_onmessage(&pc->sctp, onmessage);
   }
+}
+
+int peer_connection_lookup_sid(PeerConnection *pc, const char *label, uint16_t *sid) {
+    for (int i = 0; i < pc->sctp.stream_count; i++) {
+        if (strncmp(pc->sctp.stream_table[i].label, label, sizeof(pc->sctp.stream_table[i].label)) == 0) {
+            *sid = pc->sctp.stream_table[i].sid;
+            return 0;
+        }
+    }
+    return -1; // Not found
+}
+
+char *peer_connection_lookup_sid_label(PeerConnection *pc, uint16_t sid) {
+    for (int i = 0; i < pc->sctp.stream_count; i++) {
+        if (pc->sctp.stream_table[i].sid == sid) {
+            return pc->sctp.stream_table[i].label;
+        }
+    }
+    return NULL; // Not found
 }
 
