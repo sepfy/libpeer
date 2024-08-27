@@ -255,10 +255,10 @@ int peer_connection_send_video(PeerConnection *pc, const uint8_t *buf, size_t le
 }
 
 int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len) {
-  return peer_connection_datachannel_send_sid(pc, message, len, 0);
+  return peer_connection_datachannel_send_ext(pc, message, len, 0, SVC_PARTIALLY_RELIABLE);
 }
 
-int peer_connection_datachannel_send_sid(PeerConnection *pc, char *message, size_t len, uint16_t sid) {
+int peer_connection_datachannel_send_ext(PeerConnection *pc, char *message, size_t len, uint16_t sid, SctpService service) {
 
   if(!sctp_is_connected(&pc->sctp)) {
     LOGE("sctp not connected");
@@ -266,9 +266,9 @@ int peer_connection_datachannel_send_sid(PeerConnection *pc, char *message, size
   }
 
   if (pc->config.datachannel == DATA_CHANNEL_STRING)
-    return sctp_outgoing_data(&pc->sctp, message, len, PPID_STRING, sid);
+    return sctp_outgoing_data(&pc->sctp, message, len, PPID_STRING, sid, service);
   else
-    return sctp_outgoing_data(&pc->sctp, message, len, PPID_BINARY, sid);
+    return sctp_outgoing_data(&pc->sctp, message, len, PPID_BINARY, sid, service);
 }
 
 static void peer_connection_state_new(PeerConnection *pc) {
@@ -410,9 +410,9 @@ int peer_connection_loop(PeerConnection *pc) {
       if (data) {
 
          if (pc->config.datachannel == DATA_CHANNEL_STRING)
-           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_STRING, 0);
+           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_STRING, 0, SVC_RELIABLE);
          else
-           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_BINARY, 0);
+           sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_BINARY, 0, SVC_RELIABLE);
          buffer_pop_head(pc->data_rb);
       }
 
