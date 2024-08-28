@@ -109,13 +109,19 @@ static int sctp_outgoing_data_cb(void *userdata, void *buf, size_t len, uint8_t 
   return 0;
 }
 
-int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid, uint16_t sid) {
+int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid, uint16_t sid,SctpService service) {
 
 #ifdef HAVE_USRSCTP
   int res;
   struct sctp_sendv_spa spa = {0};
 
   spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
+  if (service==SVC_PARTIALLY_RELIABLE)
+  {
+    spa.sendv_flags |= SCTP_SEND_PRINFO_VALID;
+    spa.sendv_prinfo.pr_policy = SCTP_PR_SCTP_TTL; //SCTP_PR_SCTP_RTX; 
+    spa.sendv_prinfo.pr_value = 10;
+  }
 
   spa.sendv_sndinfo.snd_sid = sid;
   spa.sendv_sndinfo.snd_flags = SCTP_EOR;
@@ -214,7 +220,17 @@ void sctp_parse_data_channel_open(Sctp *sctp, uint16_t sid, char *data, size_t l
   }
 }
 
+
+void print_hex_buffer(uint8_t *buf, int len) {
+    printf("data (%d): ", len);
+    for (int i = 0; i < len; i++) {
+        printf("%02X ", buf[i]);
+    }
+    printf("\n");
+}
+
 void sctp_handle_sctp_packet(Sctp *sctp, char *buf, size_t len) {
+    //print_hex_buffer((uint8_t *)buf, len);
     if (len<=29)
         return;
   
@@ -426,12 +442,11 @@ static int sctp_handle_incoming_data(Sctp *sctp, char *data, size_t len, uint32_
 static void sctp_process_notification(Sctp *sctp, union sctp_notification *notification, size_t len) {
 
 
- if(notification->sn_header.sn_length != (uint32_t)len) {
-   return;
- }
+  if(notification->sn_header.sn_length != (uint32_t)len) {
+    return;
+  }
 
   switch (notification->sn_header.sn_type) {
-
     case SCTP_ASSOC_CHANGE:
 
       switch (notification->sn_assoc_change.sac_state) {

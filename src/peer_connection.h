@@ -93,9 +93,10 @@ int peer_connection_loop(PeerConnection *pc);
  * @param[in] message buffer
  * @param[in] length of message
  */
+
 int peer_connection_datachannel_send(PeerConnection *pc, char *message, size_t len);
 
-int peer_connection_datachannel_send_sid(PeerConnection *pc, char *message, size_t len, uint16_t sid);
+int peer_connection_datachannel_send_ext(PeerConnection *pc, char *message, size_t len, uint16_t sid, SctpService service);
 
 int peer_connection_send_audio(PeerConnection *pc, const uint8_t *packet, size_t bytes);
 

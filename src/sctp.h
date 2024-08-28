@@ -136,6 +136,11 @@ typedef enum SctpDataPpid {
 
 } SctpDataPpid;
 
+typedef enum SctpService {
+  SVC_RELIABLE,
+  SVC_PARTIALLY_RELIABLE
+} SctpService;
+
 #define SCTP_MAX_STREAMS           5
 
 typedef struct {
@@ -177,7 +182,7 @@ int sctp_is_connected(Sctp *sctp);
 
 void sctp_incoming_data(Sctp *sctp, char *buf, size_t len);
 
-int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid, uint16_t sid);
+int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid, uint16_t sid, SctpService service);
 
 void sctp_onmessage(Sctp *sctp, void (*onmessage)(char *msg, size_t len, void *userdata, uint16_t sid));
 
