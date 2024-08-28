@@ -66,7 +66,7 @@ typedef struct PeerConfiguration {
 
   void (*onaudiotrack)(uint8_t *data, size_t size, void *userdata);
   void (*onvideotrack)(uint8_t *data, size_t size, void *userdata);
-  void (*on_request_keyframe)();
+  void (*on_request_keyframe)(void *userdata);
   void *user_data;
 
 } PeerConfiguration;
@@ -99,6 +99,8 @@ int peer_connection_datachannel_send_sid(PeerConnection *pc, char *message, size
 int peer_connection_send_audio(PeerConnection *pc, const uint8_t *packet, size_t bytes);
 
 int peer_connection_send_video(PeerConnection *pc, const uint8_t *packet, size_t bytes);
+
+void peer_connection_prepare_remote_description(PeerConnection *pc, const char *sdp);
 
 void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp);
 

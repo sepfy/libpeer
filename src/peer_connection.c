@@ -126,7 +126,7 @@ static void peer_connection_incoming_rtcp(PeerConnection *pc, uint8_t *buf, size
         LOGD("RTCP_PSFB %d", fmt);
         // PLI and FIR
         if ((fmt == 1 || fmt == 4) && pc->config.on_request_keyframe) {
-            pc->config.on_request_keyframe();
+            pc->config.on_request_keyframe(pc->config.user_data);
         } 
       }
       default:
@@ -469,6 +469,11 @@ int peer_connection_loop(PeerConnection *pc) {
   }
 
   return 0;
+}
+
+
+void peer_connection_prepare_remote_description(PeerConnection *pc, const char *sdp_text) {
+//	sdp_parse(&pc->bundle_info, sdp_text);
 }
 
 void peer_connection_set_remote_description(PeerConnection *pc, const char *sdp_text) {
