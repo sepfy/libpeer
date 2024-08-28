@@ -23,5 +23,6 @@
 #define IFR_NAME "w"
 
 //#define LOG_LEVEL LEVEL_DEBUG
+#define LOG_REDIRECT	0
 
 #endif // CONFIG_H_
