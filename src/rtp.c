@@ -240,8 +240,10 @@ int rtp_encoder_encode(RtpEncoder *rtp_encoder, uint8_t *buf, size_t size) {
 static int rtp_decode_generic(RtpDecoder *rtp_decoder, uint8_t *buf, size_t size) {
 
   RtpPacket *rtp_packet = (RtpPacket*)buf;
-  rtp_decoder->on_packet(rtp_packet->payload, size - sizeof(RtpHeader), rtp_decoder->user_data);
-  return size;
+	if (rtp_decoder->on_packet != NULL)
+	  rtp_decoder->on_packet(rtp_packet->payload, size - sizeof(RtpHeader), rtp_decoder->user_data);
+	  // even if there is no callback set, assume everything is ok for caller and do not return an error
+  return (int) size;
 }
 
 void rtp_decoder_init(RtpDecoder *rtp_decoder, MediaCodec codec, RtpOnPacket on_packet, void *user_data) {
