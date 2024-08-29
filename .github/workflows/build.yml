@@ -19,5 +19,6 @@ jobs:
       run: >
         mkdir cmake ;
         cd cmake ;
-        cmake .. ;
-        make
+        cmake .. -DENABLE_TESTS=true ;
+        make -j$(nproc);
+        run-parts ./tests/
