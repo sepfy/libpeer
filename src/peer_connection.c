@@ -126,7 +126,7 @@ static void peer_connection_incoming_rtcp(PeerConnection *pc, uint8_t *buf, size
         LOGD("RTCP_PSFB %d", fmt);
         // PLI and FIR
         if ((fmt == 1 || fmt == 4) && pc->config.on_request_keyframe) {
-            pc->config.on_request_keyframe();
+            pc->config.on_request_keyframe(pc->config.user_data);
         } 
       }
       default:
