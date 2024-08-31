@@ -38,7 +38,7 @@ struct PeerConnection {
   uint8_t temp_buf[CONFIG_MTU];
   uint8_t agent_buf[CONFIG_MTU];
   int agent_ret;
-  int b_offer_created;
+  int b_local_description_created;
 
   Buffer* audio_rb;
   Buffer* video_rb;
@@ -170,10 +170,6 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
   pc->agent.mode = AGENT_MODE_CONTROLLED;
 
   memset(&pc->sctp, 0, sizeof(pc->sctp));
-  dtls_srtp_init(&pc->dtls_srtp, DTLS_SRTP_ROLE_SERVER, pc);
-
-  pc->dtls_srtp.udp_recv = peer_connection_dtls_srtp_recv;
-  pc->dtls_srtp.udp_send = peer_connection_dtls_srtp_send;
 
   if (pc->config.datachannel) {
     LOGI("Datachannel allocates heap size: %d", DATA_RB_DATA_LENGTH);
@@ -254,7 +250,11 @@ int peer_connection_datachannel_send_sid(PeerConnection* pc, char* message, size
     return sctp_outgoing_data(&pc->sctp, message, len, PPID_BINARY, sid);
 }
 
-static void peer_connection_state_new(PeerConnection* pc) {
+static char* peer_connection_dtls_role_setup_value(DtlsSrtpRole d) {
+  return d == DTLS_SRTP_ROLE_SERVER ? "a=setup:passive" : "a=setup:active";
+}
+
+static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role) {
   char* description = (char*)pc->temp_buf;
 
   memset(pc->temp_buf, 0, sizeof(pc->temp_buf));
@@ -262,6 +262,9 @@ static void peer_connection_state_new(PeerConnection* pc) {
   agent_deinit(&pc->agent);
 
   dtls_srtp_reset_session(&pc->dtls_srtp);
+  dtls_srtp_init(&pc->dtls_srtp, role, pc);
+  pc->dtls_srtp.udp_recv = peer_connection_dtls_srtp_recv;
+  pc->dtls_srtp.udp_send = peer_connection_dtls_srtp_send;
 
   pc->sctp.connected = 0;
 
@@ -284,7 +287,7 @@ static void peer_connection_state_new(PeerConnection* pc) {
   if (pc->config.video_codec == CODEC_H264) {
     sdp_append_h264(&pc->local_sdp);
     sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-    sdp_append(&pc->local_sdp, "a=setup:passive");
+    sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
     strcat(pc->local_sdp.content, description);
   }
 
@@ -293,7 +296,7 @@ static void peer_connection_state_new(PeerConnection* pc) {
 
       sdp_append_pcma(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-      sdp_append(&pc->local_sdp, "a=setup:passive");
+      sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
       strcat(pc->local_sdp.content, description);
       break;
 
@@ -301,14 +304,14 @@ static void peer_connection_state_new(PeerConnection* pc) {
 
       sdp_append_pcmu(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-      sdp_append(&pc->local_sdp, "a=setup:passive");
+      sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
       strcat(pc->local_sdp.content, description);
       break;
 
     case CODEC_OPUS:
       sdp_append_opus(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-      sdp_append(&pc->local_sdp, "a=setup:passive");
+      sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
       strcat(pc->local_sdp.content, description);
 
     default:
@@ -318,11 +321,11 @@ static void peer_connection_state_new(PeerConnection* pc) {
   if (pc->config.datachannel) {
     sdp_append_datachannel(&pc->local_sdp);
     sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-    sdp_append(&pc->local_sdp, "a=setup:passive");
+    sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
     strcat(pc->local_sdp.content, description);
   }
 
-  pc->b_offer_created = 1;
+  pc->b_local_description_created = 1;
 
   if (pc->onicecandidate) {
     pc->onicecandidate(pc->local_sdp.content, pc->config.user_data);
@@ -339,13 +342,12 @@ int peer_connection_loop(PeerConnection* pc) {
   switch (pc->state) {
     case PEER_CONNECTION_NEW:
 
-      if (!pc->b_offer_created) {
-        peer_connection_state_new(pc);
+      if (!pc->b_local_description_created) {
+        peer_connection_state_new(pc, DTLS_SRTP_ROLE_SERVER);
       }
       break;
 
     case PEER_CONNECTION_CHECKING:
-
       if (agent_select_candidate_pair(&pc->agent) < 0) {
         STATE_CHANGED(pc, PEER_CONNECTION_FAILED);
       } else if (agent_connectivity_check(&pc->agent) == 0) {
@@ -446,13 +448,23 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
   char* start = (char*)sdp_text;
   char* line = NULL;
   char buf[256];
-  char* ssrc_start = NULL;
+  char* val_start = NULL;
   uint32_t* ssrc = NULL;
+  DtlsSrtpRole role = DTLS_SRTP_ROLE_SERVER;
 
   while ((line = strstr(start, "\r\n"))) {
     line = strstr(start, "\r\n");
     strncpy(buf, start, line - start);
     buf[line - start] = '\0';
+
+    if (strstr(buf, "a=setup:passive")) {
+      pc->agent.mode = AGENT_MODE_CONTROLLING;
+      role = DTLS_SRTP_ROLE_CLIENT;
+    }
+
+    if (strstr(buf, "a=fingerprint")) {
+      strncpy(pc->dtls_srtp.remote_fingerprint, buf + 22, DTLS_SRTP_FINGERPRINT_LENGTH);
+    }
 
     if (strstr(buf, "a=mid:video")) {
       ssrc = &pc->remote_vssrc;
@@ -460,12 +472,16 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
       ssrc = &pc->remote_assrc;
     }
 
-    if ((ssrc_start = strstr(buf, "a=ssrc:")) && ssrc) {
-      *ssrc = strtoul(ssrc_start + 7, NULL, 10);
+    if ((val_start = strstr(buf, "a=ssrc:")) && ssrc) {
+      *ssrc = strtoul(val_start + 7, NULL, 10);
       LOGD("SSRC: %" PRIu32, *ssrc);
     }
 
     start = line + 2;
+  }
+
+  if (!pc->b_local_description_created) {
+    peer_connection_state_new(pc, role);
   }
 
   agent_set_remote_description(&pc->agent, (char*)sdp_text);
@@ -474,7 +490,7 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
 
 void peer_connection_create_offer(PeerConnection* pc) {
   STATE_CHANGED(pc, PEER_CONNECTION_NEW);
-  pc->b_offer_created = 0;
+  pc->b_local_description_created = 0;
 }
 
 int peer_connection_send_rtcp_pil(PeerConnection* pc, uint32_t ssrc) {

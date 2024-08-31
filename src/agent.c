@@ -451,7 +451,6 @@ int agent_connectivity_check(Agent* agent) {
 
   agent_recv(agent, buf, sizeof(buf));
 
-  // XXX: FULL ICE
   if (agent->nominated_pair->state == ICE_CANDIDATE_STATE_SUCCEEDED) {
     agent->selected_pair = agent->nominated_pair;
     return 0;

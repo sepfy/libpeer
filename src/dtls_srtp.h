@@ -65,6 +65,7 @@ typedef struct DtlsSrtp {
 
   char local_fingerprint[DTLS_SRTP_FINGERPRINT_LENGTH];
   char remote_fingerprint[DTLS_SRTP_FINGERPRINT_LENGTH];
+  char actual_remote_fingerprint[DTLS_SRTP_FINGERPRINT_LENGTH];
 
   void* user_data;
 
