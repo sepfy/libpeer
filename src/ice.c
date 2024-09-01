@@ -1,20 +1,19 @@
-#include <stdlib.h>
-#include <string.h>
+#include <arpa/inet.h>
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <inttypes.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 
+#include "ice.h"
 #include "mdns.h"
 #include "ports.h"
 #include "socket.h"
 #include "utils.h"
-#include "ice.h"
 
 static uint8_t ice_candidate_type_preference(IceCandidateType type) {
-
   switch (type) {
     case ICE_CANDIDATE_TYPE_HOST:
       return 126;
@@ -27,19 +26,16 @@ static uint8_t ice_candidate_type_preference(IceCandidateType type) {
   }
 }
 
-static uint16_t ice_candidate_local_preference(IceCandidate *candidate) {
-
+static uint16_t ice_candidate_local_preference(IceCandidate* candidate) {
   return candidate->addr.port;
 }
 
-static void ice_candidate_priority(IceCandidate *candidate) {
-
+static void ice_candidate_priority(IceCandidate* candidate) {
   // priority = (2^24)*(type preference) + (2^8)*(local preference) + (256 - component ID)
   candidate->priority = (1 << 24) * ice_candidate_type_preference(candidate->type) + (1 << 8) * ice_candidate_local_preference(candidate) + (256 - candidate->component);
 }
 
-void ice_candidate_create(IceCandidate *candidate, int foundation, IceCandidateType type, Address *addr) {
-
+void ice_candidate_create(IceCandidate* candidate, int foundation, IceCandidateType type, Address* addr) {
   memcpy(&candidate->addr, addr, sizeof(Address));
   candidate->type = type;
   candidate->foundation = foundation;
@@ -51,8 +47,7 @@ void ice_candidate_create(IceCandidate *candidate, int foundation, IceCandidateT
   snprintf(candidate->transport, sizeof(candidate->transport), "%s", "UDP");
 }
 
-void ice_candidate_to_description(IceCandidate *candidate, char *description, int length) {
-
+void ice_candidate_to_description(IceCandidate* candidate, char* description, int length) {
   char addr_string[ADDRSTRLEN];
   char typ_raddr[128];
 
@@ -74,25 +69,23 @@ void ice_candidate_to_description(IceCandidate *candidate, char *description, in
 
   addr_to_string(&candidate->addr, addr_string, sizeof(addr_string));
   snprintf(description, length, "a=candidate:%d %d %s %" PRIu32 " %s %d typ %s\r\n",
-   candidate->foundation,
-   candidate->component,
-   candidate->transport,
-   candidate->priority,
-   addr_string,
-   candidate->addr.port,
-   typ_raddr);
+           candidate->foundation,
+           candidate->component,
+           candidate->transport,
+           candidate->priority,
+           addr_string,
+           candidate->addr.port,
+           typ_raddr);
 }
 
-int ice_candidate_from_description(IceCandidate *candidate, char *description, char *end) {
-
-  char *split_start = description + strlen("a=candidate:");
-  char *split_end = NULL;
+int ice_candidate_from_description(IceCandidate* candidate, char* description, char* end) {
+  char* split_start = description + strlen("a=candidate:");
+  char* split_end = NULL;
   int index = 0;
   char buf[64];
   // a=candidate:448736988 1 udp 2122260223 172.17.0.1 49250 typ host generation 0 network-id 1 network-cost 50
   // a=candidate:udpcandidate 1 udp 120 192.168.1.102 8000 typ host
   while ((split_end = strstr(split_start, " ")) != NULL && split_start < end) {
-
     memset(buf, 0, sizeof(buf));
     strncpy(buf, split_start, split_end - split_start);
     switch (index) {
@@ -118,11 +111,11 @@ int ice_candidate_from_description(IceCandidate *candidate, char *description, c
             return -1;
           }
         } else if (addr_from_string(buf, &candidate->addr) == 0) {
-	  return -1;
-	}
+          return -1;
+        }
         break;
       case 5:
-	addr_set_port(&candidate->addr, atoi(buf));
+        addr_set_port(&candidate->addr, atoi(buf));
         break;
       case 7:
 
@@ -148,4 +141,3 @@ int ice_candidate_from_description(IceCandidate *candidate, char *description, c
 
   return 0;
 }
-

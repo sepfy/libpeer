@@ -1,18 +1,18 @@
-#include <string.h>
-#include <signal.h>
 #include <assert.h>
-#include <unistd.h>
 #include <cJSON.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
 
-#include <core_mqtt.h>
 #include <core_http_client.h>
+#include <core_mqtt.h>
 
-#include "config.h"
 #include "base64.h"
-#include "utils.h"
+#include "config.h"
+#include "peer_signaling.h"
 #include "ports.h"
 #include "ssl_transport.h"
-#include "peer_signaling.h"
+#include "utils.h"
 
 #define KEEP_ALIVE_TIMEOUT_SECONDS 60
 #define CONNACK_RECV_TIMEOUT_MS 1000
@@ -40,7 +40,6 @@
 #define RPC_ERROR_INTERNAL_ERROR "{\"code\":-32603,\"message\":\"Internal error\"}"
 
 typedef struct PeerSignaling {
-
   MQTTContext_t mqtt_ctx;
   MQTTFixedBuffer_t mqtt_fixed_buf;
 
@@ -64,14 +63,13 @@ typedef struct PeerSignaling {
   char username[CRED_LEN];
   char password[CRED_LEN];
   char client_id[CRED_LEN];
-  PeerConnection *pc;
+  PeerConnection* pc;
 
 } PeerSignaling;
 
 static PeerSignaling g_ps;
 
-static void peer_signaling_mqtt_publish(MQTTContext_t *mqtt_ctx, const char *message) {
-
+static void peer_signaling_mqtt_publish(MQTTContext_t* mqtt_ctx, const char* message) {
   MQTTStatus_t status;
   MQTTPublishInfo_t pub_info;
 
@@ -86,33 +84,27 @@ static void peer_signaling_mqtt_publish(MQTTContext_t *mqtt_ctx, const char *mes
 
   status = MQTT_Publish(mqtt_ctx, &pub_info, MQTT_GetPacketId(mqtt_ctx));
   if (status != MQTTSuccess) {
-
     LOGE("MQTT_Publish failed: Status=%s.", MQTT_Status_strerror(status));
   } else {
-
     LOGD("MQTT_Publish succeeded.");
   }
 }
 
-
-static void peer_signaling_on_pub_event(const char *msg, size_t size) {
-
+static void peer_signaling_on_pub_event(const char* msg, size_t size) {
   cJSON *req, *res, *item, *result, *error;
   int id = -1;
-  char *payload = NULL;
+  char* payload = NULL;
   PeerConnectionState state;
 
   req = res = item = result = error = NULL;
   state = peer_connection_get_state(g_ps.pc);
   do {
-
     req = cJSON_Parse(msg);
     if (!req) {
       error = cJSON_CreateRaw(RPC_ERROR_PARSE_ERROR);
       LOGW("Parse json failed");
       break;
     }
-
 
     item = cJSON_GetObjectItem(req, "id");
     if (!item && !cJSON_IsNumber(item)) {
@@ -144,12 +136,11 @@ static void peer_signaling_on_pub_event(const char *msg, size_t size) {
         } break;
       }
     } else if (strcmp(item->valuestring, RPC_METHOD_ANSWER) == 0) {
-
       item = cJSON_GetObjectItem(req, "params");
       if (!item && !cJSON_IsString(item)) {
         error = cJSON_CreateRaw(RPC_ERROR_INVALID_PARAMS);
-	LOGW("Cannot find params");
-	break;
+        LOGW("Cannot find params");
+        break;
       }
 
       if (state == PEER_CONNECTION_NEW) {
@@ -158,11 +149,9 @@ static void peer_signaling_on_pub_event(const char *msg, size_t size) {
       }
 
     } else if (strcmp(item->valuestring, RPC_METHOD_STATE) == 0) {
-
       result = cJSON_CreateString(peer_connection_state_to_string(state));
 
     } else if (strcmp(item->valuestring, RPC_METHOD_CLOSE) == 0) {
-
       peer_connection_close(g_ps.pc);
       result = cJSON_CreateString("");
 
@@ -174,7 +163,6 @@ static void peer_signaling_on_pub_event(const char *msg, size_t size) {
   } while (0);
 
   if (result || error) {
-
     res = cJSON_CreateObject();
     cJSON_AddStringToObject(res, "jsonrpc", RPC_VERSION);
     cJSON_AddNumberToObject(res, "id", id);
@@ -199,13 +187,17 @@ static void peer_signaling_on_pub_event(const char *msg, size_t size) {
   }
 }
 
-HTTPResponse_t peer_signaling_http_request(const TransportInterface_t *transport_interface,
- const char *method, size_t method_len,
- const char *host, size_t host_len,
- const char *path, size_t path_len,
- const char *auth, size_t auth_len,
- const char *body, size_t body_len) {
-
+HTTPResponse_t peer_signaling_http_request(const TransportInterface_t* transport_interface,
+                                           const char* method,
+                                           size_t method_len,
+                                           const char* host,
+                                           size_t host_len,
+                                           const char* path,
+                                           size_t path_len,
+                                           const char* auth,
+                                           size_t auth_len,
+                                           const char* body,
+                                           size_t body_len) {
   HTTPStatus_t status = HTTPSuccess;
   HTTPRequestInfo_t request_info = {0};
   HTTPResponse_t response = {0};
@@ -225,32 +217,28 @@ HTTPResponse_t peer_signaling_http_request(const TransportInterface_t *transport
   status = HTTPClient_InitializeRequestHeaders(&request_headers, &request_info);
 
   if (status == HTTPSuccess) {
-
     HTTPClient_AddHeader(&request_headers,
-     "Content-Type", strlen("Content-Type"), "application/sdp", strlen("application/sdp"));
+                         "Content-Type", strlen("Content-Type"), "application/sdp", strlen("application/sdp"));
 
     if (auth_len > 0) {
       HTTPClient_AddHeader(&request_headers,
-       "Authorization", strlen("Authorization"), auth, auth_len);
+                           "Authorization", strlen("Authorization"), auth, auth_len);
     }
 
     response.pBuffer = g_ps.http_buf;
     response.bufferLen = sizeof(g_ps.http_buf);
 
     status = HTTPClient_Send(transport_interface,
-     &request_headers, (uint8_t*)body, body ? body_len : 0, &response, 0);
+                             &request_headers, (uint8_t*)body, body ? body_len : 0, &response, 0);
 
   } else {
-
     LOGE("Failed to initialize HTTP request headers: Error=%s.", HTTPClient_strerror(status));
   }
 
   return response;
 }
 
-static int peer_signaling_http_post(const char *hostname, const char *path, int port,
- const char *auth, const char *body) {
-
+static int peer_signaling_http_post(const char* hostname, const char* path, int port, const char* auth, const char* body) {
   int ret = 0;
   TransportInterface_t trans_if = {0};
   NetworkContext_t net_ctx;
@@ -273,42 +261,42 @@ static int peer_signaling_http_post(const char *hostname, const char *path, int 
   }
 
   res = peer_signaling_http_request(&trans_if, "POST", 4, hostname, strlen(hostname), path,
-   strlen(path), auth, strlen(auth), body, strlen(body));
+                                    strlen(path), auth, strlen(auth), body, strlen(body));
 
   ssl_transport_disconnect(&net_ctx);
 
   if (res.pHeaders == NULL) {
-     LOGE("Response headers are NULL");
-     return -1;
+    LOGE("Response headers are NULL");
+    return -1;
   }
 
   if (res.pBody == NULL) {
-     LOGE("Response body is NULL");
-     return -1;
+    LOGE("Response body is NULL");
+    return -1;
   }
 
-  LOGI("Received HTTP response from %s%s\n"
-   "Response Headers: %s\nResponse Status: %u\nResponse Body: %s\n",
-   hostname, path, res.pHeaders, res.statusCode, res.pBody);
+  LOGI(
+      "Received HTTP response from %s%s\n"
+      "Response Headers: %s\nResponse Status: %u\nResponse Body: %s\n",
+      hostname, path, res.pHeaders, res.statusCode, res.pBody);
 
   if (res.statusCode == 201) {
-   peer_connection_set_remote_description(g_ps.pc, (const char*)res.pBody);
+    peer_connection_set_remote_description(g_ps.pc, (const char*)res.pBody);
   }
   return 0;
 }
 
-static void peer_signaling_mqtt_event_cb(MQTTContext_t *mqtt_ctx,
- MQTTPacketInfo_t *packet_info, MQTTDeserializedInfo_t *deserialized_info) {
-
+static void peer_signaling_mqtt_event_cb(MQTTContext_t* mqtt_ctx,
+                                         MQTTPacketInfo_t* packet_info,
+                                         MQTTDeserializedInfo_t* deserialized_info) {
   switch (packet_info->type) {
-
     case MQTT_PACKET_TYPE_CONNACK:
       LOGI("MQTT_PACKET_TYPE_CONNACK");
       break;
     case MQTT_PACKET_TYPE_PUBLISH:
       LOGI("MQTT_PACKET_TYPE_PUBLISH");
       peer_signaling_on_pub_event(deserialized_info->pPublishInfo->pPayload,
-       deserialized_info->pPublishInfo->payloadLength);
+                                  deserialized_info->pPublishInfo->payloadLength);
       break;
     case MQTT_PACKET_TYPE_SUBACK:
       LOGD("MQTT_PACKET_TYPE_SUBACK");
@@ -318,8 +306,7 @@ static void peer_signaling_mqtt_event_cb(MQTTContext_t *mqtt_ctx,
   }
 }
 
-static int peer_signaling_mqtt_connect(const char *hostname, int port) {
-
+static int peer_signaling_mqtt_connect(const char* hostname, int port) {
   MQTTStatus_t status;
   MQTTConnectInfo_t conn_info;
   bool session_present;
@@ -335,7 +322,7 @@ static int peer_signaling_mqtt_connect(const char *hostname, int port) {
   g_ps.mqtt_fixed_buf.pBuffer = g_ps.mqtt_buf;
   g_ps.mqtt_fixed_buf.size = sizeof(g_ps.mqtt_buf);
   status = MQTT_Init(&g_ps.mqtt_ctx, &g_ps.transport,
-   ports_get_epoch_time, peer_signaling_mqtt_event_cb, &g_ps.mqtt_fixed_buf);
+                     ports_get_epoch_time, peer_signaling_mqtt_event_cb, &g_ps.mqtt_fixed_buf);
 
   memset(&conn_info, 0, sizeof(conn_info));
 
@@ -358,7 +345,7 @@ static int peer_signaling_mqtt_connect(const char *hostname, int port) {
   conn_info.keepAliveSeconds = KEEP_ALIVE_TIMEOUT_SECONDS;
 
   status = MQTT_Connect(&g_ps.mqtt_ctx,
-   &conn_info, NULL, CONNACK_RECV_TIMEOUT_MS, &session_present);
+                        &conn_info, NULL, CONNACK_RECV_TIMEOUT_MS, &session_present);
 
   if (status != MQTTSuccess) {
     LOGE("MQTT_Connect failed: Status=%s.", MQTT_Status_strerror(status));
@@ -370,7 +357,6 @@ static int peer_signaling_mqtt_connect(const char *hostname, int port) {
 }
 
 static int peer_signaling_mqtt_subscribe(int subscribed) {
-
   MQTTStatus_t status = MQTTSuccess;
   MQTTSubscribeInfo_t sub_info;
 
@@ -402,12 +388,11 @@ static int peer_signaling_mqtt_subscribe(int subscribed) {
   return 0;
 }
 
-static void peer_signaling_onicecandidate(char *description, void *userdata) {
-
-  cJSON *res;
-  char *payload;
-  char cred_plaintext[2*CRED_LEN + 1];
-  char cred_base64[2*CRED_LEN + 10];
+static void peer_signaling_onicecandidate(char* description, void* userdata) {
+  cJSON* res;
+  char* payload;
+  char cred_plaintext[2 * CRED_LEN + 1];
+  char cred_base64[2 * CRED_LEN + 10];
 
   if (g_ps.id > 0) {
     res = cJSON_CreateObject();
@@ -422,13 +407,12 @@ static void peer_signaling_onicecandidate(char *description, void *userdata) {
     cJSON_Delete(res);
     g_ps.id = 0;
   } else {
-
     // enable authentication
     if (strlen(g_ps.username) > 0 && strlen(g_ps.password) > 0) {
       snprintf(cred_plaintext, sizeof(cred_plaintext), "%s:%s", g_ps.username, g_ps.password);
       snprintf(cred_base64, sizeof(cred_base64), "Basic ");
       base64_encode((unsigned char*)cred_plaintext, strlen(cred_plaintext),
-       cred_base64 + strlen(cred_base64), sizeof(cred_base64) - strlen(cred_base64));
+                    cred_base64 + strlen(cred_base64), sizeof(cred_base64) - strlen(cred_base64));
       LOGD("Basic Auth: %s", cred_base64);
       peer_signaling_http_post(g_ps.http_host, g_ps.http_path, g_ps.http_port, cred_base64, description);
     } else {
@@ -438,7 +422,6 @@ static void peer_signaling_onicecandidate(char *description, void *userdata) {
 }
 
 int peer_signaling_whip_connect() {
-
   if (g_ps.pc == NULL) {
     LOGW("PeerConnection is NULL");
     return -1;
@@ -456,7 +439,6 @@ void peer_signaling_whip_disconnect() {
 }
 
 int peer_signaling_join_channel() {
-
   if (g_ps.pc == NULL) {
     LOGW("PeerConnection is NULL");
     return -1;
@@ -479,7 +461,6 @@ int peer_signaling_join_channel() {
 }
 
 int peer_signaling_loop() {
-
   if (g_ps.mqtt_port > 0) {
     MQTT_ProcessLoop(&g_ps.mqtt_ctx);
   }
@@ -487,27 +468,22 @@ int peer_signaling_loop() {
 }
 
 void peer_signaling_leave_channel() {
-
   MQTTStatus_t status = MQTTSuccess;
 
   if (g_ps.mqtt_port > 0 && peer_signaling_mqtt_subscribe(0) == 0) {
-
     status = MQTT_Disconnect(&g_ps.mqtt_ctx);
-    if(status != MQTTSuccess) {
-
+    if (status != MQTTSuccess) {
       LOGE("Failed to disconnect with broker: %s", MQTT_Status_strerror(status));
     }
   }
 }
 
-void peer_signaling_set_config(ServiceConfiguration *service_config) {
-
-  char *pos;
+void peer_signaling_set_config(ServiceConfiguration* service_config) {
+  char* pos;
 
   memset(&g_ps, 0, sizeof(g_ps));
 
   do {
-
     if (service_config->http_url == NULL || strlen(service_config->http_url) == 0) {
       break;
     }
@@ -523,9 +499,7 @@ void peer_signaling_set_config(ServiceConfiguration *service_config) {
     LOGI("HTTP Host: %s, Port: %d, Path: %s", g_ps.http_host, g_ps.http_port, g_ps.http_path);
   } while (0);
 
-
   do {
-
     if (service_config->mqtt_url == NULL || strlen(service_config->mqtt_url) == 0) {
       break;
     }

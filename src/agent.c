@@ -1,26 +1,25 @@
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
 #include <sys/select.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #include <pthread.h>
-#include "socket.h"
-#include "utils.h"
-#include "stun.h"
-#include "ice.h"
-#include "base64.h"
 #include "agent.h"
+#include "base64.h"
+#include "ice.h"
 #include "ports.h"
+#include "socket.h"
+#include "stun.h"
+#include "utils.h"
 
 #define AGENT_POLL_TIMEOUT 1
 #define AGENT_CONNCHECK_MAX 300
 #define AGENT_CONNCHECK_PERIOD 100
 
-static int agent_create_sockets(Agent *agent) {
-
+static int agent_create_sockets(Agent* agent) {
   int ret;
   if ((ret = udp_socket_open(&agent->udp_sockets[0], AF_INET, 0)) < 0) {
     LOGE("Failed to create UDP socket.");
@@ -38,8 +37,7 @@ static int agent_create_sockets(Agent *agent) {
   return 0;
 }
 
-static int agent_socket_recv(Agent *agent, Address *addr, uint8_t *buf, int len) {
-
+static int agent_socket_recv(Agent* agent, Address* addr, uint8_t* buf, int len) {
   int ret = -1;
   int i = 0;
   int maxfd = 0;
@@ -75,8 +73,7 @@ static int agent_socket_recv(Agent *agent, Address *addr, uint8_t *buf, int len)
   return ret;
 }
 
-static int agent_socket_send(Agent *agent, Address *addr, const uint8_t *buf, int len) {
-
+static int agent_socket_send(Agent* agent, Address* addr, const uint8_t* buf, int len) {
   switch (addr->family) {
     case AF_INET6:
       return udp_socket_sendto(&agent->udp_sockets[1], addr, buf, len);
@@ -87,30 +84,28 @@ static int agent_socket_send(Agent *agent, Address *addr, const uint8_t *buf, in
   return -1;
 }
 
-static int agent_create_host_addr(Agent *agent) {
-
-  UdpSocket *udp_socket;
+static int agent_create_host_addr(Agent* agent) {
+  UdpSocket* udp_socket;
 
   udp_socket = &agent->udp_sockets[0];
   if (ports_get_host_addr(&udp_socket->bind_addr)) {
-    //LOGD("addr: %d.%d.%d.%d", udp_socket->bind_addr.ipv4[0], udp_socket->bind_addr.ipv4[1], udp_socket->bind_addr.ipv4[2], udp_socket->bind_addr.ipv4[3]);
-    IceCandidate *ice_candidate = agent->local_candidates + agent->local_candidates_count++;
+    // LOGD("addr: %d.%d.%d.%d", udp_socket->bind_addr.ipv4[0], udp_socket->bind_addr.ipv4[1], udp_socket->bind_addr.ipv4[2], udp_socket->bind_addr.ipv4[3]);
+    IceCandidate* ice_candidate = agent->local_candidates + agent->local_candidates_count++;
     ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_HOST, &udp_socket->bind_addr);
   }
 
 #if CONFIG_IPV6
   udp_socket = &agent->udp_sockets[1];
   if (ports_get_host_addr(&udp_socket->bind_addr)) {
-    //LOGD("addr: %x:%x:%x:%x:%x:%x:%x:%x", udp_socket->bind_addr.ipv6[0], udp_socket->bind_addr.ipv6[1], udp_socket->bind_addr.ipv6[2], udp_socket->bind_addr.ipv6[3], udp_socket->bind_addr.ipv6[4], udp_socket->bind_addr.ipv6[5], udp_socket->bind_addr.ipv6[6], udp_socket->bind_addr.ipv6[7]);
-    IceCandidate *ice_candidate = agent->local_candidates + agent->local_candidates_count++;
+    // LOGD("addr: %x:%x:%x:%x:%x:%x:%x:%x", udp_socket->bind_addr.ipv6[0], udp_socket->bind_addr.ipv6[1], udp_socket->bind_addr.ipv6[2], udp_socket->bind_addr.ipv6[3], udp_socket->bind_addr.ipv6[4], udp_socket->bind_addr.ipv6[5], udp_socket->bind_addr.ipv6[6], udp_socket->bind_addr.ipv6[7]);
+    IceCandidate* ice_candidate = agent->local_candidates + agent->local_candidates_count++;
     ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_HOST, &udp_socket->bind_addr);
   }
 #endif
   return 0;
 }
 
-static int agent_create_bind_addr(Agent *agent, Address *serv_addr) {
-
+static int agent_create_bind_addr(Agent* agent, Address* serv_addr) {
   int ret = -1;
   int retry = 0;
   Address bind_addr;
@@ -143,13 +138,12 @@ static int agent_create_bind_addr(Agent *agent, Address *serv_addr) {
 
   stun_parse_msg_buf(&recv_msg);
   memcpy(&bind_addr, &recv_msg.mapped_addr, sizeof(Address));
-  IceCandidate *ice_candidate = agent->local_candidates + agent->local_candidates_count++;
+  IceCandidate* ice_candidate = agent->local_candidates + agent->local_candidates_count++;
   ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_SRFLX, &bind_addr);
   return ret;
 }
 
-static int agent_create_turn_addr(Agent *agent, Address *serv_addr, const char *username, const char *credential) {
-
+static int agent_create_turn_addr(Agent* agent, Address* serv_addr, const char* username, const char* credential) {
   int ret = -1;
   uint32_t attr = ntohl(0x11000000);
   int retry = 0;
@@ -159,7 +153,7 @@ static int agent_create_turn_addr(Agent *agent, Address *serv_addr, const char *
   memset(&recv_msg, 0, sizeof(recv_msg));
   memset(&send_msg, 0, sizeof(send_msg));
   stun_msg_create(&send_msg, STUN_METHOD_ALLOCATE);
-  stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REQUESTED_TRANSPORT, sizeof(attr), (char*)&attr); // UDP
+  stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REQUESTED_TRANSPORT, sizeof(attr), (char*)&attr);  // UDP
   stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_USERNAME, strlen(username), (char*)username);
 
   ret = agent_socket_send(agent, serv_addr, send_msg.buf, send_msg.size);
@@ -184,10 +178,9 @@ static int agent_create_turn_addr(Agent *agent, Address *serv_addr, const char *
   stun_parse_msg_buf(&recv_msg);
 
   if (recv_msg.stunclass == STUN_CLASS_ERROR && recv_msg.stunmethod == STUN_METHOD_ALLOCATE) {
-
     memset(&send_msg, 0, sizeof(send_msg));
     stun_msg_create(&send_msg, STUN_METHOD_ALLOCATE);
-    stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REQUESTED_TRANSPORT, sizeof(attr), (char*)&attr); // UDP
+    stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REQUESTED_TRANSPORT, sizeof(attr), (char*)&attr);  // UDP
     stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_USERNAME, strlen(username), (char*)username);
     stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_NONCE, strlen(recv_msg.nonce), recv_msg.nonce);
     stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REALM, strlen(recv_msg.realm), recv_msg.realm);
@@ -212,17 +205,16 @@ static int agent_create_turn_addr(Agent *agent, Address *serv_addr, const char *
 
   stun_parse_msg_buf(&recv_msg);
   memcpy(&turn_addr, &recv_msg.relayed_addr, sizeof(Address));
-  IceCandidate *ice_candidate = agent->local_candidates + agent->local_candidates_count++;
+  IceCandidate* ice_candidate = agent->local_candidates + agent->local_candidates_count++;
   ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_RELAY, &turn_addr);
   return ret;
 }
 
-void agent_init(Agent *agent) {
+void agent_init(Agent* agent) {
   agent->local_candidates_count = 0;
 }
 
-void agent_deinit(Agent *agent) {
-
+void agent_deinit(Agent* agent) {
   udp_socket_close(&agent->udp_socket);
   memset(agent, 0, sizeof(Agent));
 }
@@ -233,14 +225,13 @@ void agent_deinit(Agent *agent) {
  * create host candidate
  * create server-reflexive candidate or relay candidate
  */
-void agent_gather_candidate(Agent *agent, const char *urls, const char *username, const char *credential) {
-
-  char *pos;
+void agent_gather_candidate(Agent* agent, const char* urls, const char* username, const char* credential) {
+  char* pos;
   int port;
   char hostname[64];
   char addr_string[ADDRSTRLEN];
   int i;
-  int addr_type[1] = {AF_INET}; // ipv6 no need stun
+  int addr_type[1] = {AF_INET};  // ipv6 no need stun
   Address resolved_addr;
   memset(hostname, 0, sizeof(hostname));
   memset(agent, 0, sizeof(Agent));
@@ -249,7 +240,6 @@ void agent_gather_candidate(Agent *agent, const char *urls, const char *username
   agent_create_host_addr(agent);
 
   do {
-
     if ((pos = strstr(urls + 5, ":")) == NULL) {
       break;
     }
@@ -263,7 +253,6 @@ void agent_gather_candidate(Agent *agent, const char *urls, const char *username
     snprintf(hostname, pos - urls - 5 + 1, "%s", urls + 5);
 
     for (i = 0; i < sizeof(addr_type) / sizeof(addr_type[0]); i++) {
-
       if (ports_resolve_addr(hostname, &resolved_addr) != 0) {
         continue;
       }
@@ -282,11 +271,9 @@ void agent_gather_candidate(Agent *agent, const char *urls, const char *username
     }
 
   } while (0);
-
 }
 
-void agent_get_local_description(Agent *agent, char *description, int length) {
-
+void agent_get_local_description(Agent* agent, char* description, int length) {
   int ncandidates = 0;
 
   memset(description, 0, length);
@@ -308,18 +295,16 @@ void agent_get_local_description(Agent *agent, char *description, int length) {
   LOGD("local description:\n%s", description);
 }
 
-int agent_send(Agent *agent, const uint8_t *buf, int len) {
-
+int agent_send(Agent* agent, const uint8_t* buf, int len) {
   return agent_socket_send(agent, &agent->nominated_pair->remote->addr, buf, len);
 }
 
-static void agent_create_binding_response(Agent *agent, StunMessage *msg, Address *addr) {
-
+static void agent_create_binding_response(Agent* agent, StunMessage* msg, Address* addr) {
   char username[584];
   char mapped_address[8];
-  StunHeader *header;
+  StunHeader* header;
   stun_msg_create(msg, STUN_CLASS_RESPONSE | STUN_METHOD_BINDING);
-  header = (StunHeader *)msg->buf;
+  header = (StunHeader*)msg->buf;
   memcpy(header->transaction_id, agent->transaction_id, sizeof(header->transaction_id));
   snprintf(username, sizeof(username), "%s:%s", agent->local_ufrag, agent->remote_ufrag);
   // TODO: XOR-MAPPED-ADDRESS
@@ -329,29 +314,27 @@ static void agent_create_binding_response(Agent *agent, StunMessage *msg, Addres
   stun_msg_finish(msg, STUN_CREDENTIAL_SHORT_TERM, agent->local_upwd, strlen(agent->local_upwd));
 }
 
-static void agent_create_binding_request(Agent *agent, StunMessage *msg) {
-
-  uint64_t tie_breaker = 0; // always be controlled
+static void agent_create_binding_request(Agent* agent, StunMessage* msg) {
+  uint64_t tie_breaker = 0;  // always be controlled
   // send binding request
   stun_msg_create(msg, STUN_CLASS_REQUEST | STUN_METHOD_BINDING);
   char username[584];
   memset(username, 0, sizeof(username));
   snprintf(username, sizeof(username), "%s:%s", agent->remote_ufrag, agent->local_ufrag);
   stun_msg_write_attr(msg, STUN_ATTR_TYPE_USERNAME, strlen(username), username);
-  stun_msg_write_attr(msg, STUN_ATTR_TYPE_PRIORITY, 4, (char *)&agent->nominated_pair->priority);
+  stun_msg_write_attr(msg, STUN_ATTR_TYPE_PRIORITY, 4, (char*)&agent->nominated_pair->priority);
   stun_msg_write_attr(msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
-  stun_msg_write_attr(msg, STUN_ATTR_TYPE_ICE_CONTROLLED, 8, (char *)&tie_breaker);
+  stun_msg_write_attr(msg, STUN_ATTR_TYPE_ICE_CONTROLLED, 8, (char*)&tie_breaker);
   stun_msg_finish(msg, STUN_CREDENTIAL_SHORT_TERM, agent->remote_upwd, strlen(agent->remote_upwd));
 }
 
-void agent_process_stun_request(Agent *agent, StunMessage *stun_msg, Address *addr) {
-
+void agent_process_stun_request(Agent* agent, StunMessage* stun_msg, Address* addr) {
   StunMessage msg;
-  StunHeader *header;
+  StunHeader* header;
   switch (stun_msg->stunmethod) {
     case STUN_METHOD_BINDING:
       if (stun_msg_is_valid(stun_msg->buf, stun_msg->size, agent->local_upwd) == 0) {
-        header = (StunHeader *)stun_msg->buf;
+        header = (StunHeader*)stun_msg->buf;
         memcpy(agent->transaction_id, header->transaction_id, sizeof(header->transaction_id));
         agent_create_binding_response(agent, &msg, addr);
         agent_socket_send(agent, addr, msg.buf, msg.size);
@@ -363,8 +346,7 @@ void agent_process_stun_request(Agent *agent, StunMessage *stun_msg, Address *ad
   }
 }
 
-void agent_process_stun_response(Agent *agent, StunMessage *stun_msg) {
-
+void agent_process_stun_response(Agent* agent, StunMessage* stun_msg) {
   switch (stun_msg->stunmethod) {
     case STUN_METHOD_BINDING:
       if (stun_msg_is_valid(stun_msg->buf, stun_msg->size, agent->remote_upwd) == 0) {
@@ -376,14 +358,11 @@ void agent_process_stun_response(Agent *agent, StunMessage *stun_msg) {
   }
 }
 
-
-int agent_recv(Agent *agent, uint8_t *buf, int len) {
-
+int agent_recv(Agent* agent, uint8_t* buf, int len) {
   int ret = -1;
   StunMessage stun_msg;
   Address addr;
   if ((ret = agent_socket_recv(agent, &addr, buf, len)) > 0 && stun_probe(buf, len) == 0) {
-
     memcpy(stun_msg.buf, buf, ret);
     stun_msg.size = ret;
     stun_parse_msg_buf(&stun_msg);
@@ -404,32 +383,27 @@ int agent_recv(Agent *agent, uint8_t *buf, int len) {
   return ret;
 }
 
-void agent_set_remote_description(Agent *agent, char *description) {
-
-/*
-a=ice-ufrag:Iexb
-a=ice-pwd:IexbSoY7JulyMbjKwISsG9
-a=candidate:1 1 UDP 1 36.231.28.50 38143 typ srflx
-*/
+void agent_set_remote_description(Agent* agent, char* description) {
+  /*
+  a=ice-ufrag:Iexb
+  a=ice-pwd:IexbSoY7JulyMbjKwISsG9
+  a=candidate:1 1 UDP 1 36.231.28.50 38143 typ srflx
+  */
   int i, j;
 
   LOGD("Set remote description:\n%s", description);
 
-  char *line_start = description;
-  char *line_end = NULL;
+  char* line_start = description;
+  char* line_end = NULL;
 
   while ((line_end = strstr(line_start, "\r\n")) != NULL) {
-
     if (strncmp(line_start, "a=ice-ufrag:", strlen("a=ice-ufrag:")) == 0) {
-
       strncpy(agent->remote_ufrag, line_start + strlen("a=ice-ufrag:"), line_end - line_start - strlen("a=ice-ufrag:"));
 
     } else if (strncmp(line_start, "a=ice-pwd:", strlen("a=ice-pwd:")) == 0) {
-
       strncpy(agent->remote_upwd, line_start + strlen("a=ice-pwd:"), line_end - line_start - strlen("a=ice-pwd:"));
 
     } else if (strncmp(line_start, "a=candidate:", strlen("a=candidate:")) == 0) {
-
       if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], line_start, line_end) == 0) {
         agent->remote_candidates_count++;
       }
@@ -445,20 +419,18 @@ a=candidate:1 1 UDP 1 36.231.28.50 38143 typ srflx
   for (i = 0; i < agent->local_candidates_count; i++) {
     for (j = 0; j < agent->remote_candidates_count; j++) {
       if (agent->local_candidates[i].addr.family == agent->remote_candidates[j].addr.family) {
-	agent->candidate_pairs[agent->candidate_pairs_num].local = &agent->local_candidates[i];
-	agent->candidate_pairs[agent->candidate_pairs_num].remote = &agent->remote_candidates[j];
-	agent->candidate_pairs[agent->candidate_pairs_num].priority = agent->local_candidates[i].priority + agent->remote_candidates[j].priority;
-	agent->candidate_pairs[agent->candidate_pairs_num].state = ICE_CANDIDATE_STATE_FROZEN;
-	agent->candidate_pairs_num++;
+        agent->candidate_pairs[agent->candidate_pairs_num].local = &agent->local_candidates[i];
+        agent->candidate_pairs[agent->candidate_pairs_num].remote = &agent->remote_candidates[j];
+        agent->candidate_pairs[agent->candidate_pairs_num].priority = agent->local_candidates[i].priority + agent->remote_candidates[j].priority;
+        agent->candidate_pairs[agent->candidate_pairs_num].state = ICE_CANDIDATE_STATE_FROZEN;
+        agent->candidate_pairs_num++;
       }
     }
   }
   LOGD("candidate pairs num: %d", agent->candidate_pairs_num);
 }
 
-
-int agent_connectivity_check(Agent *agent) {
-
+int agent_connectivity_check(Agent* agent) {
   char addr_string[ADDRSTRLEN];
   uint8_t buf[1400];
   StunMessage msg;
@@ -471,7 +443,6 @@ int agent_connectivity_check(Agent *agent) {
   memset(&msg, 0, sizeof(msg));
 
   if (agent->nominated_pair->conncheck % AGENT_CONNCHECK_PERIOD == 0) {
-
     addr_to_string(&agent->nominated_pair->remote->addr, addr_string, sizeof(addr_string));
     LOGD("send binding request to remote ip: %s, port: %d", addr_string, agent->nominated_pair->remote->addr.port);
     agent_create_binding_request(agent, &msg);
@@ -489,11 +460,9 @@ int agent_connectivity_check(Agent *agent) {
   return -1;
 }
 
-int agent_select_candidate_pair(Agent *agent) {
-
+int agent_select_candidate_pair(Agent* agent) {
   int i;
   for (i = 0; i < agent->candidate_pairs_num; i++) {
-
     if (agent->candidate_pairs[i].state == ICE_CANDIDATE_STATE_FROZEN) {
       // nominate this pair
       agent->nominated_pair = &agent->candidate_pairs[i];
@@ -507,7 +476,6 @@ int agent_select_candidate_pair(Agent *agent) {
       }
       agent->candidate_pairs[i].state = ICE_CANDIDATE_STATE_FAILED;
     } else if (agent->candidate_pairs[i].state == ICE_CANDIDATE_STATE_FAILED) {
-
     } else if (agent->candidate_pairs[i].state == ICE_CANDIDATE_STATE_SUCCEEDED) {
       agent->selected_pair = &agent->candidate_pairs[i];
       return 0;

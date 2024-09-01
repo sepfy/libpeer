@@ -1,36 +1,35 @@
+#include "driver/i2s_pdm.h"
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_log.h"
-#include "driver/i2s_pdm.h"
 
+#include "esp_audio_enc.h"
 #include "esp_audio_enc_default.h"
 #include "esp_audio_enc_reg.h"
 #include "esp_g711_enc.h"
-#include "esp_audio_enc.h"
 
 #include "peer_connection.h"
 
 #define I2S_CLK_GPIO 42
 #define I2S_DATA_GPIO 41
 
-static const char *TAG = "AUDIO";
+static const char* TAG = "AUDIO";
 
-extern PeerConnection *g_pc;
+extern PeerConnection* g_pc;
 extern PeerConnectionState eState;
 extern int get_timestamp();
 
 i2s_chan_handle_t rx_handle = NULL;
 
 esp_audio_enc_handle_t enc_handle = NULL;
-esp_audio_enc_in_frame_t aenc_in_frame = { 0 };
-esp_audio_enc_out_frame_t aenc_out_frame = { 0 };
+esp_audio_enc_in_frame_t aenc_in_frame = {0};
+esp_audio_enc_out_frame_t aenc_out_frame = {0};
 esp_g711_enc_config_t g711_cfg;
 esp_audio_enc_config_t enc_cfg;
 
 esp_err_t audio_codec_init() {
-
-  uint8_t *read_buf = NULL;
-  uint8_t *write_buf = NULL;
+  uint8_t* read_buf = NULL;
+  uint8_t* write_buf = NULL;
   int read_size = 0;
   int out_size = 0;
 
@@ -77,20 +76,19 @@ esp_err_t audio_codec_init() {
 }
 
 esp_err_t audio_init(void) {
-
   i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
   ESP_ERROR_CHECK(i2s_new_channel(&chan_cfg, NULL, &rx_handle));
 
   i2s_pdm_rx_config_t pdm_rx_cfg = {
-   .clk_cfg = I2S_PDM_RX_CLK_DEFAULT_CONFIG(8000),
-   .slot_cfg = I2S_PDM_RX_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
-   .gpio_cfg = {
-    .clk = I2S_CLK_GPIO,
-    .din = I2S_DATA_GPIO,
-    .invert_flags = {
-     .clk_inv = false,
-    },
-   },
+      .clk_cfg = I2S_PDM_RX_CLK_DEFAULT_CONFIG(8000),
+      .slot_cfg = I2S_PDM_RX_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
+      .gpio_cfg = {
+          .clk = I2S_CLK_GPIO,
+          .din = I2S_DATA_GPIO,
+          .invert_flags = {
+              .clk_inv = false,
+          },
+      },
   };
 
   ESP_ERROR_CHECK(i2s_channel_init_pdm_rx_mode(rx_handle, &pdm_rx_cfg));
@@ -100,24 +98,21 @@ esp_err_t audio_init(void) {
 }
 
 void audio_deinit(void) {
-
   ESP_ERROR_CHECK(i2s_channel_disable(rx_handle));
   ESP_ERROR_CHECK(i2s_del_channel(rx_handle));
 }
 
-int32_t audio_get_samples(uint8_t *buf, size_t size) {
-
+int32_t audio_get_samples(uint8_t* buf, size_t size) {
   size_t bytes_read;
 
-  if (i2s_channel_read(rx_handle, (char *)buf, size, &bytes_read, 1000) != ESP_OK) {
+  if (i2s_channel_read(rx_handle, (char*)buf, size, &bytes_read, 1000) != ESP_OK) {
     ESP_LOGE(TAG, "i2s read error");
   }
 
   return bytes_read;
 }
 
-void audio_task(void *arg) {
-
+void audio_task(void* arg) {
   int ret;
   static int64_t last_time;
   int64_t curr_time;
@@ -127,20 +122,15 @@ void audio_task(void *arg) {
   ESP_LOGI(TAG, "audio task started");
 
   for (;;) {
-
     if (eState == PEER_CONNECTION_COMPLETED) {
-
       ret = audio_get_samples(aenc_in_frame.buffer, aenc_in_frame.len);
 
       if (ret == aenc_in_frame.len) {
-
         if (esp_audio_enc_process(enc_handle, &aenc_in_frame, &aenc_out_frame) == ESP_AUDIO_ERR_OK) {
-
           peer_connection_send_audio(g_pc, aenc_out_frame.buffer, aenc_out_frame.encoded_bytes);
 
           bytes += aenc_out_frame.encoded_bytes;
           if (bytes > 50000) {
-
             curr_time = get_timestamp();
             ESP_LOGI(TAG, "audio bitrate: %.1f bps", 1000.0 * (bytes * 8.0 / (float)(curr_time - last_time)));
             last_time = curr_time;
@@ -151,9 +141,7 @@ void audio_task(void *arg) {
       vTaskDelay(pdMS_TO_TICKS(5));
 
     } else {
-
       vTaskDelay(pdMS_TO_TICKS(100));
     }
   }
 }
-

@@ -8,28 +8,29 @@ extern "C" {
 #endif
 
 typedef struct ServiceConfiguration {
-  const char *mqtt_url;
+  const char* mqtt_url;
   int mqtt_port;
-  const char *client_id;
-  const char *http_url;
+  const char* client_id;
+  const char* http_url;
   int http_port;
-  const char *username;
-  const char *password;
-  PeerConnection *pc;
+  const char* username;
+  const char* password;
+  PeerConnection* pc;
 } ServiceConfiguration;
 
-#define SERVICE_CONFIG_DEFAULT() { \
- .mqtt_url = "broker.emqx.io", \
- .mqtt_port = 8883,                \
- .client_id = "peer",              \
- .http_url = "",                   \
- .http_port = 443,                 \
- .username = "",                   \
- .password = "",                   \
- .pc = NULL                        \
-}
+#define SERVICE_CONFIG_DEFAULT()  \
+  {                               \
+    .mqtt_url = "broker.emqx.io", \
+    .mqtt_port = 8883,            \
+    .client_id = "peer",          \
+    .http_url = "",               \
+    .http_port = 443,             \
+    .username = "",               \
+    .password = "",               \
+    .pc = NULL                    \
+  }
 
-void peer_signaling_set_config(ServiceConfiguration *config);
+void peer_signaling_set_config(ServiceConfiguration* config);
 
 int peer_signaling_whip_connect();
 
@@ -42,8 +43,7 @@ void peer_signaling_leave_channel();
 int peer_signaling_loop();
 
 #ifdef __cplusplus
-} 
+}
 #endif
 
-#endif //PEER_SIGNALING_H_
-
+#endif  // PEER_SIGNALING_H_

@@ -16,13 +16,13 @@
 #define DATA_RB_DATA_LENGTH (SCTP_MTU * 128)
 #endif
 
-#define AUDIO_LATENCY 20 // ms
+#define AUDIO_LATENCY 20  // ms
 #define KEEPALIVE_CONNCHECK 10000
 #define CONFIG_IPV6 0
 // default use wifi interface
 #define IFR_NAME "w"
 
-//#define LOG_LEVEL LEVEL_DEBUG
-#define LOG_REDIRECT	0
+// #define LOG_LEVEL LEVEL_DEBUG
+#define LOG_REDIRECT 0
 
-#endif // CONFIG_H_
+#endif  // CONFIG_H_

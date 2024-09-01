@@ -5,7 +5,7 @@
 
 #include "dtls_srtp.h"
 
-void test_handshake(int argc, char *argv[]) {
+void test_handshake(int argc, char* argv[]) {
 #if 0
   DtlsSrtp dtls_srtp;
   UdpSocket udp_socket;
@@ -86,17 +86,14 @@ void test_handshake(int argc, char *argv[]) {
 }
 
 void test_reset() {
-
   DtlsSrtp dtls_srtp;
   dtls_srtp_init(&dtls_srtp, DTLS_SRTP_ROLE_CLIENT, NULL);
   dtls_srtp_deinit(&dtls_srtp);
 }
 
-int main(int argc, char *argv[]) {
-
+int main(int argc, char* argv[]) {
   test_reset();
   test_handshake(argc, argv);
 
   return 0;
 }
-
