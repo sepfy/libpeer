@@ -4,12 +4,11 @@
 
 #include "agent.h"
 
-void on_agent_state_changed(AgentState state, void *user_data) {
-
+void on_agent_state_changed(AgentState state, void* user_data) {
   printf("Agent state changed: %d\n", state);
-} 
+}
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
 #if 0
   Agent agent;
 
@@ -58,4 +57,3 @@ int main(int argc, char *argv[]) {
 #endif
   return 0;
 }
-

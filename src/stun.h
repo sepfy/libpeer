@@ -16,9 +16,9 @@ typedef struct StunMessage StunMessage;
 #define STUN_ATTR_BUF_SIZE 256
 #define MAGIC_COOKIE 0x2112A442
 #define STUN_FINGERPRINT_XOR 0x5354554e
-  
+
 typedef enum StunClass {
-  
+
   STUN_CLASS_REQUEST = 0x0000,
   STUN_CLASS_INDICATION = 0x0010,
   STUN_CLASS_RESPONSE = 0x0100,
@@ -63,22 +63,19 @@ typedef enum StunCredential {
 } StunCredential;
 
 struct StunHeader {
-
   uint16_t type;
   uint16_t length;
   uint32_t magic_cookie;
   uint32_t transaction_id[3];
 };
-    
-struct StunAttribute {
 
+struct StunAttribute {
   uint16_t type;
   uint16_t length;
   char value[0];
 };
 
 struct StunMessage {
-
   StunClass stunclass;
   StunMethod stunmethod;
   uint32_t fingerprint;
@@ -90,29 +87,28 @@ struct StunMessage {
   Address relayed_addr;
   uint8_t buf[STUN_ATTR_BUF_SIZE];
   size_t size;
+};
 
-};  
+void stun_msg_create(StunMessage* msg, uint16_t type);
 
-void stun_msg_create(StunMessage *msg, uint16_t type);
+void stun_set_mapped_address(char* value, uint8_t* mask, Address* addr);
 
-void stun_set_mapped_address(char *value, uint8_t *mask, Address *addr);
+void stun_get_mapped_address(char* value, uint8_t* mask, Address* addr);
 
-void stun_get_mapped_address(char *value, uint8_t *mask, Address *addr);
+void stun_parse_binding_response(char* attr_buf, size_t len, Address* addr);
 
-void stun_parse_binding_response(char *attr_buf, size_t len, Address *addr);
+void stun_msg_parse(StunMessage* msg, uint8_t* buf, size_t len);
 
-void stun_msg_parse(StunMessage *msg, uint8_t *buf, size_t len);
+void stun_parse_msg_buf(StunMessage* msg);
 
-void stun_parse_msg_buf(StunMessage *msg);
+void stun_calculate_fingerprint(char* buf, size_t len, uint32_t* fingerprint);
 
-void stun_calculate_fingerprint(char *buf, size_t len, uint32_t *fingerprint);
+int stun_msg_write_attr(StunMessage* msg, StunAttrType type, uint16_t length, char* value);
 
-int stun_msg_write_attr(StunMessage *msg, StunAttrType type, uint16_t length, char *value);
+int stun_probe(uint8_t* buf, size_t size);
 
-int stun_probe(uint8_t *buf, size_t size);
+int stun_msg_is_valid(uint8_t* buf, size_t len, char* password);
 
-int stun_msg_is_valid(uint8_t *buf, size_t len, char *password);
+int stun_msg_finish(StunMessage* msg, StunCredential credential, const char* password, size_t password_len);
 
-int stun_msg_finish(StunMessage *msg, StunCredential credential, const char *password, size_t password_len);
-
-#endif // STUN_H_
+#endif  // STUN_H_

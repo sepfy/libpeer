@@ -1,15 +1,15 @@
+#include <arpa/inet.h>
+#include <inttypes.h>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
 #include <sys/select.h>
-#include <netinet/in.h>
-#include <inttypes.h>
-#include "utils.h"
+#include <sys/socket.h>
+#include <unistd.h>
 #include "address.h"
 #include "socket.h"
+#include "utils.h"
 
 #define MDNS_GROUP "224.0.0.251"
 #define MDNS_PORT 5353
@@ -36,19 +36,18 @@ typedef struct DnsQuery {
   uint16_t class;
 } DnsQuery;
 
-static int mdns_parse_answer(uint8_t *buf, int size, Address *addr) {
-
-  char *pos;
+static int mdns_parse_answer(uint8_t* buf, int size, Address* addr) {
+  char* pos;
   int flags_qr;
-  DnsHeader *header;
-  DnsAnswer *answer;
+  DnsHeader* header;
+  DnsAnswer* answer;
 
   if (size < sizeof(DnsHeader)) {
     LOGE("response too short");
     return -1;
   }
 
-  header = (DnsHeader *)buf;
+  header = (DnsHeader*)buf;
   flags_qr = ntohs(header->flags) >> 15;
   if (flags_qr != 1) {
     LOGD("flag is not a DNS response");
@@ -62,10 +61,9 @@ static int mdns_parse_answer(uint8_t *buf, int size, Address *addr) {
     return -1;
   }
 
-
   pos += 6;
-  answer = (DnsAnswer *)pos;
-  LOGD("type: %"PRIu16", class: %"PRIu16", ttl: %"PRIu32", length: %"PRIu16"", ntohs(answer->type), ntohs(answer->class), ntohl(answer->ttl), ntohs(answer->length));
+  answer = (DnsAnswer*)pos;
+  LOGD("type: %" PRIu16 ", class: %" PRIu16 ", ttl: %" PRIu32 ", length: %" PRIu16 "", ntohs(answer->type), ntohs(answer->class), ntohl(answer->ttl), ntohs(answer->length));
   if (ntohs(answer->length) != 4) {
     LOGI("invalid length");
     return -1;
@@ -75,12 +73,11 @@ static int mdns_parse_answer(uint8_t *buf, int size, Address *addr) {
   return 0;
 }
 
-static int mdns_build_query(const char *hostname, uint8_t *buf, int size) {
-
+static int mdns_build_query(const char* hostname, uint8_t* buf, int size) {
   int total_size, len, offset;
   const char *label, *dot;
-  DnsHeader *dns_header;
-  DnsQuery *dns_query;
+  DnsHeader* dns_header;
+  DnsQuery* dns_query;
 
   total_size = sizeof(DnsHeader) + strlen(hostname) + sizeof(DnsQuery) + 2;
   if (size < total_size) {
@@ -109,13 +106,13 @@ static int mdns_build_query(const char *hostname, uint8_t *buf, int size) {
 
   buf[offset++] = 0x00;
 
-  dns_query = (DnsQuery*) (buf + offset);
+  dns_query = (DnsQuery*)(buf + offset);
   dns_query->type = 0x0100;
   dns_query->class = 0x0100;
   return total_size;
 }
 
-int mdns_resolve_addr(const char *hostname, Address *addr) {
+int mdns_resolve_addr(const char* hostname, Address* addr) {
   Address mcast_addr = {0};
   UdpSocket udp_socket;
   uint8_t buf[256];

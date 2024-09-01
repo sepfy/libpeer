@@ -1,33 +1,29 @@
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <signal.h>
 #include <sys/time.h>
-#include <pthread.h>
+#include <unistd.h>
 
-#include "reader.h"
 #include "peer.h"
+#include "reader.h"
 
 int g_interrupted = 0;
-PeerConnection *g_pc = NULL;
+PeerConnection* g_pc = NULL;
 PeerConnectionState g_state;
 
-static void onconnectionstatechange(PeerConnectionState state, void *data) {
-
+static void onconnectionstatechange(PeerConnectionState state, void* data) {
   printf("state is changed: %s\n", peer_connection_state_to_string(state));
   g_state = state;
 }
 
-static void onopen(void *user_data) {
-
+static void onopen(void* user_data) {
 }
 
-static void onclose(void *user_data) {
-
+static void onclose(void* user_data) {
 }
 
-static void onmessage(char *msg, size_t len, void *user_data, uint16_t sid) {
-
+static void onmessage(char* msg, size_t len, void* user_data, uint16_t sid) {
   printf("on message: %d %s", sid, msg);
 
   if (strncmp(msg, "ping", 4) == 0) {
@@ -37,14 +33,11 @@ static void onmessage(char *msg, size_t len, void *user_data, uint16_t sid) {
 }
 
 static void signal_handler(int signal) {
-
   g_interrupted = 1;
 }
 
-static void* peer_singaling_task(void *data) {
-
+static void* peer_singaling_task(void* data) {
   while (!g_interrupted) {
-
     peer_signaling_loop();
     usleep(1000);
   }
@@ -52,26 +45,22 @@ static void* peer_singaling_task(void *data) {
   pthread_exit(NULL);
 }
 
-static void* peer_connection_task(void *data) {
-
+static void* peer_connection_task(void* data) {
   while (!g_interrupted) {
-
     peer_connection_loop(g_pc);
-    usleep(1000); 
+    usleep(1000);
   }
 
-  pthread_exit(NULL); 
+  pthread_exit(NULL);
 }
 
 static uint64_t get_timestamp() {
-
   struct timeval tv;
   gettimeofday(&tv, NULL);
   return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
-int main(int argc, char *argv[]) {
-
+int main(int argc, char* argv[]) {
   uint64_t curr_time, video_time, audio_time;
   uint8_t buf[102400];
   int size;
@@ -87,13 +76,12 @@ int main(int argc, char *argv[]) {
   signal(SIGINT, signal_handler);
 
   PeerConfiguration config = {
-   .ice_servers = {
-    { .urls = "stun:stun.l.google.com:19302" },
-   },
-   .datachannel = DATA_CHANNEL_STRING,
-   .video_codec = CODEC_H264,
-   .audio_codec = CODEC_PCMA
-  };
+      .ice_servers = {
+          {.urls = "stun:stun.l.google.com:19302"},
+      },
+      .datachannel = DATA_CHANNEL_STRING,
+      .video_codec = CODEC_H264,
+      .audio_codec = CODEC_PCMA};
 
   ServiceConfiguration service_config = SERVICE_CONFIG_DEFAULT();
 
@@ -115,9 +103,7 @@ int main(int argc, char *argv[]) {
   reader_init();
 
   while (!g_interrupted) {
-
     if (g_state == PEER_CONNECTION_COMPLETED) {
-
       curr_time = get_timestamp();
 
       // FPS 25

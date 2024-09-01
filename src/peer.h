@@ -16,5 +16,4 @@ void peer_deinit();
 }
 #endif
 
-#endif // PEER_H_
-
+#endif  // PEER_H_

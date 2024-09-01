@@ -1,14 +1,14 @@
+#include <cjson/cJSON.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <cjson/cJSON.h>
 #include "stun.h"
 
 #include "peer_connection.h"
 #define STUN_ADDR "142.250.21.127"
 #define STUN_PORT 19302
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
 #if 0
   PeerConnection pc;
 
@@ -67,4 +67,3 @@ int main(int argc, char *argv[]) {
   }
 #endif
 }
-

@@ -1,10 +1,9 @@
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 #include "sdp.h"
 
-int sdp_append(Sdp *sdp, const char *format, ...) {
-
+int sdp_append(Sdp* sdp, const char* format, ...) {
   va_list argptr;
 
   char attr[SDP_ATTR_LENGTH];
@@ -22,13 +21,11 @@ int sdp_append(Sdp *sdp, const char *format, ...) {
   return 0;
 }
 
-void sdp_reset(Sdp *sdp) {
-
+void sdp_reset(Sdp* sdp) {
   memset(sdp->content, 0, sizeof(sdp->content));
 }
 
-void sdp_append_h264(Sdp *sdp) {
-
+void sdp_append_h264(Sdp* sdp) {
   sdp_append(sdp, "m=video 9 UDP/TLS/RTP/SAVPF 96 102");
   sdp_append(sdp, "a=rtcp-fb:102 nack");
   sdp_append(sdp, "a=rtcp-fb:102 nack pli");
@@ -43,8 +40,7 @@ void sdp_append_h264(Sdp *sdp) {
   sdp_append(sdp, "a=rtcp-mux");
 }
 
-void sdp_append_pcma(Sdp *sdp) {
-
+void sdp_append_pcma(Sdp* sdp) {
   sdp_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 8");
   sdp_append(sdp, "a=rtpmap:8 PCMA/8000");
   sdp_append(sdp, "a=ssrc:4 cname:webrtc-pcma");
@@ -54,8 +50,7 @@ void sdp_append_pcma(Sdp *sdp) {
   sdp_append(sdp, "a=rtcp-mux");
 }
 
-void sdp_append_pcmu(Sdp *sdp) {
-
+void sdp_append_pcmu(Sdp* sdp) {
   sdp_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 0");
   sdp_append(sdp, "a=rtpmap:0 PCMU/8000");
   sdp_append(sdp, "a=ssrc:5 cname:webrtc-pcmu");
@@ -65,8 +60,7 @@ void sdp_append_pcmu(Sdp *sdp) {
   sdp_append(sdp, "a=rtcp-mux");
 }
 
-void sdp_append_opus(Sdp *sdp) {
-
+void sdp_append_opus(Sdp* sdp) {
   sdp_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 111");
   sdp_append(sdp, "a=rtpmap:111 opus/48000/2");
   sdp_append(sdp, "a=ssrc:6 cname:webrtc-opus");
@@ -76,8 +70,7 @@ void sdp_append_opus(Sdp *sdp) {
   sdp_append(sdp, "a=rtcp-mux");
 }
 
-void sdp_append_datachannel(Sdp *sdp) {
-
+void sdp_append_datachannel(Sdp* sdp) {
   sdp_append(sdp, "m=application 50712 UDP/DTLS/SCTP webrtc-datachannel");
   sdp_append(sdp, "a=mid:datachannel");
   sdp_append(sdp, "a=sctp-port:5000");
@@ -85,8 +78,7 @@ void sdp_append_datachannel(Sdp *sdp) {
   sdp_append(sdp, "a=max-message-size:262144");
 }
 
-void sdp_create(Sdp *sdp, int b_video, int b_audio, int b_datachannel) {
-
+void sdp_create(Sdp* sdp, int b_video, int b_audio, int b_datachannel) {
   char bundle[64];
   sdp_append(sdp, "v=0");
   sdp_append(sdp, "o=- 1495799811084970 1495799811084970 IN IP4 0.0.0.0");
@@ -114,4 +106,3 @@ void sdp_create(Sdp *sdp, int b_video, int b_audio, int b_datachannel) {
 
   sdp_append(sdp, bundle);
 }
-
