@@ -7,6 +7,8 @@
 extern "C" {
 #endif
 
+#ifndef DISABLE_PEER_SIGNALING
+
 typedef struct ServiceConfiguration {
   const char* mqtt_url;
   int mqtt_port;
@@ -45,5 +47,7 @@ int peer_signaling_loop();
 #ifdef __cplusplus
 }
 #endif
+
+#endif  // DISABLE_PEER_SIGNALING
 
 #endif  // PEER_SIGNALING_H_

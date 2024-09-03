@@ -1,3 +1,4 @@
+#ifndef DISABLE_PEER_SIGNALING
 #include <assert.h>
 #include <cJSON.h>
 #include <signal.h>
@@ -526,3 +527,4 @@ void peer_signaling_set_config(ServiceConfiguration* service_config) {
   g_ps.pc = service_config->pc;
   peer_connection_onicecandidate(g_ps.pc, peer_signaling_onicecandidate);
 }
+#endif  // DISABLE_PEER_SIGNALING

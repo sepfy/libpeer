@@ -25,4 +25,7 @@
 // #define LOG_LEVEL LEVEL_DEBUG
 #define LOG_REDIRECT 0
 
+// Disable MQTT and HTTP signaling
+// #define DISABLE_PEER_SIGNALING 1
+
 #endif  // CONFIG_H_

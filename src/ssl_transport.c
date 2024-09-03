@@ -1,3 +1,4 @@
+#ifndef DISABLE_PEER_SIGNALING
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -122,3 +123,4 @@ int ssl_transport_send(NetworkContext_t* net_ctx, const void* buf, size_t len) {
 
   return ret;
 }
+#endif  // DISABLE_PEER_SIGNALING
