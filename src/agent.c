@@ -44,8 +44,9 @@ static int agent_socket_recv(Agent *agent, Address *addr, uint8_t *buf, int len)
   int maxfd = 0;
   fd_set rfds;
   struct timeval tv;
+  // setting timeout to 0 reduces peer_connection_loop() execution time
   tv.tv_sec = 0;
-  tv.tv_usec = AGENT_POLL_TIMEOUT * 1000;
+  tv.tv_usec = 0; //AGENT_POLL_TIMEOUT * 1000;
   FD_ZERO(&rfds);
 
   for (i = 0; i < 2; i++) {

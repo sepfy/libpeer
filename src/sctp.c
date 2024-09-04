@@ -119,8 +119,10 @@ int sctp_outgoing_data(Sctp *sctp, char *buf, size_t len, SctpDataPpid ppid, uin
   if (service==SVC_PARTIALLY_RELIABLE)
   {
     spa.sendv_flags |= SCTP_SEND_PRINFO_VALID;
-    spa.sendv_prinfo.pr_policy = SCTP_PR_SCTP_TTL; //SCTP_PR_SCTP_RTX; 
+    spa.sendv_prinfo.pr_policy = SCTP_PR_SCTP_TTL; 
     spa.sendv_prinfo.pr_value = 10;
+    //spa.sendv_prinfo.pr_policy = SCTP_PR_SCTP_RTX; 
+    //spa.sendv_prinfo.pr_value = 0;
   }
 
   spa.sendv_sndinfo.snd_sid = sid;
@@ -221,7 +223,7 @@ void sctp_parse_data_channel_open(Sctp *sctp, uint16_t sid, char *data, size_t l
 }
 
 
-void print_hex_buffer(uint8_t *buf, int len) {
+static void print_hex_buffer(uint8_t *buf, int len) {
     printf("data (%d): ", len);
     for (int i = 0; i < len; i++) {
         printf("%02X ", buf[i]);
