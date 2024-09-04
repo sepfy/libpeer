@@ -1,69 +1,98 @@
-#include <cjson/cJSON.h>
+#include <pthread.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "stun.h"
+#include <unistd.h>
 
-#include "peer_connection.h"
-#define STUN_ADDR "142.250.21.127"
-#define STUN_PORT 19302
+#include "peer.h"
+
+#define MAX_CONNECTION_ATTEMPTS 25
+
+typedef struct {
+  PeerConnection *offer_peer_connection, *answer_peer_connection;
+} TestUserData;
+
+static void onconnectionstatechange_offerer_peer_connection(PeerConnectionState state, void* user_data) {
+  printf("offer state is changed: %s\n", peer_connection_state_to_string(state));
+}
+
+static void onconnectionstatechange_answerer_peer_connection(PeerConnectionState state, void* user_data) {
+  printf("answerer state is changed: %s\n", peer_connection_state_to_string(state));
+}
+
+static void onicecandidate_offerer_peer_connection(char* description, void* user_data) {
+  TestUserData* test_user_data = (TestUserData*)user_data;
+  peer_connection_set_remote_description(test_user_data->answer_peer_connection, description);
+}
+
+static void onicecandidate_answerer_peer_connection(char* description, void* user_data) {
+  TestUserData* test_user_data = (TestUserData*)user_data;
+  peer_connection_set_remote_description(test_user_data->offer_peer_connection, description);
+}
+
+static void* peer_connection_task(void* user_data) {
+  PeerConnection* peer_connection = (PeerConnection*)user_data;
+
+  while (1) {
+    if (peer_connection_get_state(peer_connection) == PEER_CONNECTION_COMPLETED) {
+      break;
+    }
+
+    peer_connection_loop(peer_connection);
+    usleep(1000);
+  }
+
+  pthread_exit(NULL);
+  return NULL;
+}
 
 int main(int argc, char* argv[]) {
-#if 0
-  PeerConnection pc;
+  pthread_t offer_thread, answer_thread;
 
-  const char *sdp_text;
+  TestUserData test_user_data = {
+      .offer_peer_connection = NULL,
+      .answer_peer_connection = NULL,
+  };
 
-  peer_connection_init(&pc);
+  PeerConfiguration config = {
+      .ice_servers = {
+          {.urls = "stun:stun.l.google.com:19302"},
+      },
+      .datachannel = DATA_CHANNEL_STRING,
+      .video_codec = CODEC_H264,
+      .audio_codec = CODEC_OPUS,
+      .user_data = &test_user_data,
+  };
 
-  cJSON *offer = cJSON_CreateObject();
+  peer_init();
 
-  char remote_description[AGENT_MAX_DESCRIPTION];
-  char local_description[AGENT_MAX_DESCRIPTION];
-  char offer_base64[AGENT_MAX_DESCRIPTION];
-  char answer_base64[AGENT_MAX_DESCRIPTION];
+  test_user_data.offer_peer_connection = peer_connection_create(&config);
+  test_user_data.answer_peer_connection = peer_connection_create(&config);
 
-  memset(remote_description, 0, sizeof(remote_description));
-  memset(local_description, 0, sizeof(local_description));
-  memset(offer_base64, 0, sizeof(offer_base64));
+  peer_connection_oniceconnectionstatechange(test_user_data.offer_peer_connection, onconnectionstatechange_offerer_peer_connection);
+  peer_connection_oniceconnectionstatechange(test_user_data.answer_peer_connection, onconnectionstatechange_answerer_peer_connection);
 
-  peer_connection_create_offer(&pc);
-#if 0
-  printf("sdp: \n%s\n", sdp_text);
+  peer_connection_onicecandidate(test_user_data.offer_peer_connection, onicecandidate_offerer_peer_connection);
+  peer_connection_onicecandidate(test_user_data.answer_peer_connection, onicecandidate_answerer_peer_connection);
 
-  // create offer
-  cJSON_AddStringToObject(offer, "type", "offer");
-  cJSON_AddStringToObject(offer, "sdp", sdp_text);
+  peer_connection_create_offer(test_user_data.offer_peer_connection);
 
-  char *offer_str = cJSON_Print(offer);
+  pthread_create(&offer_thread, NULL, peer_connection_task, test_user_data.offer_peer_connection);
+  pthread_create(&answer_thread, NULL, peer_connection_task, test_user_data.answer_peer_connection);
 
-  printf("Offer: \n%s\n", offer_str);
-
-  base64_encode(offer_str, strlen(offer_str), offer_base64, sizeof(offer_base64));
-
-  printf("Offer base64: \n%s\n", offer_base64);
-
-  free(offer_str);
-  cJSON_Delete(offer);
-
-  printf("Enter base64 answer\n");
-  scanf("%s", answer_base64);
-
-  char answer_str[AGENT_MAX_DESCRIPTION];
-
-  base64_decode(answer_base64, strlen(answer_base64), answer_str, sizeof(answer_str));
-
-  cJSON *answer = cJSON_Parse(answer_str);
-
-  char *answer_sdp = cJSON_GetObjectItem(answer, "sdp")->valuestring;
-
-  printf("Answer SDP: \n%s\n", answer_sdp);
-
-  peer_connection_set_remote_description(&pc, answer_sdp);
-  cJSON_Delete(answer);
-#endif
+  int attempts = 0;
   while (1) {
-    usleep(100*1000);
+    if (peer_connection_get_state(test_user_data.offer_peer_connection) == PEER_CONNECTION_COMPLETED && peer_connection_get_state(test_user_data.answer_peer_connection) == PEER_CONNECTION_COMPLETED) {
+      break;
+    } else if (attempts == MAX_CONNECTION_ATTEMPTS) {
+      break;
+    }
+
+    attempts++;
+    usleep(250000);
   }
-#endif
+
+  peer_connection_destroy(test_user_data.offer_peer_connection);
+  peer_connection_destroy(test_user_data.answer_peer_connection);
+
+  peer_deinit();
+  return attempts == MAX_CONNECTION_ATTEMPTS ? 1 : 0;
 }

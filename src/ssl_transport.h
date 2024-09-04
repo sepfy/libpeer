@@ -1,6 +1,8 @@
 #ifndef SSL_TRANSPORT_H_
 #define SSL_TRANSPORT_H_
 
+#ifndef DISABLE_PEER_SIGNALING
+
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/ssl.h>
@@ -29,4 +31,5 @@ int ssl_transport_recv(NetworkContext_t* net_ctx, void* buf, size_t len);
 
 int ssl_transport_send(NetworkContext_t* net_ctx, const void* buf, size_t len);
 
+#endif  // DISABLE_PEER_SIGNALING
 #endif  // SSL_TRANSPORT_H_
