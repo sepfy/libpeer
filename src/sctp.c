@@ -358,6 +358,12 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
           }
         }
         break;
+      case SCTP_ABORT:
+        sctp->connected = 0;
+        if (sctp->onclose) {
+          sctp->onclose(sctp->userdata);
+        }
+        break;
       default:
         LOGI("Unknown chunk type %d", chunk_common->type);
         length = 0;
