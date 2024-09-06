@@ -81,7 +81,7 @@ int agent_loop(Agent *agent);
 
 int agent_send(Agent *agent, const uint8_t *buf, int len);
 
-int agent_recv(Agent *agent, uint8_t *buf, int len);
+int agent_recv(Agent *agent, uint8_t *buf, int len, int timeout);
 
 void agent_set_remote_description(Agent *agent, char *description);
 

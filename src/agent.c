@@ -359,12 +359,12 @@ void agent_process_stun_response(Agent *agent, StunMessage *stun_msg) {
 }
 
 
-int agent_recv(Agent *agent, uint8_t *buf, int len) {
+int agent_recv(Agent *agent, uint8_t *buf, int len, int timeout) {
 
   int ret = -1;
   StunMessage stun_msg;
   Address addr;
-  if ((ret = agent_socket_recv(agent, &addr, buf, len, 0)) > 0 && stun_probe(buf, len) == 0) {
+  if ((ret = agent_socket_recv(agent, &addr, buf, len, timeout)) > 0 && stun_probe(buf, len) == 0) {
 
     memcpy(stun_msg.buf, buf, ret);
     stun_msg.size = ret;
@@ -464,7 +464,7 @@ int agent_connectivity_check(Agent *agent) {
     agent_socket_send(agent, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
   }
 
-  agent_recv(agent, buf, sizeof(buf));
+  agent_recv(agent, buf, sizeof(buf), 1);
 
   // XXX: FULL ICE
   if (agent->nominated_pair->state == ICE_CANDIDATE_STATE_SUCCEEDED) {
