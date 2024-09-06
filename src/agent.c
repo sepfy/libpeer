@@ -14,7 +14,6 @@
 #include "agent.h"
 #include "ports.h"
 
-#define AGENT_POLL_TIMEOUT 1
 #define AGENT_CONNCHECK_MAX 300
 #define AGENT_CONNCHECK_PERIOD 100
 
@@ -37,16 +36,15 @@ static int agent_create_sockets(Agent *agent) {
   return 0;
 }
 
-static int agent_socket_recv(Agent *agent, Address *addr, uint8_t *buf, int len) {
+static int agent_socket_recv(Agent *agent, Address *addr, uint8_t *buf, int len, int timeout) {
 
   int ret = -1;
   int i = 0;
   int maxfd = 0;
   fd_set rfds;
   struct timeval tv;
-  // setting timeout to 0 reduces peer_connection_loop() execution time
-  tv.tv_sec = 0;
-  tv.tv_usec = 0; //AGENT_POLL_TIMEOUT * 1000;
+  tv.tv_sec = timeout/1000;
+  tv.tv_usec = timeout%1000*1000;
   FD_ZERO(&rfds);
 
   for (i = 0; i < 2; i++) {
@@ -129,12 +127,7 @@ static int agent_create_bind_addr(Agent *agent, Address *serv_addr) {
   }
 
   // blocking 1 second
-  while (retry < 1000) {
-    ret = agent_socket_recv(agent, NULL, recv_msg.buf, sizeof(recv_msg.buf));
-    if (ret > 0) {
-      break;
-    }
-  }
+  ret = agent_socket_recv(agent, NULL, recv_msg.buf, sizeof(recv_msg.buf), 1000);
 
   if (ret <= 0) {
     LOGD("Failed to receive STUN Binding Response.");
@@ -169,12 +162,7 @@ static int agent_create_turn_addr(Agent *agent, Address *serv_addr, const char *
   }
 
   // blocking 1 second
-  while (retry < 1000) {
-    ret = agent_socket_recv(agent, NULL, recv_msg.buf, sizeof(recv_msg.buf));
-    if (ret > 0) {
-      break;
-    }
-  }
+  ret = agent_socket_recv(agent, NULL, recv_msg.buf, sizeof(recv_msg.buf), 1000);
 
   if (ret <= 0) {
     LOGD("Failed to receive STUN Binding Response.");
@@ -204,7 +192,7 @@ static int agent_create_turn_addr(Agent *agent, Address *serv_addr, const char *
   }
 
   memset(&recv_msg, 0, sizeof(recv_msg));
-  ret = agent_socket_recv(agent, NULL, recv_msg.buf, sizeof(recv_msg.buf));
+  ret = agent_socket_recv(agent, NULL, recv_msg.buf, sizeof(recv_msg.buf), 1000);
   if (ret <= 0) {
     LOGD("Failed to receive TURN Binding Response.");
     return ret;
@@ -376,7 +364,7 @@ int agent_recv(Agent *agent, uint8_t *buf, int len) {
   int ret = -1;
   StunMessage stun_msg;
   Address addr;
-  if ((ret = agent_socket_recv(agent, &addr, buf, len)) > 0 && stun_probe(buf, len) == 0) {
+  if ((ret = agent_socket_recv(agent, &addr, buf, len, 0)) > 0 && stun_probe(buf, len) == 0) {
 
     memcpy(stun_msg.buf, buf, ret);
     stun_msg.size = ret;
