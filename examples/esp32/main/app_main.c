@@ -22,7 +22,6 @@
 static const char* TAG = "webrtc";
 
 static TaskHandle_t xPcTaskHandle = NULL;
-static TaskHandle_t xPsTaskHandle = NULL;
 static TaskHandle_t xCameraTaskHandle = NULL;
 static TaskHandle_t xAudioTaskHandle = NULL;
 
@@ -62,16 +61,6 @@ void onopen(void* userdata) {
 }
 
 static void onclose(void* userdata) {
-}
-
-void peer_signaling_task(void* arg) {
-  ESP_LOGI(TAG, "peer_signaling_task started");
-
-  for (;;) {
-    peer_signaling_loop();
-
-    vTaskDelay(pdMS_TO_TICKS(10));
-  }
 }
 
 void peer_connection_task(void* arg) {
@@ -144,19 +133,22 @@ void app_main(void) {
   peer_signaling_join_channel(deviceid, g_pc);
 
 #if defined(CONFIG_ESP32S3_XIAO_SENSE)
-  xTaskCreatePinnedToCore(audio_task, "audio", 8192, NULL, 7, &xAudioTaskHandle, 0);
+  StackType_t* stack_memory = (StackType_t*)heap_caps_malloc(8192 * sizeof(StackType_t), MALLOC_CAP_SPIRAM);
+  StaticTask_t task_buffer;
+  if (stack_memory) {
+    xAudioTaskHandle = xTaskCreateStaticPinnedToCore(audio_task, "audio", 8192, NULL, 7, stack_memory, &task_buffer, 0);
+  }
 #endif
 
   xTaskCreatePinnedToCore(camera_task, "camera", 4096, NULL, 8, &xCameraTaskHandle, 1);
 
   xTaskCreatePinnedToCore(peer_connection_task, "peer_connection", 8192, NULL, 5, &xPcTaskHandle, 1);
 
-  xTaskCreatePinnedToCore(peer_signaling_task, "peer_signaling", 8192, NULL, 6, &xPsTaskHandle, 1);
-
   ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
   ESP_LOGI(TAG, "open https://sepfy.github.io/webrtc?deviceId=%s", deviceid);
 
   while (1) {
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    peer_signaling_loop();
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
