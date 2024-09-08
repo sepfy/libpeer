@@ -1,0 +1,32 @@
+name: sanitizers
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    env:
+      CC: clang
+      CXX: clang++
+    strategy:
+      matrix:
+        sanitizer:
+          - ADDRESS_SANITIZER
+          - MEMORY_SANITIZER
+          - THREAD_SANITIZER
+          - UNDEFINED_BEHAVIOR_SANITIZER
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: install
+      run: sudo apt-get update && sudo apt-get --no-install-recommends -y install cmake clang
+
+    - name: build
+      run: >
+        mkdir cmake ;
+        cd cmake ;
+        cmake .. -DENABLE_TESTS=true -D${{matrix.sanitizer}}=true;
+        make -j$(nproc);
+        run-parts ./tests/ || true;

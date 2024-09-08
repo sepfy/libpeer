@@ -18,6 +18,10 @@ project(peer)
 
 option(ENABLE_TESTS "Enable tests" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+option(ADDRESS_SANITIZER "Build with AddressSanitizer." OFF)
+option(MEMORY_SANITIZER "Build with MemorySanitizer." OFF)
+option(THREAD_SANITIZER "Build with ThreadSanitizer." OFF)
+option(UNDEFINED_BEHAVIOR_SANITIZER "Build with UndefinedBehaviorSanitizer." OFF)
 
 include(ExternalProject)
 
@@ -29,6 +33,29 @@ set(DEP_LIBS "srtp2" "usrsctp" "mbedtls" "mbedcrypto" "mbedx509" "cjson")
 # Extended debug information (symbols, source code, and macro definitions)
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g3")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g3")
+
+function(enableSanitizer SANITIZER)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g -fsanitize=${SANITIZER} -fno-omit-frame-pointer -fno-optimize-sibling-calls" PARENT_SCOPE)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=${SANITIZER}" PARENT_SCOPE)
+endfunction()
+
+if(ADDRESS_SANITIZER)
+  enableSanitizer("address")
+endif()
+
+if(MEMORY_SANITIZER)
+  enableSanitizer("memory")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize-memory-track-origins")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize-memory-track-origins")
+endif()
+
+if(THREAD_SANITIZER)
+  enableSanitizer("thread")
+endif()
+
+if(UNDEFINED_BEHAVIOR_SANITIZER)
+  enableSanitizer("undefined")
+endif()
 
 add_definitions("-Wunused-variable -Werror=sequence-point -Werror=pointer-sign -Werror=return-type -Werror=sizeof-pointer-memaccess -Wincompatible-pointer-types -DHTTP_DO_NOT_USE_CUSTOM_CONFIG -DMQTT_DO_NOT_USE_CUSTOM_CONFIG")
 
