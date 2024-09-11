@@ -557,3 +557,13 @@ char* peer_connection_lookup_sid_label(PeerConnection* pc, uint16_t sid) {
   }
   return NULL;  // Not found
 }
+
+int peer_connection_add_ice_candidate(PeerConnection* pc, char* candidate) {
+  Agent* agent = &pc->agent;
+  if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], candidate, candidate + strlen(candidate)) != 0) {
+    return -1;
+  }
+
+  agent->remote_candidates_count++;
+  return 0;
+}

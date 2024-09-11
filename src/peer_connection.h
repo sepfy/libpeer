@@ -144,6 +144,13 @@ int peer_connection_lookup_sid(PeerConnection* pc, const char* label, uint16_t* 
 
 char* peer_connection_lookup_sid_label(PeerConnection* pc, uint16_t sid);
 
+/**
+ * @brief adds a new remote candidate to the peer connection
+ * @param[in] peer connection
+ * @param[in] ice candidate
+ */
+int peer_connection_add_ice_candidate(PeerConnection* pc, char* ice_candidate);
+
 #ifdef __cplusplus
 }
 #endif
