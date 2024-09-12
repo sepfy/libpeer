@@ -300,16 +300,19 @@ int agent_send(Agent* agent, const uint8_t* buf, int len) {
 }
 
 static void agent_create_binding_response(Agent* agent, StunMessage* msg, Address* addr) {
+  int size = 0;
   char username[584];
-  char mapped_address[8];
+  char mapped_address[32];
+  uint8_t mask[16];
   StunHeader* header;
   stun_msg_create(msg, STUN_CLASS_RESPONSE | STUN_METHOD_BINDING);
   header = (StunHeader*)msg->buf;
   memcpy(header->transaction_id, agent->transaction_id, sizeof(header->transaction_id));
   snprintf(username, sizeof(username), "%s:%s", agent->local_ufrag, agent->remote_ufrag);
-  // TODO: XOR-MAPPED-ADDRESS
-  stun_set_mapped_address(mapped_address, NULL, addr);
-  stun_msg_write_attr(msg, STUN_ATTR_TYPE_MAPPED_ADDRESS, 8, mapped_address);
+  *((uint32_t*)mask) = htonl(MAGIC_COOKIE);
+  memcpy(mask + 4, agent->transaction_id, sizeof(agent->transaction_id));
+  size = stun_set_mapped_address(mapped_address, mask, addr);
+  stun_msg_write_attr(msg, STUN_ATTR_TYPE_XOR_MAPPED_ADDRESS, size, mapped_address);
   stun_msg_write_attr(msg, STUN_ATTR_TYPE_USERNAME, strlen(username), username);
   stun_msg_finish(msg, STUN_CREDENTIAL_SHORT_TERM, agent->local_upwd, strlen(agent->local_upwd));
 }

@@ -1,8 +1,6 @@
-#include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <unistd.h>
 
 #include "stun.h"
@@ -58,19 +56,37 @@ void stun_msg_create(StunMessage* msg, uint16_t type) {
   msg->size = sizeof(StunHeader);
 }
 
-void stun_set_mapped_address(char* value, uint8_t* mask, Address* addr) {
+int stun_set_mapped_address(char* value, uint8_t* mask, Address* addr) {
+  int ret, i;
+  char addr_string[ADDRSTRLEN];
   uint8_t* family = (uint8_t*)(value + 1);
   uint16_t* port = (uint16_t*)(value + 2);
-  uint8_t* ipv4 = (uint8_t*)(value + 4);
+  uint32_t* addr32 = (uint32_t*)(value + 4);
+  uint16_t* addr16 = (uint16_t*)(value + 4);
 
-  *family = 0x01;
-  *port = htons(addr->port);
+  switch (addr->family) {
+    case AF_INET6:
+      *family = STUN_FAMILY_IPV6;
+      for (i = 0; i < 8; i++) {
+        addr16[i] = addr->sin6.sin6_addr.s6_addr16[i] ^ *(uint16_t*)(mask + 2 * i);
+      }
+      ret = 20;
+      break;
+    case AF_INET:
+    default:
+      *family = STUN_FAMILY_IPV4;
+      *addr32 = addr->sin.sin_addr.s_addr ^ *(uint32_t*)mask;
+      ret = 8;
+      break;
+  }
 
-  memcpy(ipv4, &addr->sin.sin_addr, 4);
+  *port = htons(addr->port) ^ *(uint16_t*)mask;
+  addr_to_string(addr, addr_string, sizeof(addr_string));
 
-  // LOGD("XOR Mapped Address Family: 0x%02x", *family);
-  // LOGD("XOR Mapped Address Port: %d", *port);
-  // LOGD("XOR Mapped Address Address: %d.%d.%d.%d", ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
+  LOGD("XOR Mapped Address Family: %d", *family);
+  LOGD("XOR Mapped Address Port: %d (Port XOR: %04x)", addr->port, *port);
+  LOGD("XOR Mapped Address IP: %s (IP XOR: %08x)", addr_string, *addr32);
+  return ret;
 }
 
 void stun_get_mapped_address(char* value, uint8_t* mask, Address* addr) {
@@ -79,22 +95,29 @@ void stun_get_mapped_address(char* value, uint8_t* mask, Address* addr) {
   uint32_t* addr32 = (uint32_t*)&addr->sin.sin_addr;
   uint16_t* addr16 = (uint16_t*)&addr->sin6.sin6_addr;
   uint8_t family = value[1];
-  if (family == 0x02) {
-    addr_set_family(addr, AF_INET6);
-    for (i = 0; i < 8; i++) {
-      addr16[i] = (*(uint16_t*)(value + 4 + 2 * i) ^ *(uint16_t*)(mask + 2 * i));
-    }
-  } else if (family == 0x01) {
-    addr_set_family(addr, AF_INET);
-    *addr32 = (*(uint32_t*)(value + 4) ^ *(uint32_t*)mask);
+  uint16_t port;
+
+  switch (family) {
+    case STUN_FAMILY_IPV6:
+      addr_set_family(addr, AF_INET6);
+      for (i = 0; i < 8; i++) {
+        addr16[i] = (*(uint16_t*)(value + 4 + 2 * i) ^ *(uint16_t*)(mask + 2 * i));
+      }
+      break;
+    case STUN_FAMILY_IPV4:
+    default:
+      addr_set_family(addr, AF_INET);
+      *addr32 = (*(uint32_t*)(value + 4) ^ *(uint32_t*)mask);
+      break;
   }
 
+  port = ntohs(*(uint16_t*)(value + 2) ^ *(uint16_t*)mask);
   addr_to_string(addr, addr_string, sizeof(addr_string));
-  addr_set_port(addr, ntohs(*(uint16_t*)(value + 2) ^ *(uint16_t*)mask));
+  addr_set_port(addr, port);
 
-  LOGD("XOR Mapped Address Family: 0x%02x", addr->family);
-  LOGD("XOR Mapped Address Port: %d", addr->port);
-  LOGD("XOR Mapped Address Address: %s", addr_string);
+  LOGD("XOR Mapped Address Family: %d", family);
+  LOGD("XOR Mapped Address Port: %d (Port XOR: %04x)", addr->port, port);
+  LOGD("XOR Mapped Address IP: %s (IP XOR: %08x)", addr_string, *addr32);
 }
 
 void stun_parse_msg_buf(StunMessage* msg) {
@@ -189,58 +212,6 @@ void stun_parse_msg_buf(StunMessage* msg) {
       default:
         LOGE("Unknown Attribute Type: 0x%04x", ntohs(attr->type));
         break;
-    }
-
-    pos += 4 * ((ntohs(attr->length) + 3) / 4) + sizeof(StunAttribute);
-  }
-}
-
-void stun_parse_binding_response(char* buf, size_t len, Address* addr) {
-  int pos = 0;
-
-  uint8_t mask[16];
-
-  while (pos < len) {
-    StunAttribute* attr = (StunAttribute*)(buf + pos);
-
-    // LOGD("Attribute Type: 0x%04x", ntohs(attr->type));
-    // LOGD("Attribute Length: %d", ntohs(attr->length));
-
-    if (ntohs(attr->type) == STUN_ATTR_TYPE_MAPPED_ADDRESS) {
-      stun_get_mapped_address(attr->value, mask, addr);
-
-    } else if (ntohs(attr->type) == STUN_ATTR_TYPE_XOR_MAPPED_ADDRESS) {
-      *((uint32_t*)mask) = htonl(MAGIC_COOKIE);
-
-      stun_get_mapped_address(attr->value, mask, addr);
-
-    } else if (ntohs(attr->type) == STUN_ATTR_TYPE_USERNAME) {
-      char username[16];
-      memset(username, 0, sizeof(username));
-
-      memcpy(username, attr->value, ntohs(attr->length));
-      LOGD("Username %s", username);
-
-    } else if (ntohs(attr->type) == STUN_ATTR_TYPE_MESSAGE_INTEGRITY) {
-      char message_integrity[20];
-
-      memcpy(message_integrity, attr->value, ntohs(attr->length));
-
-      for (int i = 0; i < 20; i++) {
-        printf("%02x", (uint8_t)message_integrity[i]);
-      }
-
-      printf("\n");
-
-      //     stun_calculate_fingerprint((char*)msg, sizeof(StunHeader) + header_length + 24, (uint32_t*)(msg->buf + header_length + 24 + sizeof(StunAttribute)));
-
-      LOGD("Message Integrity");
-
-    } else if (ntohs(attr->type) == STUN_ATTR_TYPE_FINGERPRINT) {
-      LOGD("Fingerprint");
-
-    } else {
-      LOGD("Unknown Attribute");
     }
 
     pos += 4 * ((ntohs(attr->length) + 3) / 4) + sizeof(StunAttribute);

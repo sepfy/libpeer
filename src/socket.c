@@ -176,13 +176,13 @@ int udp_socket_recvfrom(UdpSocket* udp_socket, Address* addr, uint8_t* buf, int 
     switch (udp_socket->bind_addr.family) {
       case AF_INET6:
         addr->family = AF_INET6;
-        addr->port = htons(addr->sin6.sin6_port);
+        addr->port = htons(sin6.sin6_port);
         memcpy(&addr->sin6, &sin6, sizeof(struct sockaddr_in6));
         break;
       case AF_INET:
       default:
         addr->family = AF_INET;
-        addr->port = htons(addr->sin.sin_port);
+        addr->port = htons(sin.sin_port);
         memcpy(&addr->sin, &sin, sizeof(struct sockaddr_in));
         break;
     }

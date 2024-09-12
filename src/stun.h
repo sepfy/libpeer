@@ -62,6 +62,13 @@ typedef enum StunCredential {
 
 } StunCredential;
 
+typedef enum StunFamily {
+
+  STUN_FAMILY_IPV4 = 0x01,
+  STUN_FAMILY_IPV6 = 0x02,
+
+} StunFamily;
+
 struct StunHeader {
   uint16_t type;
   uint16_t length;
@@ -91,11 +98,9 @@ struct StunMessage {
 
 void stun_msg_create(StunMessage* msg, uint16_t type);
 
-void stun_set_mapped_address(char* value, uint8_t* mask, Address* addr);
+int stun_set_mapped_address(char* value, uint8_t* mask, Address* addr);
 
 void stun_get_mapped_address(char* value, uint8_t* mask, Address* addr);
-
-void stun_parse_binding_response(char* attr_buf, size_t len, Address* addr);
 
 void stun_msg_parse(StunMessage* msg, uint8_t* buf, size_t len);
 
