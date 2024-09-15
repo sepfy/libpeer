@@ -253,40 +253,22 @@ void tcp_socket_close(TcpSocket* tcp_socket) {
 }
 
 int tcp_socket_send(TcpSocket* tcp_socket, const uint8_t* buf, int len) {
-  fd_set write_set;
-  struct timeval tv;
-  int ret = -1;
+  int ret;
 
   if (tcp_socket->fd < 0) {
     LOGE("sendto before socket init");
     return -1;
   }
 
-  FD_ZERO(&write_set);
-  FD_SET(tcp_socket->fd, &write_set);
-
-  tv.tv_sec = 0;
-  tv.tv_usec = 500000;
-
-  if ((ret = select(tcp_socket->fd + 1, NULL, &write_set, NULL, &tv)) < 0) {
-    LOGE("Failed to select: %s", strerror(errno));
+  ret = send(tcp_socket->fd, buf, len, 0);
+  if (ret < 0) {
+    LOGE("Failed to send: %s", strerror(errno));
     return -1;
   }
-
-  if (FD_ISSET(tcp_socket->fd, &write_set)) {
-    ret = send(tcp_socket->fd, buf, len, 0);
-    if (ret < 0) {
-      LOGE("Failed to send: %s", strerror(errno));
-      return -1;
-    }
-  }
-
   return ret;
 }
 
 int tcp_socket_recv(TcpSocket* tcp_socket, uint8_t* buf, int len) {
-  fd_set read_set;
-  struct timeval tv;
   int ret;
 
   if (tcp_socket->fd < 0) {
@@ -294,23 +276,10 @@ int tcp_socket_recv(TcpSocket* tcp_socket, uint8_t* buf, int len) {
     return -1;
   }
 
-  FD_ZERO(&read_set);
-  FD_SET(tcp_socket->fd, &read_set);
-  tv.tv_sec = 0;
-  tv.tv_usec = 500000;
-
-  if ((ret = select(tcp_socket->fd + 1, &read_set, NULL, NULL, &tv)) < 0) {
-    LOGE("Failed to select: %s", strerror(errno));
+  ret = recv(tcp_socket->fd, buf, len, 0);
+  if (ret < 0) {
+    LOGE("Failed to recv: %s", strerror(errno));
     return -1;
   }
-
-  if (FD_ISSET(tcp_socket->fd, &read_set)) {
-    ret = recv(tcp_socket->fd, buf, len, 0);
-    if (ret < 0) {
-      LOGE("Failed to recv: %s", strerror(errno));
-      return -1;
-    }
-  }
-
   return ret;
 }
