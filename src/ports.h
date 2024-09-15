@@ -8,7 +8,7 @@ int ports_resolve_addr(const char* host, Address* addr);
 
 int ports_resolve_mdns_host(const char* host, Address* addr);
 
-int ports_get_host_addr(Address* addr);
+int ports_get_host_addr(Address* addr, const char* iface_prefix);
 
 uint32_t ports_get_epoch_time();
 

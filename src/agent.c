@@ -118,21 +118,28 @@ static int agent_socket_send(Agent* agent, Address* addr, const uint8_t* buf, in
 }
 
 static int agent_create_host_addr(Agent* agent) {
-  UdpSocket* udp_socket;
-
-  udp_socket = &agent->udp_sockets[0];
-  if (ports_get_host_addr(&udp_socket->bind_addr)) {
-    IceCandidate* ice_candidate = agent->local_candidates + agent->local_candidates_count++;
-    ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_HOST, &udp_socket->bind_addr);
-  }
-
+  int i, j;
+  const char* iface_prefx[] = {CONFIG_IFACE_PREFIX};
+  IceCandidate* ice_candidate;
+  int addr_type[] = {AF_INET,
 #if CONFIG_IPV6
-  udp_socket = &agent->udp_sockets[1];
-  if (ports_get_host_addr(&udp_socket->bind_addr)) {
-    IceCandidate* ice_candidate = agent->local_candidates + agent->local_candidates_count++;
-    ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_HOST, &udp_socket->bind_addr);
-  }
+                     AF_INET6,
 #endif
+  };
+
+  for (i = 0; i < sizeof(addr_type) / sizeof(addr_type[0]); i++) {
+    for (j = 0; j < sizeof(iface_prefx) / sizeof(iface_prefx[0]); j++) {
+      ice_candidate = agent->local_candidates + agent->local_candidates_count;
+      // only copy port and family to addr of ice candidate
+      ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_HOST,
+                           &agent->udp_sockets[i].bind_addr);
+      // if resolve host addr, add to local candidate
+      if (ports_get_host_addr(&ice_candidate->addr, iface_prefx[j])) {
+        agent->local_candidates_count++;
+      }
+    }
+  }
+
   return 0;
 }
 
