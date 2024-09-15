@@ -168,6 +168,7 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
   memcpy(&pc->config, config, sizeof(PeerConfiguration));
 
   pc->agent.mode = AGENT_MODE_CONTROLLED;
+  agent_create(&pc->agent);
 
   memset(&pc->sctp, 0, sizeof(pc->sctp));
 
@@ -203,6 +204,7 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
 
 void peer_connection_destroy(PeerConnection* pc) {
   if (pc) {
+    agent_destroy(&pc->agent);
     buffer_free(pc->data_rb);
     buffer_free(pc->audio_rb);
     buffer_free(pc->video_rb);
@@ -259,8 +261,6 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role) {
 
   memset(pc->temp_buf, 0, sizeof(pc->temp_buf));
 
-  agent_deinit(&pc->agent);
-
   dtls_srtp_reset_session(&pc->dtls_srtp);
   dtls_srtp_init(&pc->dtls_srtp, role, pc);
   pc->dtls_srtp.udp_recv = peer_connection_dtls_srtp_recv;
@@ -268,9 +268,12 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role) {
 
   pc->sctp.connected = 0;
 
+  agent_clear_candidates(&pc->agent);
+
+  agent_gather_candidate(&pc->agent, NULL, NULL, NULL);  // host address
   for (int i = 0; i < sizeof(pc->config.ice_servers) / sizeof(pc->config.ice_servers[0]); ++i) {
     if (pc->config.ice_servers[i].urls) {
-      LOGI("ice_servers: %s", pc->config.ice_servers[i].urls);
+      LOGI("ice server: %s", pc->config.ice_servers[i].urls);
       agent_gather_candidate(&pc->agent, pc->config.ice_servers[i].urls, pc->config.ice_servers[i].username, pc->config.ice_servers[i].credential);
     }
   }
