@@ -79,10 +79,16 @@ void ice_candidate_to_description(IceCandidate* candidate, char* description, in
 }
 
 int ice_candidate_from_description(IceCandidate* candidate, char* description, char* end) {
-  char* split_start = description + strlen("a=candidate:");
+  char* split_start = description;
   char* split_end = NULL;
   int index = 0;
   char buf[64];
+
+  if (strncmp("a=", split_start, strlen("a=")) == 0) {
+    split_start += strlen("a=");
+  }
+  split_start += strlen("candidate:");
+
   // a=candidate:448736988 1 udp 2122260223 172.17.0.1 49250 typ host generation 0 network-id 1 network-cost 50
   // a=candidate:udpcandidate 1 udp 120 192.168.1.102 8000 typ host
   while ((split_end = strstr(split_start, " ")) != NULL && split_start < end) {
