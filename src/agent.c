@@ -121,9 +121,9 @@ static int agent_create_host_addr(Agent* agent) {
   int i, j;
   const char* iface_prefx[] = {CONFIG_IFACE_PREFIX};
   IceCandidate* ice_candidate;
-  int addr_type[] = {AF_INET,
+  int addr_type[] = { AF_INET,
 #if CONFIG_IPV6
-                     AF_INET6,
+                      AF_INET6,
 #endif
   };
 
