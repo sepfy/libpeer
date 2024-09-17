@@ -61,21 +61,23 @@ int stun_set_mapped_address(char* value, uint8_t* mask, Address* addr) {
   char addr_string[ADDRSTRLEN];
   uint8_t* family = (uint8_t*)(value + 1);
   uint16_t* port = (uint16_t*)(value + 2);
-  uint32_t* addr32 = (uint32_t*)(value + 4);
-  uint16_t* addr16 = (uint16_t*)(value + 4);
+  uint32_t* val32 = (uint32_t*)(value + 4);
+  uint16_t* val16 = (uint16_t*)(value + 4);
+  uint32_t* addr32 = (uint32_t*)(&addr->sin.sin_addr);
+  uint16_t* addr16 = (uint16_t*)(&addr->sin6.sin6_addr);
 
   switch (addr->family) {
     case AF_INET6:
       *family = STUN_FAMILY_IPV6;
       for (i = 0; i < 8; i++) {
-        addr16[i] = addr->sin6.sin6_addr.s6_addr16[i] ^ *(uint16_t*)(mask + 2 * i);
+        val16[i] = addr16[i] ^ *(uint16_t*)(mask + 2 * i);
       }
       ret = 20;
       break;
     case AF_INET:
     default:
       *family = STUN_FAMILY_IPV4;
-      *addr32 = addr->sin.sin_addr.s_addr ^ *(uint32_t*)mask;
+      *val32 = *addr32 ^ *(uint32_t*)mask;
       ret = 8;
       break;
   }
