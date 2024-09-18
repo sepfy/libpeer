@@ -58,6 +58,11 @@ void agent_destroy(Agent* agent) {
 #endif
 }
 
+void agent_deinit(Agent* agent) {
+  agent_destroy(agent);
+  agent_create(agent);
+}
+
 static int agent_socket_recv(Agent* agent, Address* addr, uint8_t* buf, int len) {
   int ret = -1;
   int i = 0;

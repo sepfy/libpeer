@@ -96,4 +96,6 @@ int agent_create(Agent* agent);
 
 void agent_destroy(Agent* agent);
 
+void agent_deinit(Agent* agent);
+
 #endif  // AGENT_H_

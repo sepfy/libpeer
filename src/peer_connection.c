@@ -261,14 +261,14 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role) {
 
   memset(pc->temp_buf, 0, sizeof(pc->temp_buf));
 
+  agent_deinit(&pc->agent);
+
   dtls_srtp_reset_session(&pc->dtls_srtp);
   dtls_srtp_init(&pc->dtls_srtp, role, pc);
   pc->dtls_srtp.udp_recv = peer_connection_dtls_srtp_recv;
   pc->dtls_srtp.udp_send = peer_connection_dtls_srtp_send;
 
   pc->sctp.connected = 0;
-
-  agent_clear_candidates(&pc->agent);
 
   agent_gather_candidate(&pc->agent, NULL, NULL, NULL);  // host address
   for (int i = 0; i < sizeof(pc->config.ice_servers) / sizeof(pc->config.ice_servers[0]); ++i) {
