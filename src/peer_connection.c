@@ -256,7 +256,7 @@ static char* peer_connection_dtls_role_setup_value(DtlsSrtpRole d) {
   return d == DTLS_SRTP_ROLE_SERVER ? "a=setup:passive" : "a=setup:active";
 }
 
-static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role) {
+static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int isOfferer) {
   char* description = (char*)pc->temp_buf;
 
   memset(pc->temp_buf, 0, sizeof(pc->temp_buf));
@@ -268,7 +268,9 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role) {
 
   pc->sctp.connected = 0;
 
-  agent_clear_candidates(&pc->agent);
+  if (isOfferer) {
+    agent_clear_candidates(&pc->agent);
+  }
 
   agent_gather_candidate(&pc->agent, NULL, NULL, NULL);  // host address
   for (int i = 0; i < sizeof(pc->config.ice_servers) / sizeof(pc->config.ice_servers[0]); ++i) {
@@ -346,7 +348,7 @@ int peer_connection_loop(PeerConnection* pc) {
     case PEER_CONNECTION_NEW:
 
       if (!pc->b_local_description_created) {
-        peer_connection_state_new(pc, DTLS_SRTP_ROLE_SERVER);
+        peer_connection_state_new(pc, DTLS_SRTP_ROLE_SERVER, 1);
       }
       break;
 
@@ -484,7 +486,7 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
   }
 
   if (!pc->b_local_description_created) {
-    peer_connection_state_new(pc, role);
+    peer_connection_state_new(pc, role, 0);
   }
 
   agent_set_remote_description(&pc->agent, (char*)sdp_text);
