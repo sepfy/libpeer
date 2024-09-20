@@ -329,7 +329,9 @@ static void agent_create_binding_request(Agent* agent, StunMessage* msg) {
   snprintf(username, sizeof(username), "%s:%s", agent->remote_ufrag, agent->local_ufrag);
   stun_msg_write_attr(msg, STUN_ATTR_TYPE_USERNAME, strlen(username), username);
   stun_msg_write_attr(msg, STUN_ATTR_TYPE_PRIORITY, 4, (char*)&agent->nominated_pair->priority);
-  stun_msg_write_attr(msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
+  if (agent->mode == AGENT_MODE_CONTROLLING) {
+    stun_msg_write_attr(msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
+  }
   stun_msg_write_attr(msg, STUN_ATTR_TYPE_ICE_CONTROLLED, 8, (char*)&tie_breaker);
   stun_msg_finish(msg, STUN_CREDENTIAL_SHORT_TERM, agent->remote_upwd, strlen(agent->remote_upwd));
 }
