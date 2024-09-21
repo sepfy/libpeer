@@ -456,6 +456,8 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
   char* val_start = NULL;
   uint32_t* ssrc = NULL;
   DtlsSrtpRole role = DTLS_SRTP_ROLE_SERVER;
+  int is_update = 0;
+  Agent* agent = &pc->agent;
 
   while ((line = strstr(start, "\r\n"))) {
     line = strstr(start, "\r\n");
@@ -471,6 +473,12 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
       strncpy(pc->dtls_srtp.remote_fingerprint, buf + 22, DTLS_SRTP_FINGERPRINT_LENGTH);
     }
 
+    if (strstr(buf, "a=ice-ufrag") &&
+        strlen(agent->remote_ufrag) != 0 &&
+        (strncmp(buf + strlen("a=ice-ufrag:"), agent->remote_ufrag, strlen(agent->remote_ufrag)) == 0)) {
+      is_update = 1;
+    }
+
     if (strstr(buf, "a=mid:video")) {
       ssrc = &pc->remote_vssrc;
     } else if (strstr(buf, "a=mid:audio")) {
@@ -483,6 +491,10 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
     }
 
     start = line + 2;
+  }
+
+  if (is_update) {
+    return;
   }
 
   if (!pc->b_local_description_created) {
