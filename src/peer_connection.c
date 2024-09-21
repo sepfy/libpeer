@@ -479,9 +479,9 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
       is_update = 1;
     }
 
-    if (strstr(buf, "a=mid:video")) {
+    if (strstr(buf, "m=video")) {
       ssrc = &pc->remote_vssrc;
-    } else if (strstr(buf, "a=mid:audio")) {
+    } else if (strstr(buf, "m=audio")) {
       ssrc = &pc->remote_assrc;
     }
 
