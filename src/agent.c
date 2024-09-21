@@ -277,8 +277,6 @@ void agent_gather_candidate(Agent* agent, const char* urls, const char* username
 }
 
 void agent_get_local_description(Agent* agent, char* description, int length) {
-  int ncandidates = 0;
-
   memset(description, 0, length);
   memset(agent->local_ufrag, 0, sizeof(agent->local_ufrag));
   memset(agent->local_upwd, 0, sizeof(agent->local_upwd));
@@ -287,7 +285,6 @@ void agent_get_local_description(Agent* agent, char* description, int length) {
   utils_random_string(agent->local_upwd, 24);
 
   snprintf(description, length, "a=ice-ufrag:%s\r\na=ice-pwd:%s\r\n", agent->local_ufrag, agent->local_upwd);
-  ncandidates = agent->local_candidates_count;
 
   for (int i = 0; i < agent->local_candidates_count; i++) {
     ice_candidate_to_description(&agent->local_candidates[i], description + strlen(description), length - strlen(description));
