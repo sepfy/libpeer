@@ -7,6 +7,8 @@ menu "ESP32 Hardware Configuration"
             Select the camera model to use.
         config ESP32_EYE
             bool "ESP32-EYE"
+        config ESP32S3_EYE
+            bool "ESP32S3-EYE"
         config ESP32_M5STACK_CAMERA_B
             bool "M5STACK-CAMERA-B"
         config ESP32S3_XIAO_SENSE
