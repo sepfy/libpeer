@@ -167,7 +167,6 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
 
   memcpy(&pc->config, config, sizeof(PeerConfiguration));
 
-  pc->agent.mode = AGENT_MODE_CONTROLLED;
   agent_create(&pc->agent);
 
   memset(&pc->sctp, 0, sizeof(pc->sctp));
@@ -270,6 +269,9 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int
 
   if (isOfferer) {
     agent_clear_candidates(&pc->agent);
+    pc->agent.mode = AGENT_MODE_CONTROLLING;
+  } else {
+    pc->agent.mode = AGENT_MODE_CONTROLLED;
   }
 
   agent_gather_candidate(&pc->agent, NULL, NULL, NULL);  // host address
@@ -465,7 +467,6 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
     buf[line - start] = '\0';
 
     if (strstr(buf, "a=setup:passive")) {
-      pc->agent.mode = AGENT_MODE_CONTROLLING;
       role = DTLS_SRTP_ROLE_CLIENT;
     }
 
