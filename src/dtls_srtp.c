@@ -251,17 +251,18 @@ static void dtls_srtp_key_derivation(void* context, mbedtls_ssl_key_export_type 
 #endif
 
   // derive inbounds keys
-
-  memset(&dtls_srtp->remote_policy, 0, sizeof(dtls_srtp->remote_policy));
-
-  srtp_crypto_policy_set_rtp_default(&dtls_srtp->remote_policy.rtp);
-  srtp_crypto_policy_set_rtcp_default(&dtls_srtp->remote_policy.rtcp);
-
   memcpy(dtls_srtp->remote_policy_key, key_material, SRTP_MASTER_KEY_LENGTH);
   memcpy(dtls_srtp->remote_policy_key + SRTP_MASTER_KEY_LENGTH, key_material + SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_KEY_LENGTH, SRTP_MASTER_SALT_LENGTH);
 
+  memcpy(dtls_srtp->local_policy_key, key_material + SRTP_MASTER_KEY_LENGTH, SRTP_MASTER_KEY_LENGTH);
+  memcpy(dtls_srtp->local_policy_key + SRTP_MASTER_KEY_LENGTH, key_material + SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_SALT_LENGTH, SRTP_MASTER_SALT_LENGTH);
+
+  memset(&dtls_srtp->remote_policy, 0, sizeof(dtls_srtp->remote_policy));
+  srtp_crypto_policy_set_rtp_default(&dtls_srtp->remote_policy.rtp);
+  srtp_crypto_policy_set_rtcp_default(&dtls_srtp->remote_policy.rtcp);
+
   dtls_srtp->remote_policy.ssrc.type = ssrc_any_inbound;
-  dtls_srtp->remote_policy.key = dtls_srtp->remote_policy_key;
+  dtls_srtp->remote_policy.key = (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) ? dtls_srtp->remote_policy_key : dtls_srtp->local_policy_key;
   dtls_srtp->remote_policy.next = NULL;
 
   if (srtp_create(&dtls_srtp->srtp_in, &dtls_srtp->remote_policy) != srtp_err_status_ok) {
@@ -273,15 +274,11 @@ static void dtls_srtp_key_derivation(void* context, mbedtls_ssl_key_export_type 
 
   // derive outbounds keys
   memset(&dtls_srtp->local_policy, 0, sizeof(dtls_srtp->local_policy));
-
   srtp_crypto_policy_set_rtp_default(&dtls_srtp->local_policy.rtp);
   srtp_crypto_policy_set_rtcp_default(&dtls_srtp->local_policy.rtcp);
 
-  memcpy(dtls_srtp->local_policy_key, key_material + SRTP_MASTER_KEY_LENGTH, SRTP_MASTER_KEY_LENGTH);
-  memcpy(dtls_srtp->local_policy_key + SRTP_MASTER_KEY_LENGTH, key_material + SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_SALT_LENGTH, SRTP_MASTER_SALT_LENGTH);
-
   dtls_srtp->local_policy.ssrc.type = ssrc_any_outbound;
-  dtls_srtp->local_policy.key = dtls_srtp->local_policy_key;
+  dtls_srtp->local_policy.key = (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) ? dtls_srtp->local_policy_key : dtls_srtp->remote_policy_key;
   dtls_srtp->local_policy.next = NULL;
 
   if (srtp_create(&dtls_srtp->srtp_out, &dtls_srtp->local_policy) != srtp_err_status_ok) {
