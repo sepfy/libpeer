@@ -135,7 +135,7 @@ int32_t ssl_transport_send(NetworkContext_t* net_ctx, const void* buf, size_t le
 
   while ((ret = mbedtls_ssl_write(&net_ctx->ssl, buf, len)) <= 0) {
     if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE) {
-      LOGE("");
+      LOGE("ssl write error: -0x%x", (unsigned int)-ret);
     }
   }
 

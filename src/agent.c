@@ -1,12 +1,9 @@
-#include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/select.h>
-#include <sys/socket.h>
 #include <unistd.h>
 
-#include <pthread.h>
 #include "agent.h"
 #include "base64.h"
 #include "ice.h"
@@ -16,7 +13,7 @@
 #include "utils.h"
 
 #define AGENT_POLL_TIMEOUT 1
-#define AGENT_CONNCHECK_MAX 300
+#define AGENT_CONNCHECK_MAX 1000
 #define AGENT_CONNCHECK_PERIOD 100
 #define AGENT_STUN_RECV_MAXTIMES 1000
 
@@ -61,7 +58,7 @@ void agent_destroy(Agent* agent) {
 static int agent_socket_recv(Agent* agent, Address* addr, uint8_t* buf, int len) {
   int ret = -1;
   int i = 0;
-  int maxfd = 0;
+  int maxfd = -1;
   fd_set rfds;
   struct timeval tv;
   tv.tv_sec = 0;
@@ -72,7 +69,7 @@ static int agent_socket_recv(Agent* agent, Address* addr, uint8_t* buf, int len)
     if (agent->udp_sockets[i].fd > maxfd) {
       maxfd = agent->udp_sockets[i].fd;
     }
-    if (agent->udp_sockets[i].fd > 0) {
+    if (agent->udp_sockets[i].fd >= 0) {
       FD_SET(agent->udp_sockets[i].fd, &rfds);
     }
   }

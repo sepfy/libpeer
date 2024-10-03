@@ -1,0 +1,5 @@
+
+```
+FREERTOS_KERNEL_PATH=
+PICO_SDK_PATH=
+```

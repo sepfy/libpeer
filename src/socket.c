@@ -1,13 +1,5 @@
-#include <arpa/inet.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <net/if.h>
-#include <netdb.h>
-#include <netinet/in.h>
 #include <string.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 #include "socket.h"
@@ -70,8 +62,7 @@ int udp_socket_open(UdpSocket* udp_socket, int family, int port) {
 
   do {
     if ((ret = setsockopt(udp_socket->fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse))) < 0) {
-      LOGE("reuse failed");
-      break;
+      LOGW("reuse failed. ignore");
     }
 
     if ((ret = bind(udp_socket->fd, sa, sock_len)) < 0) {

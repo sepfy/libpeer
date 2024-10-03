@@ -172,13 +172,13 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
   memset(&pc->sctp, 0, sizeof(pc->sctp));
 
   if (pc->config.datachannel) {
-    LOGI("Datachannel allocates heap size: %d", DATA_RB_DATA_LENGTH);
-    pc->data_rb = buffer_new(DATA_RB_DATA_LENGTH);
+    LOGI("Datachannel allocates heap size: %d", CONFIG_DATA_BUFFER_SIZE);
+    pc->data_rb = buffer_new(CONFIG_DATA_BUFFER_SIZE);
   }
 
   if (pc->config.audio_codec) {
-    LOGI("Audio allocates heap size: %d", AUDIO_RB_DATA_LENGTH);
-    pc->audio_rb = buffer_new(AUDIO_RB_DATA_LENGTH);
+    LOGI("Audio allocates heap size: %d", CONFIG_AUDIO_BUFFER_SIZE);
+    pc->audio_rb = buffer_new(CONFIG_AUDIO_BUFFER_SIZE);
 
     rtp_encoder_init(&pc->artp_encoder, pc->config.audio_codec,
                      peer_connection_outgoing_rtp_packet, (void*)pc);
@@ -188,8 +188,8 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
   }
 
   if (pc->config.video_codec) {
-    LOGI("Video allocates heap size: %d", VIDEO_RB_DATA_LENGTH);
-    pc->video_rb = buffer_new(VIDEO_RB_DATA_LENGTH);
+    LOGI("Video allocates heap size: %d", CONFIG_VIDEO_BUFFER_SIZE);
+    pc->video_rb = buffer_new(CONFIG_VIDEO_BUFFER_SIZE);
 
     rtp_encoder_init(&pc->vrtp_encoder, pc->config.video_codec,
                      peer_connection_outgoing_rtp_packet, (void*)pc);

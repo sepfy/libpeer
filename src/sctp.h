@@ -6,7 +6,7 @@
 #include "dtls_srtp.h"
 #include "utils.h"
 
-#ifndef HAVE_USRSCTP
+#if !CONFIG_USE_USRSCTP
 
 typedef enum DecpMsgType {
 

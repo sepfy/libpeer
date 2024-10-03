@@ -1,16 +1,22 @@
-#include <arpa/inet.h>
-#include <net/if.h>
-#include <netdb.h>
+#include <errno.h>
 #include <string.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#ifdef ESP32
+#include "config.h"
+
+#if CONFIG_USE_LWIP
+#include "lwip/ip_addr.h"
+#include "lwip/netdb.h"
+#include "lwip/netif.h"
+#include "lwip/sys.h"
+#elif ESP32
 #include <esp_netif.h>
 #else
-#include <errno.h>
 #include <ifaddrs.h>
+#include <net/if.h>
+#include <netdb.h>
 #include <sys/ioctl.h>
 #endif
 
@@ -20,7 +26,17 @@
 int ports_get_host_addr(Address* addr, const char* iface_prefix) {
   int ret = 0;
 
-#ifdef ESP32
+#if CONFIG_USE_LWIP
+  struct netif* netif;
+  ip_addr_t ip_addr;
+
+  for (netif = netif_list; netif != NULL; netif = netif->next) {
+    ip_addr = netif->ip_addr;
+    printf("Interface %s IP Address: %s\n", netif->name, ipaddr_ntoa(&ip_addr));
+    memcpy(&addr->sin.sin_addr, &ip_addr.u_addr.ip4, 4);
+    ret = 1;
+  }
+#elif ESP32
   esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
   esp_netif_ip_info_t ip_info;
   esp_ip6_addr_t ip6_info;
@@ -138,4 +154,12 @@ uint32_t ports_get_epoch_time() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
   return (uint32_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+
+void ports_sleep_ms(int ms) {
+#if CONFIG_USE_LWIP
+  sys_msleep(ms);
+#else
+  usleep(ms * 1000);
+#endif
 }

@@ -1,14 +1,10 @@
-#include <arpa/inet.h>
-#include <netdb.h>
+#include "utils.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/socket.h>
-#include <time.h>
-
-#include <stdint.h>
 #include <string.h>
+#include <time.h>
 #include "mbedtls/md.h"
-#include "utils.h"
 
 void utils_random_string(char* s, const int len) {
   int i;
