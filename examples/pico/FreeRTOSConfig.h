@@ -76,7 +76,6 @@
 
 /* Not currently supported */
 #define configENABLE_MPU 0
-//#define configSYSTEM_CALL_STACK_SIZE            ( configSTACK_DEPTH_TYPE ) 512
 #define configENABLE_FPU 1
 /* Not currently supported */
 #define configENABLE_TRUSTZONE 0
