@@ -1,10 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 
 set(PICO_BOARD pico_w)
-set(WIFI_SSID "myssid")
-set(WIFI_PASSWORD "mypassword")
 
-include(/pico-sdk/pico_sdk_init.cmake)
+include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
 
 project(pico-peer)
 pico_sdk_init()
@@ -112,8 +110,8 @@ add_executable(pico_peer
 )
 
 target_compile_definitions(pico_peer PRIVATE
-  WIFI_SSID=\"${WIFI_SSID}\"
-  WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
+  WIFI_SSID="$ENV{WIFI_SSID}"
+  WIFI_PASSWORD="$ENV{WIFI_PASSWORD}"
   PICO_HEAP_SIZE=0x20000
   #PICO_DEBUG_MALLOC=1
 )

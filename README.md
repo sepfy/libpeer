@@ -41,4 +41,5 @@ $ ./generic/sample/sample
 
 ### Examples for Platforms
 - [ESP32](https://github.com/sepfy/libpeer/tree/main/examples/esp32): MJPEG over datachannel
+- [PICO](https://github.com/sepfy/libpeer/tree/main/examples/pico): Ping pong with datachannel
 - [Raspberry Pi](https://github.com/sepfy/libpeer/tree/main/examples/raspberrypi): Video and two-way audio stream
