@@ -1,7 +1,7 @@
-#include <arpa/inet.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "address.h"
 #include "rtcp.h"
 #include "rtp.h"
 

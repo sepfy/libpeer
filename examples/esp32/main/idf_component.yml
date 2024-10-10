@@ -1,6 +1,8 @@
 ## IDF Component Manager Manifest File
 dependencies:
-  sepfy/libpeer: ">=0.0.2"
+  sepfy/libpeer:
+    path: ../../../
+    version: ">=0.0.2"
   espressif/esp_audio_codec: "^2.0.0"
   espressif/esp32-camera: "^2.0.4"
   protocol_examples_common:

@@ -19,7 +19,7 @@
 #define CONNACK_RECV_TIMEOUT_MS 1000
 
 #ifndef BUF_SIZE
-#define BUF_SIZE 4096
+#define BUF_SIZE 2048
 #endif
 
 #define TOPIC_SIZE 128

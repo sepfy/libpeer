@@ -130,8 +130,6 @@ void app_main(void) {
   peer_signaling_set_config(&service_config);
   peer_signaling_join_channel();
 
-  peer_signaling_join_channel(deviceid, g_pc);
-
 #if defined(CONFIG_ESP32S3_XIAO_SENSE)
   StackType_t* stack_memory = (StackType_t*)heap_caps_malloc(8192 * sizeof(StackType_t), MALLOC_CAP_SPIRAM);
   StaticTask_t task_buffer;

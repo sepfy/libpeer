@@ -29,10 +29,14 @@ static int ssl_transport_mbedtls_recv_timeout(void* ctx, unsigned char* buf, siz
   if (ret < 0) {
     return -1;
   } else if (ret == 0) {
-    return MBEDTLS_ERR_SSL_TIMEOUT;
+    // timeout
+  } else {
+    if (FD_ISSET(((TcpSocket*)ctx)->fd, &read_fds)) {
+      ret = tcp_socket_recv((TcpSocket*)ctx, buf, len);
+    }
   }
 
-  return tcp_socket_recv((TcpSocket*)ctx, buf, len);
+  return ret;
 }
 
 static int ssl_transport_mbedlts_send(void* ctx, const uint8_t* buf, size_t len) {
@@ -135,7 +139,7 @@ int32_t ssl_transport_send(NetworkContext_t* net_ctx, const void* buf, size_t le
 
   while ((ret = mbedtls_ssl_write(&net_ctx->ssl, buf, len)) <= 0) {
     if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE) {
-      LOGE("");
+      LOGE("ssl write error: -0x%x", (unsigned int)-ret);
     }
   }
 

@@ -1,9 +1,14 @@
 #ifndef ADDRESS_H_
 #define ADDRESS_H_
 
-#include <netinet/in.h>
-#include <stdint.h>
+#include "config.h"
+#if CONFIG_USE_LWIP
+#include <lwip/sockets.h>
+#else
+#include <arpa/inet.h>
 #include <sys/socket.h>
+#endif
+#include <stdint.h>
 
 #define ADDRSTRLEN INET6_ADDRSTRLEN
 

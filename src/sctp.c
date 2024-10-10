@@ -1,9 +1,8 @@
-#include <arpa/inet.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "sctp.h"
-#ifdef HAVE_USRSCTP
+#if CONFIG_USE_USRSCTP
 #include <usrsctp.h>
 #endif
 
@@ -104,7 +103,7 @@ static int sctp_outgoing_data_cb(void* userdata, void* buf, size_t len, uint8_t 
 }
 
 int sctp_outgoing_data(Sctp* sctp, char* buf, size_t len, SctpDataPpid ppid, uint16_t sid) {
-#ifdef HAVE_USRSCTP
+#if CONFIG_USE_USRSCTP
   int res;
   struct sctp_sendv_spa spa = {0};
 
@@ -223,7 +222,7 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
   if (!sctp)
     return;
 
-#ifdef HAVE_USRSCTP
+#if CONFIG_USE_USRSCTP
   sctp_handle_sctp_packet(sctp, buf, len);
   usrsctp_conninput(sctp, buf, len, 0);
 #else
@@ -389,7 +388,7 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
 }
 
 static int sctp_handle_incoming_data(Sctp* sctp, char* data, size_t len, uint32_t ppid, uint16_t sid, int flags) {
-#ifdef HAVE_USRSCTP
+#if CONFIG_USE_USRSCTP
   switch (ppid) {
     case DATA_CHANNEL_PPID_CONTROL:
       break;
@@ -412,7 +411,7 @@ static int sctp_handle_incoming_data(Sctp* sctp, char* data, size_t len, uint32_
   return 0;
 }
 
-#ifdef HAVE_USRSCTP
+#if CONFIG_USE_USRSCTP
 
 static void sctp_process_notification(Sctp* sctp, union sctp_notification* notification, size_t len) {
   if (notification->sn_header.sn_length != (uint32_t)len) {
@@ -470,7 +469,7 @@ int sctp_create_socket(Sctp* sctp, DtlsSrtp* dtls_srtp) {
   sctp->local_port = 5000;
   sctp->remote_port = 5000;
   sctp->tsn = 1234;
-#ifdef HAVE_USRSCTP
+#if CONFIG_USE_USRSCTP
   int ret = -1;
   usrsctp_init(0, sctp_outgoing_data_cb, NULL);
   usrsctp_sysctl_set_sctp_ecn_enable(0);
@@ -579,7 +578,7 @@ int sctp_is_connected(Sctp* sctp) {
 }
 
 void sctp_destroy(Sctp* sctp) {
-#ifdef HAVE_USRSCTP
+#if CONFIG_USE_USRSCTP
   if (sctp) {
     if (sctp->sock) {
       usrsctp_shutdown(sctp->sock, SHUT_RDWR);

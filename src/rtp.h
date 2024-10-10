@@ -2,7 +2,11 @@
 #define RTP_H_
 
 #include <stdint.h>
-#ifdef __APPLE__
+
+#ifdef __BYTE_ORDER
+#define __BIG_ENDIAN 4321
+#define __LITTLE_ENDIAN 1234
+#elif __APPLE__
 #include <machine/endian.h>
 #else
 #include <endian.h>
@@ -10,12 +14,6 @@
 
 #include "config.h"
 #include "peer_connection.h"
-
-#ifdef ESP32
-#define __BIG_ENDIAN 4321
-#define __LITTLE_ENDIAN 1234
-#define __BYTE_ORDER __LITTLE_ENDIAN
-#endif
 
 typedef enum RtpPayloadType {
 

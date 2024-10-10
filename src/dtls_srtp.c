@@ -1,4 +1,3 @@
-#include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,7 +6,12 @@
 #include "address.h"
 #include "config.h"
 #include "dtls_srtp.h"
+#if CONFIG_MBEDTLS_DEBUG
+#include "mbedtls/debug.h"
+#endif
+#include "mbedtls/sha256.h"
 #include "mbedtls/ssl.h"
+#include "ports.h"
 #include "socket.h"
 #include "utils.h"
 
@@ -29,7 +33,7 @@ int dtls_srtp_udp_recv(void* ctx, uint8_t* buf, size_t len) {
   int ret;
 
   while ((ret = udp_socket_recvfrom(udp_socket, &udp_socket->bind_addr, buf, len)) <= 0) {
-    usleep(1000);
+    ports_sleep_ms(1);
   }
 
   LOGD("dtls_srtp_udp_recv (%d)", ret);
@@ -68,7 +72,11 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp* dtls_srtp) {
   mbedtls_x509write_cert crt;
 
   unsigned char* cert_buf = NULL;
+#if CONFIG_MBEDTLS_2_X
+  mbedtls_mpi serial;
+#else
   const char* serial = "peer";
+#endif
   const char* pers = "dtls_srtp";
 
   cert_buf = (unsigned char*)malloc(RSA_KEY_LENGTH * 2);
@@ -99,14 +107,23 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp* dtls_srtp) {
 
   mbedtls_x509write_crt_set_issuer_name(&crt, "CN=dtls_srtp");
 
+#if CONFIG_MBEDTLS_2_X
+  mbedtls_mpi_init(&serial);
+  mbedtls_mpi_fill_random(&serial, 16, mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
+  ret = mbedtls_x509write_crt_set_serial(&crt, &serial);
+  if (ret < 0) {
+    LOGE("mbedtls_x509write_crt_set_serial failed -0x%.4x", (unsigned int)-ret);
+  }
+#else
   mbedtls_x509write_crt_set_serial_raw(&crt, (unsigned char*)serial, strlen(serial));
+#endif
 
   mbedtls_x509write_crt_set_validity(&crt, "20180101000000", "20280101000000");
 
   ret = mbedtls_x509write_crt_pem(&crt, cert_buf, 2 * RSA_KEY_LENGTH, mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
 
   if (ret < 0) {
-    LOGE("mbedtls_x509write_crt_pem failed");
+    LOGE("mbedtls_x509write_crt_pem failed -0x%.4x", (unsigned int)-ret);
   }
 
   mbedtls_x509_crt_parse(&dtls_srtp->cert, cert_buf, 2 * RSA_KEY_LENGTH);
@@ -117,6 +134,12 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp* dtls_srtp) {
 
   return ret;
 }
+
+#if CONFIG_MBEDTLS_DEBUG
+static void dtls_srtp_debug(void* ctx, int level, const char* file, int line, const char* str) {
+  LOGD("%s:%04d: %s", file, line, str);
+}
+#endif
 
 int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
   static const mbedtls_ssl_srtp_profile default_profiles[] = {
@@ -139,7 +162,10 @@ int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
   mbedtls_pk_init(&dtls_srtp->pkey);
   mbedtls_entropy_init(&dtls_srtp->entropy);
   mbedtls_ctr_drbg_init(&dtls_srtp->ctr_drbg);
-
+#if CONFIG_MBEDTLS_DEBUG
+  mbedtls_debug_set_threshold(3);
+  mbedtls_ssl_conf_dbg(&dtls_srtp->conf, dtls_srtp_debug, NULL);
+#endif
   dtls_srtp_selfsign_cert(dtls_srtp);
 
   mbedtls_ssl_conf_verify(&dtls_srtp->conf, dtls_srtp_cert_verify, NULL);
@@ -207,25 +233,15 @@ void dtls_srtp_deinit(DtlsSrtp* dtls_srtp) {
   }
 }
 
-static void dtls_srtp_key_derivation(void* context, mbedtls_ssl_key_export_type secret_type, const unsigned char* secret, size_t secret_len, const unsigned char client_random[32], const unsigned char server_random[32], mbedtls_tls_prf_types tls_prf_type) {
-  DtlsSrtp* dtls_srtp = (DtlsSrtp*)context;
-
+static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* master_secret, const unsigned char* randbytes, mbedtls_tls_prf_types tls_prf_type) {
   int ret;
-
   const char* dtls_srtp_label = "EXTRACTOR-dtls_srtp";
-
-  unsigned char randbytes[64];
-
   uint8_t key_material[DTLS_SRTP_KEY_MATERIAL_LENGTH];
-
-  memcpy(randbytes, client_random, 32);
-  memcpy(randbytes + 32, server_random, 32);
-
   // Export keying material
-  if ((ret = mbedtls_ssl_tls_prf(tls_prf_type, secret, secret_len, dtls_srtp_label,
+  if ((ret = mbedtls_ssl_tls_prf(tls_prf_type, master_secret, sizeof(master_secret), dtls_srtp_label,
                                  randbytes, sizeof(randbytes), key_material, sizeof(key_material))) != 0) {
     LOGE("mbedtls_ssl_tls_prf failed(%d)", ret);
-    return;
+    return ret;
   }
 
 #if 0
@@ -266,7 +282,7 @@ static void dtls_srtp_key_derivation(void* context, mbedtls_ssl_key_export_type 
 
   if (srtp_create(&dtls_srtp->srtp_in, &dtls_srtp->remote_policy) != srtp_err_status_ok) {
     LOGD("Error creating inbound SRTP session for component");
-    return;
+    return -1;
   }
 
   LOGI("Created inbound SRTP session");
@@ -286,11 +302,48 @@ static void dtls_srtp_key_derivation(void* context, mbedtls_ssl_key_export_type 
 
   if (srtp_create(&dtls_srtp->srtp_out, &dtls_srtp->local_policy) != srtp_err_status_ok) {
     LOGE("Error creating outbound SRTP session");
-    return;
+    return -1;
   }
 
   LOGI("Created outbound SRTP session");
   dtls_srtp->state = DTLS_SRTP_STATE_CONNECTED;
+  return 0;
+}
+
+#if CONFIG_MBEDTLS_2_X
+static int dtls_srtp_key_derivation_cb(void* context,
+                                       const unsigned char* ms,
+                                       const unsigned char* kb,
+                                       size_t maclen,
+                                       size_t keylen,
+                                       size_t ivlen,
+                                       const unsigned char client_random[32],
+                                       const unsigned char server_random[32],
+                                       mbedtls_tls_prf_types tls_prf_type) {
+#else
+static void dtls_srtp_key_derivation_cb(void* context,
+                                        mbedtls_ssl_key_export_type secret_type,
+                                        const unsigned char* secret,
+                                        size_t secret_len,
+                                        const unsigned char client_random[32],
+                                        const unsigned char server_random[32],
+                                        mbedtls_tls_prf_types tls_prf_type) {
+#endif
+  DtlsSrtp* dtls_srtp = (DtlsSrtp*)context;
+
+  unsigned char master_secret[48];
+  unsigned char randbytes[64];
+
+  memcpy(randbytes, client_random, 32);
+  memcpy(randbytes + 32, server_random, 32);
+
+#if CONFIG_MBEDTLS_2_X
+  memcpy(master_secret, ms, sizeof(master_secret));
+  return dtls_srtp_key_derivation(dtls_srtp, master_secret, randbytes, tls_prf_type);
+#else
+  memcpy(master_secret, secret, sizeof(master_secret));
+  dtls_srtp_key_derivation(dtls_srtp, master_secret, randbytes, tls_prf_type);
+#endif
 }
 
 static int dtls_srtp_do_handshake(DtlsSrtp* dtls_srtp) {
@@ -300,7 +353,11 @@ static int dtls_srtp_do_handshake(DtlsSrtp* dtls_srtp) {
 
   mbedtls_ssl_set_timer_cb(&dtls_srtp->ssl, &timer, mbedtls_timing_set_delay, mbedtls_timing_get_delay);
 
-  mbedtls_ssl_set_export_keys_cb(&dtls_srtp->ssl, dtls_srtp_key_derivation, dtls_srtp);
+#if CONFIG_MBEDTLS_2_X
+  mbedtls_ssl_conf_export_keys_ext_cb(&dtls_srtp->conf, dtls_srtp_key_derivation_cb, dtls_srtp);
+#else
+  mbedtls_ssl_set_export_keys_cb(&dtls_srtp->ssl, dtls_srtp_key_derivation_cb, dtls_srtp);
+#endif
 
   mbedtls_ssl_set_bio(&dtls_srtp->ssl, dtls_srtp, dtls_srtp->udp_send, dtls_srtp->udp_recv, NULL);
 
@@ -424,9 +481,9 @@ int dtls_srtp_probe(uint8_t* buf) {
   if (buf == NULL)
     return 0;
 
-  // LOGD("DTLS content type: %d, version: %d, epoch: %d, sequence: %d, length: %d (%.4x)", header->content_type, header->version, header->epoch, ntohs(header->seqnum_hi), ntohs(header->length), header->length);
-
-  return ((*buf >= 20) && (*buf <= 64));
+  LOGD("DTLS content type: %d", buf[0]);
+  // only handle application data
+  return (buf[0] == 0x17);
 }
 
 void dtls_srtp_decrypt_rtp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
