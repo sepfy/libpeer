@@ -135,9 +135,11 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp* dtls_srtp) {
   return ret;
 }
 
+#if CONFIG_MBEDTLS_DEBUG
 static void dtls_srtp_debug(void* ctx, int level, const char* file, int line, const char* str) {
   LOGD("%s:%04d: %s", file, line, str);
 }
+#endif
 
 int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
   static const mbedtls_ssl_srtp_profile default_profiles[] = {
@@ -339,7 +341,7 @@ static void dtls_srtp_key_derivation_cb(void* context,
   memcpy(master_secret, ms, sizeof(master_secret));
   return dtls_srtp_key_derivation(dtls_srtp, master_secret, randbytes, tls_prf_type);
 #else
-  mencpy(master_secret, secret, sizeof(master_secret));
+  memcpy(master_secret, secret, sizeof(master_secret));
   dtls_srtp_key_derivation(dtls_srtp, master_secret, randbytes, tls_prf_type);
 #endif
 }

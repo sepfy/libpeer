@@ -29,10 +29,14 @@ static int ssl_transport_mbedtls_recv_timeout(void* ctx, unsigned char* buf, siz
   if (ret < 0) {
     return -1;
   } else if (ret == 0) {
-    return MBEDTLS_ERR_SSL_TIMEOUT;
+    // timeout
+  } else {
+    if (FD_ISSET(((TcpSocket*)ctx)->fd, &read_fds)) {
+      ret = tcp_socket_recv((TcpSocket*)ctx, buf, len);
+    }
   }
 
-  return tcp_socket_recv((TcpSocket*)ctx, buf, len);
+  return ret;
 }
 
 static int ssl_transport_mbedlts_send(void* ctx, const uint8_t* buf, size_t len) {

@@ -11,8 +11,6 @@
 #include "lwip/netdb.h"
 #include "lwip/netif.h"
 #include "lwip/sys.h"
-#elif ESP32
-#include <esp_netif.h>
 #else
 #include <ifaddrs.h>
 #include <net/if.h>
@@ -28,36 +26,30 @@ int ports_get_host_addr(Address* addr, const char* iface_prefix) {
 
 #if CONFIG_USE_LWIP
   struct netif* netif;
-  ip_addr_t ip_addr;
-
+  int i;
   for (netif = netif_list; netif != NULL; netif = netif->next) {
-    ip_addr = netif->ip_addr;
-    printf("Interface %s IP Address: %s\n", netif->name, ipaddr_ntoa(&ip_addr));
-    memcpy(&addr->sin.sin_addr, &ip_addr.u_addr.ip4, 4);
-    ret = 1;
-  }
-#elif ESP32
-  esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-  esp_netif_ip_info_t ip_info;
-  esp_ip6_addr_t ip6_info;
+    switch (addr->family) {
+      case AF_INET6:
+        for (i = 0; i < LWIP_IPV6_NUM_ADDRESSES; i++) {
+          if (!ip6_addr_isany(netif_ip6_addr(netif, i))) {
+            memcpy(&addr->sin6.sin6_addr, netif_ip6_addr(netif, i), 16);
+            ret = 1;
+            break;
+          }
+        }
+        break;
+      case AF_INET:
+      default:
+        if (!ip_addr_isany(&netif->ip_addr)) {
+          memcpy(&addr->sin.sin_addr, &netif->ip_addr.u_addr.ip4, 4);
+          ret = 1;
+        }
+        break;
+    }
 
-  switch (addr->family) {
-    case AF_INET6:
-      if (esp_netif_get_ip6_global(netif, &ip6_info) == ESP_OK) {
-        memcpy(&addr->sin6.sin6_addr, &ip6_info.addr, 16);
-        ret = 1;
-      } else if (esp_netif_get_ip6_linklocal(netif, &ip6_info) == ESP_OK) {
-        memcpy(&addr->sin6.sin6_addr, &ip6_info.addr, 16);
-        ret = 1;
-      }
+    if (ret) {
       break;
-    case AF_INET:
-    default:
-      if (esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
-        memcpy(&addr->sin.sin_addr, &ip_info.ip.addr, 4);
-        ret = 1;
-      }
-      break;
+    }
   }
 #else
 
