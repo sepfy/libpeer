@@ -44,10 +44,10 @@ void peer_signaling_leave_channel();
 
 int peer_signaling_loop();
 
+#endif  // DISABLE_PEER_SIGNALING
+
 #ifdef __cplusplus
 }
 #endif
-
-#endif  // DISABLE_PEER_SIGNALING
 
 #endif  // PEER_SIGNALING_H_
