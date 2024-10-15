@@ -85,8 +85,6 @@ int dtls_srtp_write(DtlsSrtp* dtls_srtp, const uint8_t* buf, size_t len);
 
 int dtls_srtp_read(DtlsSrtp* dtls_srtp, uint8_t* buf, size_t len);
 
-void dtls_srtp_encrypt_rtp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes);
-
 void dtls_srtp_sctp_to_dtls(DtlsSrtp* dtls_srtp, uint8_t* packet, int bytes);
 
 int dtls_srtp_probe(uint8_t* buf);

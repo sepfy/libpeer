@@ -233,13 +233,13 @@ void dtls_srtp_deinit(DtlsSrtp* dtls_srtp) {
   }
 }
 
-static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* master_secret, const unsigned char* randbytes, mbedtls_tls_prf_types tls_prf_type) {
+static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* master_secret, size_t secret_len, const unsigned char* randbytes, size_t randbytes_len, mbedtls_tls_prf_types tls_prf_type) {
   int ret;
   const char* dtls_srtp_label = "EXTRACTOR-dtls_srtp";
   uint8_t key_material[DTLS_SRTP_KEY_MATERIAL_LENGTH];
   // Export keying material
-  if ((ret = mbedtls_ssl_tls_prf(tls_prf_type, master_secret, sizeof(master_secret), dtls_srtp_label,
-                                 randbytes, sizeof(randbytes), key_material, sizeof(key_material))) != 0) {
+  if ((ret = mbedtls_ssl_tls_prf(tls_prf_type, master_secret, secret_len, dtls_srtp_label,
+                                 randbytes, randbytes_len, key_material, sizeof(key_material))) != 0) {
     LOGE("mbedtls_ssl_tls_prf failed(%d)", ret);
     return ret;
   }
@@ -339,10 +339,10 @@ static void dtls_srtp_key_derivation_cb(void* context,
 
 #if CONFIG_MBEDTLS_2_X
   memcpy(master_secret, ms, sizeof(master_secret));
-  return dtls_srtp_key_derivation(dtls_srtp, master_secret, randbytes, tls_prf_type);
+  return dtls_srtp_key_derivation(dtls_srtp, master_secret, sizeof(master_secret), randbytes, sizeof(randbytes), tls_prf_type);
 #else
   memcpy(master_secret, secret, sizeof(master_secret));
-  dtls_srtp_key_derivation(dtls_srtp, master_secret, randbytes, tls_prf_type);
+  dtls_srtp_key_derivation(dtls_srtp, master_secret, sizeof(master_secret), randbytes, sizeof(randbytes), tls_prf_type);
 #endif
 }
 
