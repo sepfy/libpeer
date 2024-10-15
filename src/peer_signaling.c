@@ -378,10 +378,9 @@ static int peer_signaling_mqtt_subscribe(int subscribed) {
     return -1;
   }
 
-  status = MQTT_ProcessLoop(&g_ps.mqtt_ctx);
-
+  status = (MQTTStatus_t)peer_signaling_loop();
   if (status != MQTTSuccess) {
-    LOGE("MQTT_ProcessLoop failed: Status=%s.", MQTT_Status_strerror(status));
+    LOGE("peer_signaling_loop failed: Status=%s.", MQTT_Status_strerror(status));
     return -1;
   }
 
@@ -462,10 +461,18 @@ int peer_signaling_join_channel() {
 }
 
 int peer_signaling_loop() {
-  if (g_ps.mqtt_port > 0) {
-    MQTT_ProcessLoop(&g_ps.mqtt_ctx);
+  if (g_ps.mqtt_port <= 0) {
+    return MQTTNoDataAvailable;
   }
-  return 0;
+  MQTTStatus_t status = MQTT_ProcessLoop(&g_ps.mqtt_ctx);
+  if (status == MQTTSuccess) {
+  } else if (status == MQTTRecvFailed || status == MQTTSendFailed || status == MQTTBadResponse || status == MQTTNotConnected) {
+    LOGD("Connection lost or error occurred, status: %d. Reconnecting...", status);
+    peer_signaling_join_channel();
+  } else {
+    LOGE("Encountered error with status: %d.", status);
+  }
+  return status;
 }
 
 void peer_signaling_leave_channel() {

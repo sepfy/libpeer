@@ -169,6 +169,12 @@ int sctp_outgoing_data(Sctp* sctp, char* buf, size_t len, SctpDataPpid ppid, uin
 }
 
 void sctp_add_stream_mapping(Sctp* sctp, const char* label, uint16_t sid) {
+  for (int i = 0; i < sctp->stream_count; i++) {
+    if (strncmp(sctp->stream_table[i].label, label, sizeof(sctp->stream_table[i].label)) == 0) {
+      sctp->stream_table[i].sid = sid;
+      return;
+    }
+  }
   if (sctp->stream_count < SCTP_MAX_STREAMS) {
     strncpy(sctp->stream_table[sctp->stream_count].label, label, sizeof(sctp->stream_table[sctp->stream_count].label));
     sctp->stream_table[sctp->stream_count].sid = sid;
