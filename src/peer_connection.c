@@ -562,7 +562,7 @@ int peer_connection_send_rtcp_pil(PeerConnection* pc, uint32_t ssrc) {
 
   // TODO: encrypt rtcp packet
   // guint size = 12;
-  // dtls_transport_encrypt_rctp_packet(pc->dtls_transport, plibuf, &size);
+  // dtls_srtp_encrypt_rtcp_packet(pc->dtls_transport, plibuf, &size);
   // ret = nice_agent_send(pc->nice_agent, pc->stream_id, pc->component_id, size, (gchar*)plibuf);
 
   return ret;
