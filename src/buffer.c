@@ -27,6 +27,7 @@ void buffer_free(Buffer* rb) {
   if (rb) {
     free(rb->data);
     rb->data = NULL;
+    free(rb);
     rb = NULL;
   }
 }
