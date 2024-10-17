@@ -444,7 +444,6 @@ static void sctp_process_notification(Sctp* sctp, union sctp_notification* notif
     default:
       break;
   }
-  free(notification);  // we need to free the memory that usrsctp allocates
 }
 
 static int sctp_incoming_data_cb(struct socket* sock, union sctp_sockstore addr, void* data, size_t len, struct sctp_rcvinfo recv_info, int flags, void* userdata) {
@@ -460,6 +459,7 @@ static int sctp_incoming_data_cb(struct socket* sock, union sctp_sockstore addr,
   } else {
     sctp_handle_incoming_data(sctp, data, len, ntohl(recv_info.rcv_ppid), recv_info.rcv_sid, flags);
   }
+  free(data);  // we need to free the memory that usrsctp allocates
   return 0;
 }
 #endif
@@ -561,9 +561,7 @@ int sctp_create_socket(Sctp* sctp, DtlsSrtp* dtls_srtp) {
   } while (0);
 
   if (ret < 0) {
-    usrsctp_shutdown(sctp->sock, SHUT_RDWR);
-    usrsctp_close(sctp->sock);
-    sctp->sock = NULL;
+    sctp_destroy_socket(sctp);
     return -1;
   }
 
@@ -573,6 +571,16 @@ int sctp_create_socket(Sctp* sctp, DtlsSrtp* dtls_srtp) {
   return 0;
 }
 
+void sctp_destroy_socket(Sctp* sctp) {
+#if CONFIG_USE_USRSCTP
+  if (sctp && sctp->sock) {
+    usrsctp_shutdown(sctp->sock, SHUT_RDWR);
+    usrsctp_close(sctp->sock);
+    sctp->sock = NULL;
+  }
+#endif
+}
+
 int sctp_is_connected(Sctp* sctp) {
   return sctp->connected;
 }
@@ -580,12 +588,7 @@ int sctp_is_connected(Sctp* sctp) {
 void sctp_destroy(Sctp* sctp) {
 #if CONFIG_USE_USRSCTP
   if (sctp) {
-    if (sctp->sock) {
-      usrsctp_shutdown(sctp->sock, SHUT_RDWR);
-      usrsctp_close(sctp->sock);
-      sctp->sock = NULL;
-    }
-
+    sctp_destroy_socket(sctp);
     free(sctp);
     sctp = NULL;
   }
