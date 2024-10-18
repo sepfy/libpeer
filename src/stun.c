@@ -238,7 +238,8 @@ int stun_msg_write_attr(StunMessage* msg, StunAttrType type, uint16_t length, ch
 
   stun_attr->type = htons(type);
   stun_attr->length = htons(length);
-  memcpy(stun_attr->value, value, length);
+  if (value)
+    memcpy(stun_attr->value, value, length);
 
   length = 4 * ((length + 3) / 4);
   header->length = htons(ntohs(header->length) + sizeof(StunAttribute) + length);

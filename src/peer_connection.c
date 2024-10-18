@@ -208,6 +208,8 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
 
 void peer_connection_destroy(PeerConnection* pc) {
   if (pc) {
+    sctp_destroy_socket(&pc->sctp);
+    dtls_srtp_deinit(&pc->dtls_srtp);
     agent_destroy(&pc->agent);
     buffer_free(pc->data_rb);
     buffer_free(pc->audio_rb);
