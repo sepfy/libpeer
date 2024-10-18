@@ -12,6 +12,15 @@
 extern "C" {
 #endif
 
+typedef enum PeerLoopTaskType {
+
+  PEER_COMMON_TASK = 0,
+  PEER_DATASEND_TASK,
+  PEER_AUDIOSEND_TASK,
+  PEER_VIDEOSEND_TASK,
+
+} PeerLoopTaskType;
+
 typedef enum PeerConnectionState {
 
   PEER_CONNECTION_CLOSED = 0,
@@ -84,6 +93,11 @@ void peer_connection_destroy(PeerConnection* pc);
 void peer_connection_close(PeerConnection* pc);
 
 int peer_connection_loop(PeerConnection* pc);
+
+int peer_connection_sender_loop(PeerLoopTaskType peerLoopTaskType, PeerConnection* pc);
+
+int peer_connection_common_loop(PeerConnection* pc);
+
 /**
  * @brief send message to data channel
  * @param[in] peer connection
