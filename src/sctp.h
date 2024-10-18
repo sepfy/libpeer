@@ -155,10 +155,6 @@ typedef struct Sctp {
   uint8_t buf[CONFIG_MTU];
 } Sctp;
 
-Sctp* sctp_create(DtlsSrtp* dtls_srtp);
-
-void sctp_destroy(Sctp* sctp);
-
 int sctp_create_socket(Sctp* sctp, DtlsSrtp* dtls_srtp);
 
 void sctp_destroy_socket(Sctp* sctp);

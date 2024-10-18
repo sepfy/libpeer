@@ -585,16 +585,6 @@ int sctp_is_connected(Sctp* sctp) {
   return sctp->connected;
 }
 
-void sctp_destroy(Sctp* sctp) {
-#if CONFIG_USE_USRSCTP
-  if (sctp) {
-    sctp_destroy_socket(sctp);
-    free(sctp);
-    sctp = NULL;
-  }
-#endif
-}
-
 void sctp_onmessage(Sctp* sctp, void (*onmessage)(char* msg, size_t len, void* userdata, uint16_t sid)) {
   sctp->onmessage = onmessage;
 }
