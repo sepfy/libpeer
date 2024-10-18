@@ -9,6 +9,7 @@ pico_sdk_init()
 
 include(FreeRTOS_Kernel_import.cmake)
 
+
 include(${CMAKE_CURRENT_LIST_DIR}/../../third_party/coreHTTP/httpFilePaths.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../../third_party/coreMQTT/mqttFilePaths.cmake)
 include_directories(
@@ -93,7 +94,9 @@ target_compile_definitions(peer PRIVATE
   CONFIG_USE_LWIP=1
   CONFIG_USE_USRSCTP=0
   CONFIG_MBEDTLS_2_X=1
-  CONFIG_DATA_BUFFER_SIZE=4096
+  CONFIG_DATA_BUFFER_SIZE=512
+  CONFIG_AUDIO_BUFFER_SIZE=2048
+  CONFIG_SDP_BUFFER_SIZE=4096
   HTTP_DO_NOT_USE_CUSTOM_CONFIG
   MQTT_DO_NOT_USE_CUSTOM_CONFIG
 )

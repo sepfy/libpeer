@@ -2,8 +2,8 @@
 #define SDP_H_
 
 #include <string.h>
+#include "config.h"
 
-#define SDP_CONTENT_LENGTH 10240
 #define SDP_ATTR_LENGTH 128
 
 #ifndef ICE_LITE
@@ -11,7 +11,7 @@
 #endif
 
 typedef struct Sdp {
-  char content[SDP_CONTENT_LENGTH];
+  char content[CONFIG_SDP_BUFFER_SIZE];
 
 } Sdp;
 

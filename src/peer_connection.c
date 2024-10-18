@@ -232,7 +232,7 @@ int peer_connection_send_audio(PeerConnection* pc, const uint8_t* buf, size_t le
 #if (CONFIG_AUDIO_BUFFER_SIZE) > 0
   return buffer_push_tail(pc->audio_rb, buf, len);
 #else
-  return rtp_encoder_encode(&pc->artp_encoder, data, bytes);
+  return rtp_encoder_encode(&pc->artp_encoder, buf, len);
 #endif
 }
 

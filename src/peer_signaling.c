@@ -18,12 +18,7 @@
 #define KEEP_ALIVE_TIMEOUT_SECONDS 60
 #define CONNACK_RECV_TIMEOUT_MS 1000
 
-#ifndef BUF_SIZE
-#define BUF_SIZE 2048
-#endif
-
 #define TOPIC_SIZE 128
-
 #define HOST_LEN 64
 #define CRED_LEN 128
 
@@ -47,8 +42,8 @@ typedef struct PeerSignaling {
   TransportInterface_t transport;
   NetworkContext_t net_ctx;
 
-  uint8_t mqtt_buf[BUF_SIZE];
-  uint8_t http_buf[BUF_SIZE];
+  uint8_t mqtt_buf[CONFIG_MQTT_BUFFER_SIZE];
+  uint8_t http_buf[CONFIG_HTTP_BUFFER_SIZE];
 
   char subtopic[TOPIC_SIZE];
   char pubtopic[TOPIC_SIZE];
