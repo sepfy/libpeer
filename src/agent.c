@@ -415,7 +415,14 @@ void agent_set_remote_description(Agent* agent, char* description) {
 
     } else if (strncmp(line_start, "a=candidate:", strlen("a=candidate:")) == 0) {
       if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], line_start, line_end) == 0) {
-        agent->remote_candidates_count++;
+        for (i = 0; i < agent->remote_candidates_count; i++) {
+          if (strcmp(agent->remote_candidates[i].foundation, agent->remote_candidates[agent->remote_candidates_count].foundation) == 0) {
+            break;
+          }
+        }
+        if (i == agent->remote_candidates_count) {
+          agent->remote_candidates_count++;
+        }
       }
     }
 
