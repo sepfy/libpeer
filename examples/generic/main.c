@@ -24,7 +24,7 @@ static void onclose(void* user_data) {
 }
 
 static void onmessage(char* msg, size_t len, void* user_data, uint16_t sid) {
-  printf("on message: %d %s", sid, msg);
+  printf("on message: %d %.*s", sid, (int)len, msg);
 
   if (strncmp(msg, "ping", 4) == 0) {
     printf(", send pong\n");
