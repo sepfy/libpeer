@@ -186,18 +186,18 @@ int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
                                 MBEDTLS_SSL_TRANSPORT_DATAGRAM,
                                 MBEDTLS_SSL_PRESET_DEFAULT);
 
-    mbedtls_ssl_cookie_init(&dtls_srtp->cookie_ctx);
-
-    mbedtls_ssl_cookie_setup(&dtls_srtp->cookie_ctx, mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
-
-    mbedtls_ssl_conf_dtls_cookies(&dtls_srtp->conf, mbedtls_ssl_cookie_write, mbedtls_ssl_cookie_check, &dtls_srtp->cookie_ctx);
-
   } else {
     mbedtls_ssl_config_defaults(&dtls_srtp->conf,
                                 MBEDTLS_SSL_IS_CLIENT,
                                 MBEDTLS_SSL_TRANSPORT_DATAGRAM,
                                 MBEDTLS_SSL_PRESET_DEFAULT);
   }
+
+  mbedtls_ssl_cookie_init(&dtls_srtp->cookie_ctx);
+
+  mbedtls_ssl_cookie_setup(&dtls_srtp->cookie_ctx, mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
+
+  mbedtls_ssl_conf_dtls_cookies(&dtls_srtp->conf, mbedtls_ssl_cookie_write, mbedtls_ssl_cookie_check, &dtls_srtp->cookie_ctx);
 
   dtls_srtp_x509_digest(&dtls_srtp->cert, dtls_srtp->local_fingerprint);
 
@@ -223,9 +223,7 @@ void dtls_srtp_deinit(DtlsSrtp* dtls_srtp) {
   mbedtls_entropy_free(&dtls_srtp->entropy);
   mbedtls_ctr_drbg_free(&dtls_srtp->ctr_drbg);
 
-  if (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) {
-    mbedtls_ssl_cookie_free(&dtls_srtp->cookie_ctx);
-  }
+  mbedtls_ssl_cookie_free(&dtls_srtp->cookie_ctx);
 
   if (dtls_srtp->state == DTLS_SRTP_STATE_CONNECTED) {
     srtp_dealloc(dtls_srtp->srtp_in);
@@ -267,40 +265,35 @@ static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* ma
 #endif
 
   // derive inbounds keys
+  memset(&dtls_srtp->srtp_in_policy, 0, sizeof(dtls_srtp->srtp_in_policy));
+  // derive outbounds keys
+  memset(&dtls_srtp->srtp_out_policy, 0, sizeof(dtls_srtp->srtp_out_policy));
 
-  memset(&dtls_srtp->remote_policy, 0, sizeof(dtls_srtp->remote_policy));
+  memcpy(dtls_srtp->client_policy_key, key_material, SRTP_MASTER_KEY_LENGTH);
+  memcpy(dtls_srtp->client_policy_key + SRTP_MASTER_KEY_LENGTH, key_material + SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_KEY_LENGTH, SRTP_MASTER_SALT_LENGTH);
+  memcpy(dtls_srtp->server_policy_key, key_material + SRTP_MASTER_KEY_LENGTH, SRTP_MASTER_KEY_LENGTH);
+  memcpy(dtls_srtp->server_policy_key + SRTP_MASTER_KEY_LENGTH, key_material + SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_SALT_LENGTH, SRTP_MASTER_SALT_LENGTH);
 
-  srtp_crypto_policy_set_rtp_default(&dtls_srtp->remote_policy.rtp);
-  srtp_crypto_policy_set_rtcp_default(&dtls_srtp->remote_policy.rtcp);
+  srtp_crypto_policy_set_rtp_default(&dtls_srtp->srtp_in_policy.rtp);
+  srtp_crypto_policy_set_rtcp_default(&dtls_srtp->srtp_in_policy.rtcp);
+  dtls_srtp->srtp_in_policy.ssrc.type = ssrc_any_inbound;
+  dtls_srtp->srtp_in_policy.key = (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) ? dtls_srtp->client_policy_key : dtls_srtp->server_policy_key;
+  dtls_srtp->srtp_in_policy.next = NULL;
 
-  memcpy(dtls_srtp->remote_policy_key, key_material, SRTP_MASTER_KEY_LENGTH);
-  memcpy(dtls_srtp->remote_policy_key + SRTP_MASTER_KEY_LENGTH, key_material + SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_KEY_LENGTH, SRTP_MASTER_SALT_LENGTH);
-
-  dtls_srtp->remote_policy.ssrc.type = ssrc_any_inbound;
-  dtls_srtp->remote_policy.key = dtls_srtp->remote_policy_key;
-  dtls_srtp->remote_policy.next = NULL;
-
-  if (srtp_create(&dtls_srtp->srtp_in, &dtls_srtp->remote_policy) != srtp_err_status_ok) {
+  if (srtp_create(&dtls_srtp->srtp_in, &dtls_srtp->srtp_in_policy) != srtp_err_status_ok) {
     LOGD("Error creating inbound SRTP session for component");
     return -1;
   }
 
   LOGI("Created inbound SRTP session");
 
-  // derive outbounds keys
-  memset(&dtls_srtp->local_policy, 0, sizeof(dtls_srtp->local_policy));
+  srtp_crypto_policy_set_rtp_default(&dtls_srtp->srtp_out_policy.rtp);
+  srtp_crypto_policy_set_rtcp_default(&dtls_srtp->srtp_out_policy.rtcp);
+  dtls_srtp->srtp_out_policy.ssrc.type = ssrc_any_outbound;
+  dtls_srtp->srtp_out_policy.key = (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) ? dtls_srtp->server_policy_key : dtls_srtp->client_policy_key;
+  dtls_srtp->srtp_out_policy.next = NULL;
 
-  srtp_crypto_policy_set_rtp_default(&dtls_srtp->local_policy.rtp);
-  srtp_crypto_policy_set_rtcp_default(&dtls_srtp->local_policy.rtcp);
-
-  memcpy(dtls_srtp->local_policy_key, key_material + SRTP_MASTER_KEY_LENGTH, SRTP_MASTER_KEY_LENGTH);
-  memcpy(dtls_srtp->local_policy_key + SRTP_MASTER_KEY_LENGTH, key_material + SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_SALT_LENGTH, SRTP_MASTER_SALT_LENGTH);
-
-  dtls_srtp->local_policy.ssrc.type = ssrc_any_outbound;
-  dtls_srtp->local_policy.key = dtls_srtp->local_policy_key;
-  dtls_srtp->local_policy.next = NULL;
-
-  if (srtp_create(&dtls_srtp->srtp_out, &dtls_srtp->local_policy) != srtp_err_status_ok) {
+  if (srtp_create(&dtls_srtp->srtp_out, &dtls_srtp->srtp_out_policy) != srtp_err_status_ok) {
     LOGE("Error creating outbound SRTP session");
     return -1;
   }

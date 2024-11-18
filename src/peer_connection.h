@@ -79,6 +79,8 @@ void* peer_connection_get_sctp(PeerConnection* pc);
 
 PeerConnection* peer_connection_create(PeerConfiguration* config);
 
+PeerConnection* peer_connection_create_ex(int is_offerer, PeerConfiguration* config);
+
 void peer_connection_destroy(PeerConnection* pc);
 
 void peer_connection_close(PeerConnection* pc);

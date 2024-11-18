@@ -321,7 +321,7 @@ static void agent_create_binding_response(Agent* agent, StunMessage* msg, Addres
 }
 
 static void agent_create_binding_request(Agent* agent, StunMessage* msg) {
-  uint64_t tie_breaker = 0;  // always be controlled
+  uint64_t tie_breaker = 1;  // always be controlled
   // send binding request
   stun_msg_create(msg, STUN_CLASS_REQUEST | STUN_METHOD_BINDING);
   char username[584];

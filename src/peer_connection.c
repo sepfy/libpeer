@@ -38,6 +38,7 @@ struct PeerConnection {
   uint8_t temp_buf[CONFIG_MTU];
   uint8_t agent_buf[CONFIG_MTU];
   int agent_ret;
+  int is_offerer;
   int b_local_description_created;
 
   Buffer* audio_rb;
@@ -165,6 +166,7 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
     return NULL;
   }
 
+  pc->is_offerer = 1;
   memcpy(&pc->config, config, sizeof(PeerConfiguration));
 
   agent_create(&pc->agent);
@@ -203,6 +205,14 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
                      pc->config.onvideotrack, pc->config.user_data);
   }
 
+  return pc;
+}
+
+PeerConnection* peer_connection_create_ex(int is_offerer, PeerConfiguration* config) {
+  PeerConnection* pc = peer_connection_create(config);
+  if (pc != NULL) {
+    pc->is_offerer = is_offerer;
+  }
   return pc;
 }
 
@@ -268,14 +278,20 @@ int peer_connection_datachannel_send_sid(PeerConnection* pc, char* message, size
 #endif
 }
 
-static char* peer_connection_dtls_role_setup_value(DtlsSrtpRole d) {
-  return d == DTLS_SRTP_ROLE_SERVER ? "a=setup:passive" : "a=setup:active";
+static char* peer_connection_dtls_role_setup_value(int is_offerer) {
+  return is_offerer == 0 ? "a=setup:passive" : "a=setup:active";
 }
 
-static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int isOfferer) {
-  char* description = (char*)pc->temp_buf;
-
-  memset(pc->temp_buf, 0, sizeof(pc->temp_buf));
+static void peer_connection_state_new(PeerConnection* pc, int is_offerer) {
+  DtlsSrtpRole role = DTLS_SRTP_ROLE_CLIENT;
+  if (is_offerer) {
+    role = DTLS_SRTP_ROLE_CLIENT;
+    agent_clear_candidates(&pc->agent);
+    pc->agent.mode = AGENT_MODE_CONTROLLING;
+  } else {
+    role = DTLS_SRTP_ROLE_SERVER;
+    pc->agent.mode = AGENT_MODE_CONTROLLED;
+  }
 
   dtls_srtp_reset_session(&pc->dtls_srtp);
   dtls_srtp_init(&pc->dtls_srtp, role, pc);
@@ -283,13 +299,6 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int
   pc->dtls_srtp.udp_send = peer_connection_dtls_srtp_send;
 
   pc->sctp.connected = 0;
-
-  if (isOfferer) {
-    agent_clear_candidates(&pc->agent);
-    pc->agent.mode = AGENT_MODE_CONTROLLING;
-  } else {
-    pc->agent.mode = AGENT_MODE_CONTROLLED;
-  }
 
   agent_gather_candidate(&pc->agent, NULL, NULL, NULL);  // host address
   for (int i = 0; i < sizeof(pc->config.ice_servers) / sizeof(pc->config.ice_servers[0]); ++i) {
@@ -299,6 +308,8 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int
     }
   }
 
+  char* description = (char*)pc->temp_buf;
+  memset(pc->temp_buf, 0, sizeof(pc->temp_buf));
   agent_get_local_description(&pc->agent, description, sizeof(pc->temp_buf));
 
   memset(&pc->local_sdp, 0, sizeof(pc->local_sdp));
@@ -311,7 +322,7 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int
   if (pc->config.video_codec == CODEC_H264) {
     sdp_append_h264(&pc->local_sdp);
     sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-    sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
+    sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(is_offerer));
     strcat(pc->local_sdp.content, description);
   }
 
@@ -320,7 +331,7 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int
 
       sdp_append_pcma(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-      sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
+      sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(is_offerer));
       strcat(pc->local_sdp.content, description);
       break;
 
@@ -328,14 +339,14 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int
 
       sdp_append_pcmu(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-      sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
+      sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(is_offerer));
       strcat(pc->local_sdp.content, description);
       break;
 
     case CODEC_OPUS:
       sdp_append_opus(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-      sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
+      sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(is_offerer));
       strcat(pc->local_sdp.content, description);
 
     default:
@@ -345,7 +356,7 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int
   if (pc->config.datachannel) {
     sdp_append_datachannel(&pc->local_sdp);
     sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-    sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
+    sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(is_offerer));
     strcat(pc->local_sdp.content, description);
   }
 
@@ -367,7 +378,7 @@ int peer_connection_loop(PeerConnection* pc) {
     case PEER_CONNECTION_NEW:
 
       if (!pc->b_local_description_created) {
-        peer_connection_state_new(pc, DTLS_SRTP_ROLE_SERVER, 1);
+        peer_connection_state_new(pc, pc->is_offerer);
       }
       break;
 
@@ -480,7 +491,7 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
   char buf[256];
   char* val_start = NULL;
   uint32_t* ssrc = NULL;
-  DtlsSrtpRole role = DTLS_SRTP_ROLE_SERVER;
+  DtlsSrtpRole role = DTLS_SRTP_ROLE_CLIENT;
   int is_update = 0;
   Agent* agent = &pc->agent;
 
@@ -490,7 +501,7 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
     buf[line - start] = '\0';
 
     if (strstr(buf, "a=setup:passive")) {
-      role = DTLS_SRTP_ROLE_CLIENT;
+      role = DTLS_SRTP_ROLE_SERVER;
     }
 
     if (strstr(buf, "a=fingerprint")) {
@@ -522,7 +533,7 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
   }
 
   if (!pc->b_local_description_created) {
-    peer_connection_state_new(pc, role, 0);
+    peer_connection_state_new(pc, role == DTLS_SRTP_ROLE_CLIENT ? 0 : 1);
   }
 
   agent_set_remote_description(&pc->agent, (char*)sdp_text);

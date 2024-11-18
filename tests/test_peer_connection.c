@@ -64,8 +64,8 @@ int main(int argc, char* argv[]) {
 
   peer_init();
 
-  test_user_data.offer_peer_connection = peer_connection_create(&config);
-  test_user_data.answer_peer_connection = peer_connection_create(&config);
+  test_user_data.offer_peer_connection = peer_connection_create_ex(1, &config);
+  test_user_data.answer_peer_connection = peer_connection_create_ex(0, &config);
 
   peer_connection_oniceconnectionstatechange(test_user_data.offer_peer_connection, onconnectionstatechange_offerer_peer_connection);
   peer_connection_oniceconnectionstatechange(test_user_data.answer_peer_connection, onconnectionstatechange_answerer_peer_connection);

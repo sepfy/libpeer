@@ -48,12 +48,12 @@ typedef struct DtlsSrtp {
   mbedtls_ctr_drbg_context ctr_drbg;
 
   // SRTP
-  srtp_policy_t remote_policy;
-  srtp_policy_t local_policy;
+  srtp_policy_t srtp_in_policy;
+  srtp_policy_t srtp_out_policy;
   srtp_t srtp_in;
   srtp_t srtp_out;
-  unsigned char remote_policy_key[SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_SALT_LENGTH];
-  unsigned char local_policy_key[SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_SALT_LENGTH];
+  unsigned char client_policy_key[SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_SALT_LENGTH];
+  unsigned char server_policy_key[SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_SALT_LENGTH];
 
   int (*udp_send)(void* ctx, const unsigned char* buf, size_t len);
   int (*udp_recv)(void* ctx, unsigned char* buf, size_t len);
