@@ -108,6 +108,8 @@ target_link_libraries(peer
   cjson
 )
 
+pico_generate_pio_header(pico_peer ${CMAKE_CURRENT_LIST_DIR}/rp2040_i2s_example/i2s.pio)
+
 # Build pico_peer
 add_executable(pico_peer
   main.c

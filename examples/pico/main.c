@@ -14,8 +14,8 @@
 #include "hardware/dma.h"
 
 #include "pcm-g711/pcm-g711/g711.h"
-#include "rp2040_i2s_example/i2s.h"
 #include "peer.h"
+#include "rp2040_i2s_example/i2s.h"
 
 static __attribute__((aligned(8))) pio_i2s i2s;
 
@@ -52,7 +52,6 @@ uint32_t get_epoch_time() {
 }
 #endif
 static void dma_i2s_in_handler(void) {
-
   int8_t alaw[AUDIO_BUFFER_FRAMES];
   int16_t pcm[AUDIO_BUFFER_FRAMES];
   int32_t* input_buffer;
@@ -62,20 +61,20 @@ static void dma_i2s_in_handler(void) {
     input_buffer = i2s.input_buffer + STEREO_BUFFER_SIZE;
   }
   for (int i = 0; i < AUDIO_BUFFER_FRAMES; i++) {
-    pcm[i] = (int16_t)(input_buffer[2*i+1] >> 16);
+    pcm[i] = (int16_t)(input_buffer[2 * i + 1] >> 16);
     alaw[i] = ALaw_Encode(pcm[i]);
   }
 
 #if 1
-static uint32_t total_bytes = 0;
-static uint32_t last_time = 0;
-total_bytes += AUDIO_BUFFER_FRAMES;
-uint32_t current_time = get_epoch_time();
-if (current_time - last_time > 1000) {
-printf("AUDIO_BUFFER_FRAMES: %d, bps: %d\n", AUDIO_BUFFER_FRAMES, 1000*total_bytes * 8 / (current_time - last_time));
-total_bytes = 0;
-last_time = current_time;
-}
+  static uint32_t total_bytes = 0;
+  static uint32_t last_time = 0;
+  total_bytes += AUDIO_BUFFER_FRAMES;
+  uint32_t current_time = get_epoch_time();
+  if (current_time - last_time > 1000) {
+    printf("AUDIO_BUFFER_FRAMES: %d, bps: %d\n", AUDIO_BUFFER_FRAMES, 1000 * total_bytes * 8 / (current_time - last_time));
+    total_bytes = 0;
+    last_time = current_time;
+  }
 #endif
 
   if (eState == PEER_CONNECTION_COMPLETED) {
@@ -94,7 +93,6 @@ void peer_connection_task() {
 }
 
 void main_task(__unused void* params) {
-
   if (cyw43_arch_init()) {
     printf("failed to initialise\n");
     vTaskDelete(NULL);
@@ -152,9 +150,8 @@ void vLaunch(void) {
 }
 
 int main(void) {
-
   stdio_init_all();
-  //set_sys_clock_khz(132000, true);
+  // set_sys_clock_khz(132000, true);
   vLaunch();
   return 0;
 }
