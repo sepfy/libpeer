@@ -208,7 +208,7 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
 
 void peer_connection_destroy(PeerConnection* pc) {
   if (pc) {
-    sctp_destroy_socket(&pc->sctp);
+    sctp_destroy_association(&pc->sctp);
     dtls_srtp_deinit(&pc->dtls_srtp);
     agent_destroy(&pc->agent);
     buffer_free(pc->data_rb);
@@ -386,7 +386,7 @@ int peer_connection_loop(PeerConnection* pc) {
 
         if (pc->config.datachannel) {
           LOGI("SCTP create socket");
-          sctp_create_socket(&pc->sctp, &pc->dtls_srtp);
+          sctp_create_association(&pc->sctp, &pc->dtls_srtp);
           pc->sctp.userdata = pc->config.user_data;
         }
 
