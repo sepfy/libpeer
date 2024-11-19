@@ -286,12 +286,13 @@ static void peer_connection_state_new(PeerConnection* pc, int is_offerer) {
   DtlsSrtpRole role = DTLS_SRTP_ROLE_CLIENT;
   if (is_offerer) {
     role = DTLS_SRTP_ROLE_CLIENT;
-    agent_clear_candidates(&pc->agent);
     pc->agent.mode = AGENT_MODE_CONTROLLING;
   } else {
     role = DTLS_SRTP_ROLE_SERVER;
     pc->agent.mode = AGENT_MODE_CONTROLLED;
   }
+
+  agent_clear_candidates(&pc->agent);
 
   dtls_srtp_reset_session(&pc->dtls_srtp);
   dtls_srtp_init(&pc->dtls_srtp, role, pc);
