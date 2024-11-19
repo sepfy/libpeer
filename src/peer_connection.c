@@ -467,6 +467,7 @@ int peer_connection_loop(PeerConnection* pc) {
       }
 
       if (KEEPALIVE_CONNCHECK > 0 && (ports_get_epoch_time() - pc->agent.binding_request_time) > KEEPALIVE_CONNCHECK) {
+        agent_connectivity_reset(&pc->agent);
         LOGI("binding request timeout");
         STATE_CHANGED(pc, PEER_CONNECTION_CLOSED);
       }

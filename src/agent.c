@@ -469,6 +469,12 @@ int agent_connectivity_check(Agent* agent) {
   return -1;
 }
 
+void agent_connectivity_reset(Agent* agent) {
+  for (int i = 0; i < agent->candidate_pairs_num; i++) {
+    agent->candidate_pairs[i].state = ICE_CANDIDATE_STATE_FROZEN;
+  }
+}
+
 int agent_select_candidate_pair(Agent* agent) {
   int i;
   for (i = 0; i < agent->candidate_pairs_num; i++) {
