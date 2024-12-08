@@ -306,7 +306,7 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
       case SCTP_INIT_ACK: {
         SctpInitChunk* init_ack = (SctpInitChunk*)in_packet->chunks;
         SctpCookieEchoChunk* cookie_echo = (SctpCookieEchoChunk*)out_packet->chunks;
-        SctpChunkParam* param;
+        SctpChunkParam* param = NULL;
         sctp->verification_tag = init_ack->initiate_tag;
         int type;
         // find cookie

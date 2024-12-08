@@ -87,7 +87,7 @@ int stun_set_mapped_address(char* value, uint8_t* mask, Address* addr) {
 
   LOGD("XOR Mapped Address Family: %d", *family);
   LOGD("XOR Mapped Address Port: %d (Port XOR: %04x)", addr->port, *port);
-  LOGD("XOR Mapped Address IP: %s (IP XOR: %08x)", addr_string, *addr32);
+  LOGD("XOR Mapped Address IP: %s (IP XOR: %08" PRIu32 ")", addr_string, *addr32);
   return ret;
 }
 
@@ -119,7 +119,7 @@ void stun_get_mapped_address(char* value, uint8_t* mask, Address* addr) {
 
   LOGD("XOR Mapped Address Family: %d", family);
   LOGD("XOR Mapped Address Port: %d (Port XOR: %04x)", addr->port, port);
-  LOGD("XOR Mapped Address IP: %s (IP XOR: %08x)", addr_string, *addr32);
+  LOGD("XOR Mapped Address IP: %s (IP XOR: %08" PRIu32 ")", addr_string, *addr32);
 }
 
 void stun_parse_msg_buf(StunMessage* msg) {

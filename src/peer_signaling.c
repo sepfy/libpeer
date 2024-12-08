@@ -18,8 +18,10 @@
 #define KEEP_ALIVE_TIMEOUT_SECONDS 60
 #define CONNACK_RECV_TIMEOUT_MS 1000
 
-#define URL_MAX_LEN 256
-#define TOPIC_MAX_LEN 128
+#define PATH_MAX_LEN 128
+#define HOST_MAX_LEN 64
+#define URL_MAX_LEN (PATH_MAX_LEN + HOST_MAX_LEN + 8)
+#define TOPIC_MAX_LEN URL_MAX_LEN
 #define TOKEN_MAX_LEN 256
 
 #define RPC_VERSION "2.0"
@@ -50,10 +52,10 @@ typedef struct PeerSignaling {
   uint16_t packet_id;
   int id;
 
-  int proto; // 0: MQTT, 1: HTTP
+  int proto;  // 0: MQTT, 1: HTTP
   int port;
-  char host[URL_MAX_LEN];
-  char path[URL_MAX_LEN];
+  char host[HOST_MAX_LEN];
+  char path[PATH_MAX_LEN];
   char token[TOKEN_MAX_LEN];
   char client_id[32];
 
@@ -76,7 +78,7 @@ static int peer_signaling_resolve_token(const char* token, char* username, char*
   if (colon == NULL) {
     LOGW("Invalid token: %s", token);
     return -1;
-  } 
+  }
 
   strncpy(username, plaintext, colon - plaintext);
   strncpy(password, colon + 1, strlen(colon + 1));
@@ -84,9 +86,8 @@ static int peer_signaling_resolve_token(const char* token, char* username, char*
   return 0;
 }
 
-static int peer_signaling_resolve_url(const char* url, char* host, int *port, char* path) {
-
-  char* port_start, *path_start;
+static int peer_signaling_resolve_url(const char* url, char* host, int* port, char* path) {
+  char *port_start, *path_start;
   int proto = 0;
 
   if (url == NULL || strlen(url) == 0) {
@@ -354,7 +355,9 @@ static void peer_signaling_mqtt_event_cb(MQTTContext_t* mqtt_ctx,
   MQTTStatus_t status = MQTTSuccess;
   switch (packet_info->type) {
     case MQTT_PACKET_TYPE_PUBLISH:
-      LOGD("MQTT received message: %s");
+      LOGD("MQTT received message: %.*s",
+           deserialized_info->pPublishInfo->payloadLength,
+           (char*)deserialized_info->pPublishInfo->pPayload);
       peer_signaling_on_pub_event(deserialized_info->pPublishInfo->pPayload,
                                   deserialized_info->pPublishInfo->payloadLength);
       break;
@@ -371,8 +374,8 @@ static void peer_signaling_mqtt_event_cb(MQTTContext_t* mqtt_ctx,
       for (i = 0; i < ncodes; i++) {
         if (codes[0] == MQTTSubAckFailure) {
           LOGE("MQTT Subscription failed. Please check authorization");
-	  break;
-	}
+          break;
+        }
       }
 
       if (i == ncodes) {
@@ -486,8 +489,8 @@ static void peer_signaling_onicecandidate(char* description, void* userdata) {
     cJSON_Delete(res);
     g_ps.id = 0;
   } else {
-    if (g_ps.token != NULL && strlen(g_ps.token) > 0) {
-      char cred[TOKEN_MAX_LEN];
+    if (strlen(g_ps.token) > 0) {
+      char cred[TOKEN_MAX_LEN + 10];
       memset(cred, 0, sizeof(cred));
       snprintf(cred, sizeof(cred), "Basic %s", g_ps.token);
       peer_signaling_http_post(g_ps.host, g_ps.path, g_ps.port, cred, description);
@@ -498,14 +501,13 @@ static void peer_signaling_onicecandidate(char* description, void* userdata) {
 }
 
 int peer_signaling_connect(const char* url, const char* token, PeerConnection* pc) {
-
   char* client_id;
 
   if ((g_ps.proto = peer_signaling_resolve_url(url, g_ps.host, &g_ps.port, g_ps.path)) < 0) {
     LOGE("Resolve URL failed");
   }
 
-  if (token) {
+  if (token && strlen(token) > 0) {
     strncpy(g_ps.token, token, sizeof(g_ps.token));
   }
 
@@ -513,7 +515,7 @@ int peer_signaling_connect(const char* url, const char* token, PeerConnection* p
   peer_connection_onicecandidate(g_ps.pc, peer_signaling_onicecandidate);
 
   switch (g_ps.proto) {
-    case 0: { // MQTT
+    case 0: {  // MQTT
       client_id = strrchr(g_ps.path, '/');
       snprintf(g_ps.client_id, sizeof(g_ps.client_id), "%s", client_id + 1);
       snprintf(g_ps.subtopic, sizeof(g_ps.subtopic), "%s/invoke", g_ps.path);
@@ -522,12 +524,11 @@ int peer_signaling_connect(const char* url, const char* token, PeerConnection* p
         peer_signaling_mqtt_subscribe(1);
       }
     } break;
-    case 1: { // HTTP
+    case 1: {  // HTTP
       peer_connection_create_offer(g_ps.pc);
     } break;
     default: {
     } break;
-
   }
 
   return 0;
@@ -544,7 +545,6 @@ void peer_signaling_disconnect() {
   }
   LOGI("Disconnected");
 }
-
 
 int peer_signaling_loop() {
   MQTT_ProcessLoop(&g_ps.mqtt_ctx);
