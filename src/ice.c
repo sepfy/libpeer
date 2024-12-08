@@ -67,7 +67,7 @@ void ice_candidate_to_description(IceCandidate* candidate, char* description, in
   }
 
   addr_to_string(&candidate->addr, addr_string, sizeof(addr_string));
-  snprintf(description, length, "a=candidate:%d %d %s %" PRIu32 " %s %d typ %s\r\n",
+  snprintf(description, length, "a=candidate:%s %d %s %" PRIu32 " %s %d typ %s\r\n",
            candidate->foundation,
            candidate->component,
            candidate->transport,

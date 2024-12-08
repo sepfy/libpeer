@@ -18,12 +18,11 @@
 #define KEEP_ALIVE_TIMEOUT_SECONDS 60
 #define CONNACK_RECV_TIMEOUT_MS 1000
 
-#define TOPIC_SIZE 128
-#define HOST_LEN 64
-#define CRED_LEN 128
+#define URL_MAX_LEN 256
+#define TOPIC_MAX_LEN 128
+#define TOKEN_MAX_LEN 256
 
 #define RPC_VERSION "2.0"
-
 #define RPC_METHOD_STATE "state"
 #define RPC_METHOD_OFFER "offer"
 #define RPC_METHOD_ANSWER "answer"
@@ -45,25 +44,95 @@ typedef struct PeerSignaling {
   uint8_t mqtt_buf[CONFIG_MQTT_BUFFER_SIZE];
   uint8_t http_buf[CONFIG_HTTP_BUFFER_SIZE];
 
-  char subtopic[TOPIC_SIZE];
-  char pubtopic[TOPIC_SIZE];
+  char subtopic[TOPIC_MAX_LEN];
+  char pubtopic[TOPIC_MAX_LEN];
 
   uint16_t packet_id;
   int id;
 
-  int mqtt_port;
-  int http_port;
-  char mqtt_host[HOST_LEN];
-  char http_host[HOST_LEN];
-  char http_path[HOST_LEN];
-  char username[CRED_LEN];
-  char password[CRED_LEN];
-  char client_id[CRED_LEN];
+  int proto; // 0: MQTT, 1: HTTP
+  int port;
+  char host[URL_MAX_LEN];
+  char path[URL_MAX_LEN];
+  char token[TOKEN_MAX_LEN];
+  char client_id[32];
+
   PeerConnection* pc;
 
 } PeerSignaling;
 
-static PeerSignaling g_ps;
+static PeerSignaling g_ps = {0};
+
+static int peer_signaling_resolve_token(const char* token, char* username, char* password) {
+  char plaintext[TOKEN_MAX_LEN] = {0};
+  char* colon;
+
+  if (token == NULL || strlen(token) == 0) {
+    LOGW("Invalid token");
+    return -1;
+  }
+  base64_decode(token, strlen(token), (unsigned char*)plaintext, sizeof(plaintext));
+  colon = strchr(plaintext, ':');
+  if (colon == NULL) {
+    LOGW("Invalid token: %s", token);
+    return -1;
+  } 
+
+  strncpy(username, plaintext, colon - plaintext);
+  strncpy(password, colon + 1, strlen(colon + 1));
+  LOGD("Username: %s, Password: %s", username, password);
+  return 0;
+}
+
+static int peer_signaling_resolve_url(const char* url, char* host, int *port, char* path) {
+
+  char* port_start, *path_start;
+  int proto = 0;
+
+  if (url == NULL || strlen(url) == 0) {
+    LOGW("Invalid URL");
+    return -1;
+  }
+
+  if (strncmp(url, "mqtts://", 8) == 0) {
+    *port = 8883;
+    url += 8;
+  } else if (strncmp(url, "https://", 8) == 0) {
+    *port = 443;
+    url += 8;
+    proto = 1;
+  } else if (strncmp(url, "mqtt://", 7) == 0) {
+    *port = 1883;
+    url += 7;
+  } else if (strncmp(url, "http://", 7) == 0) {
+    *port = 80;
+    url += 7;
+    proto = 1;
+  } else {
+    LOGW("Invalid URL: %s", url);
+    return -1;
+  }
+
+  port_start = strchr(url, ':');
+  path_start = strchr(url, '/');
+
+  if (port_start != NULL && path_start != NULL && port_start < path_start) {
+    strncpy(host, url, port_start - url);
+    strncpy(path, path_start, strlen(path_start));
+    *port = atoi(port_start + 1);
+  } else if (port_start == NULL && path_start != NULL) {
+    strncpy(host, url, path_start - url);
+    strncpy(path, path_start, strlen(path_start));
+  } else if (port_start != NULL && path_start == NULL) {
+    strncpy(host, url, port_start - url);
+    *port = atoi(port_start + 1);
+  } else {
+    strncpy(host, url, strlen(url));
+  }
+
+  LOGI("Host: %s, Port: %d, Path: %s", host, *port, path);
+  return proto;
+}
 
 static void peer_signaling_mqtt_publish(MQTTContext_t* mqtt_ctx, const char* message) {
   MQTTStatus_t status;
@@ -244,10 +313,7 @@ static int peer_signaling_http_post(const char* hostname, const char* path, int 
   trans_if.send = ssl_transport_send;
   trans_if.pNetworkContext = &net_ctx;
 
-  if (port <= 0) {
-    LOGE("Invalid port number: %d", port);
-    return -1;
-  }
+  assert(port > 0);
 
   ret = ssl_transport_connect(&net_ctx, hostname, port, NULL);
 
@@ -285,17 +351,36 @@ static int peer_signaling_http_post(const char* hostname, const char* path, int 
 static void peer_signaling_mqtt_event_cb(MQTTContext_t* mqtt_ctx,
                                          MQTTPacketInfo_t* packet_info,
                                          MQTTDeserializedInfo_t* deserialized_info) {
+  MQTTStatus_t status = MQTTSuccess;
   switch (packet_info->type) {
-    case MQTT_PACKET_TYPE_CONNACK:
-      LOGI("MQTT_PACKET_TYPE_CONNACK");
-      break;
     case MQTT_PACKET_TYPE_PUBLISH:
-      LOGI("MQTT_PACKET_TYPE_PUBLISH");
+      LOGD("MQTT received message: %s");
       peer_signaling_on_pub_event(deserialized_info->pPublishInfo->pPayload,
                                   deserialized_info->pPublishInfo->payloadLength);
       break;
-    case MQTT_PACKET_TYPE_SUBACK:
-      LOGD("MQTT_PACKET_TYPE_SUBACK");
+    case MQTT_PACKET_TYPE_SUBACK: {
+      size_t ncodes = 0;
+      int i = 0;
+      uint8_t* codes = NULL;
+      status = MQTT_GetSubAckStatusCodes(packet_info, &codes, &ncodes);
+
+      assert(status == MQTTSuccess);
+
+      assert(ncodes == 1);
+
+      for (i = 0; i < ncodes; i++) {
+        if (codes[0] == MQTTSubAckFailure) {
+          LOGE("MQTT Subscription failed. Please check authorization");
+	  break;
+	}
+      }
+
+      if (i == ncodes) {
+        LOGI("MQTT Subscribe succeeded.");
+      }
+    } break;
+    case MQTT_PACKET_TYPE_UNSUBACK:
+      LOGI("MQTT Unsubscribe succeeded.");
       break;
     default:
       break;
@@ -306,6 +391,8 @@ static int peer_signaling_mqtt_connect(const char* hostname, int port) {
   MQTTStatus_t status;
   MQTTConnectInfo_t conn_info;
   bool session_present;
+  char username[TOKEN_MAX_LEN] = {0};
+  char password[TOKEN_MAX_LEN] = {0};
 
   if (ssl_transport_connect(&g_ps.net_ctx, hostname, port, NULL) < 0) {
     LOGE("ssl transport connect failed");
@@ -323,14 +410,13 @@ static int peer_signaling_mqtt_connect(const char* hostname, int port) {
   memset(&conn_info, 0, sizeof(conn_info));
 
   conn_info.cleanSession = false;
-  if (strlen(g_ps.username) > 0) {
-    conn_info.pUserName = g_ps.username;
-    conn_info.userNameLength = strlen(g_ps.username);
-  }
 
-  if (strlen(g_ps.password) > 0) {
-    conn_info.pPassword = g_ps.password;
-    conn_info.passwordLength = strlen(g_ps.password);
+  if (strlen(g_ps.token) > 0) {
+    peer_signaling_resolve_token(g_ps.token, username, password);
+    conn_info.pUserName = username;
+    conn_info.userNameLength = strlen(username);
+    conn_info.pPassword = password;
+    conn_info.passwordLength = strlen(password);
   }
 
   if (strlen(g_ps.client_id) > 0) {
@@ -364,6 +450,7 @@ static int peer_signaling_mqtt_subscribe(int subscribed) {
   sub_info.topicFilterLength = strlen(g_ps.subtopic);
 
   if (subscribed) {
+    LOGI("Subscribing topic %s", g_ps.subtopic);
     status = MQTT_Subscribe(&g_ps.mqtt_ctx, &sub_info, 1, packet_id);
   } else {
     status = MQTT_Unsubscribe(&g_ps.mqtt_ctx, &sub_info, 1, packet_id);
@@ -380,16 +467,12 @@ static int peer_signaling_mqtt_subscribe(int subscribed) {
     return -1;
   }
 
-  LOGD("MQTT Subscribe/Unsubscribe succeeded.");
   return 0;
 }
 
 static void peer_signaling_onicecandidate(char* description, void* userdata) {
   cJSON* res;
   char* payload;
-  char cred_plaintext[2 * CRED_LEN + 1];
-  char cred_base64[2 * CRED_LEN + 10];
-
   if (g_ps.id > 0) {
     res = cJSON_CreateObject();
     cJSON_AddStringToObject(res, "jsonrpc", RPC_VERSION);
@@ -403,123 +486,68 @@ static void peer_signaling_onicecandidate(char* description, void* userdata) {
     cJSON_Delete(res);
     g_ps.id = 0;
   } else {
-    // enable authentication
-    if (strlen(g_ps.username) > 0 && strlen(g_ps.password) > 0) {
-      snprintf(cred_plaintext, sizeof(cred_plaintext), "%s:%s", g_ps.username, g_ps.password);
-      snprintf(cred_base64, sizeof(cred_base64), "Basic ");
-      base64_encode((unsigned char*)cred_plaintext, strlen(cred_plaintext),
-                    cred_base64 + strlen(cred_base64), sizeof(cred_base64) - strlen(cred_base64));
-      LOGD("Basic Auth: %s", cred_base64);
-      peer_signaling_http_post(g_ps.http_host, g_ps.http_path, g_ps.http_port, cred_base64, description);
+    if (g_ps.token != NULL && strlen(g_ps.token) > 0) {
+      char cred[TOKEN_MAX_LEN];
+      memset(cred, 0, sizeof(cred));
+      snprintf(cred, sizeof(cred), "Basic %s", g_ps.token);
+      peer_signaling_http_post(g_ps.host, g_ps.path, g_ps.port, cred, description);
     } else {
-      peer_signaling_http_post(g_ps.http_host, g_ps.http_path, g_ps.http_port, "", description);
+      peer_signaling_http_post(g_ps.host, g_ps.path, g_ps.port, "", description);
     }
   }
 }
 
-int peer_signaling_whip_connect() {
-  if (g_ps.pc == NULL) {
-    LOGW("PeerConnection is NULL");
-    return -1;
-  } else if (g_ps.http_port <= 0) {
-    LOGW("Invalid HTTP port number: %d", g_ps.http_port);
-    return -1;
+int peer_signaling_connect(const char* url, const char* token, PeerConnection* pc) {
+
+  char* client_id;
+
+  if ((g_ps.proto = peer_signaling_resolve_url(url, g_ps.host, &g_ps.port, g_ps.path)) < 0) {
+    LOGE("Resolve URL failed");
   }
 
-  peer_connection_create_offer(g_ps.pc);
+  if (token) {
+    strncpy(g_ps.token, token, sizeof(g_ps.token));
+  }
+
+  g_ps.pc = pc;
+  peer_connection_onicecandidate(g_ps.pc, peer_signaling_onicecandidate);
+
+  switch (g_ps.proto) {
+    case 0: { // MQTT
+      client_id = strrchr(g_ps.path, '/');
+      snprintf(g_ps.client_id, sizeof(g_ps.client_id), "%s", client_id + 1);
+      snprintf(g_ps.subtopic, sizeof(g_ps.subtopic), "%s/invoke", g_ps.path);
+      snprintf(g_ps.pubtopic, sizeof(g_ps.pubtopic), "%s/result", g_ps.path);
+      if (peer_signaling_mqtt_connect(g_ps.host, g_ps.port) == 0) {
+        peer_signaling_mqtt_subscribe(1);
+      }
+    } break;
+    case 1: { // HTTP
+      peer_connection_create_offer(g_ps.pc);
+    } break;
+    default: {
+    } break;
+
+  }
+
   return 0;
 }
 
-void peer_signaling_whip_disconnect() {
-  // TODO: implement
-}
-
-int peer_signaling_join_channel() {
-  if (g_ps.pc == NULL) {
-    LOGW("PeerConnection is NULL");
-    return -1;
-  } else if (g_ps.mqtt_port <= 0) {
-    LOGW("Invalid MQTT port number: %d", g_ps.mqtt_port);
-    if (peer_signaling_whip_connect() < 0) {
-      LOGW("Tried MQTT and WHIP, connect failed");
-      return -1;
-    }
-    return 0;
-  }
-
-  if (peer_signaling_mqtt_connect(g_ps.mqtt_host, g_ps.mqtt_port) < 0) {
-    LOGW("Connect MQTT server failed");
-    return -1;
-  }
-
-  peer_signaling_mqtt_subscribe(1);
-  return 0;
-}
-
-int peer_signaling_loop() {
-  if (g_ps.mqtt_port > 0) {
-    MQTT_ProcessLoop(&g_ps.mqtt_ctx);
-  }
-  return 0;
-}
-
-void peer_signaling_leave_channel() {
+void peer_signaling_disconnect() {
   MQTTStatus_t status = MQTTSuccess;
 
-  if (g_ps.mqtt_port > 0 && peer_signaling_mqtt_subscribe(0) == 0) {
+  if (!g_ps.proto && !peer_signaling_mqtt_subscribe(0)) {
     status = MQTT_Disconnect(&g_ps.mqtt_ctx);
     if (status != MQTTSuccess) {
       LOGE("Failed to disconnect with broker: %s", MQTT_Status_strerror(status));
     }
   }
+  LOGI("Disconnected");
 }
 
-void peer_signaling_set_config(ServiceConfiguration* service_config) {
-  char* pos;
 
-  memset(&g_ps, 0, sizeof(g_ps));
-
-  do {
-    if (service_config->http_url == NULL || strlen(service_config->http_url) == 0) {
-      break;
-    }
-
-    if ((pos = strstr(service_config->http_url, "/")) != NULL) {
-      strncpy(g_ps.http_host, service_config->http_url, pos - service_config->http_url);
-      strncpy(g_ps.http_path, pos, HOST_LEN);
-    } else {
-      strncpy(g_ps.http_host, service_config->http_url, HOST_LEN);
-    }
-
-    g_ps.http_port = service_config->http_port;
-    LOGI("HTTP Host: %s, Port: %d, Path: %s", g_ps.http_host, g_ps.http_port, g_ps.http_path);
-  } while (0);
-
-  do {
-    if (service_config->mqtt_url == NULL || strlen(service_config->mqtt_url) == 0) {
-      break;
-    }
-
-    strncpy(g_ps.mqtt_host, service_config->mqtt_url, HOST_LEN);
-    g_ps.mqtt_port = service_config->mqtt_port;
-    LOGD("MQTT Host: %s, Port: %d", g_ps.mqtt_host, g_ps.mqtt_port);
-  } while (0);
-
-  if (service_config->client_id != NULL && strlen(service_config->client_id) > 0) {
-    strncpy(g_ps.client_id, service_config->client_id, CRED_LEN);
-    snprintf(g_ps.subtopic, sizeof(g_ps.subtopic), "webrtc/%s/jsonrpc", service_config->client_id);
-    snprintf(g_ps.pubtopic, sizeof(g_ps.pubtopic), "webrtc/%s/jsonrpc-reply", service_config->client_id);
-  }
-
-  if (service_config->username != NULL && strlen(service_config->username) > 0) {
-    strncpy(g_ps.username, service_config->username, CRED_LEN);
-  }
-
-  if (service_config->password != NULL && strlen(service_config->password) > 0) {
-    strncpy(g_ps.password, service_config->password, CRED_LEN);
-  }
-
-  g_ps.pc = service_config->pc;
-  peer_connection_onicecandidate(g_ps.pc, peer_signaling_onicecandidate);
+int peer_signaling_loop() {
+  MQTT_ProcessLoop(&g_ps.mqtt_ctx);
+  return 0;
 }
 #endif  // DISABLE_PEER_SIGNALING

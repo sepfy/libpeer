@@ -22,7 +22,7 @@ typedef struct ServiceConfiguration {
 
 #define SERVICE_CONFIG_DEFAULT()  \
   {                               \
-    .mqtt_url = "broker.emqx.io", \
+    .mqtt_url = "libpeer.com",    \
     .mqtt_port = 8883,            \
     .client_id = "peer",          \
     .http_url = "",               \
@@ -31,6 +31,12 @@ typedef struct ServiceConfiguration {
     .password = "",               \
     .pc = NULL                    \
   }
+
+#define DEFAULT_PEER_SIGNALING "mqtts://libpeer.com/public"
+
+int peer_signaling_connect(const char* url, const char* token, PeerConnection* pc);
+
+void peer_signaling_disconnect();
 
 void peer_signaling_set_config(ServiceConfiguration* config);
 
