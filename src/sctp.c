@@ -576,6 +576,7 @@ void sctp_destroy_socket(Sctp* sctp) {
   if (sctp && sctp->sock) {
     usrsctp_shutdown(sctp->sock, SHUT_RDWR);
     usrsctp_close(sctp->sock);
+    usrsctp_finish();
     sctp->sock = NULL;
   }
 #endif
