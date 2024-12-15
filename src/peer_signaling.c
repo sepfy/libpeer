@@ -471,6 +471,8 @@ void peer_signaling_leave_channel() {
     if (status != MQTTSuccess) {
       LOGE("Failed to disconnect with broker: %s", MQTT_Status_strerror(status));
     }
+
+    ssl_transport_disconnect(&g_ps.net_ctx);
   }
 }
 
