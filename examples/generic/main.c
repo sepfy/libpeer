@@ -60,12 +60,11 @@ static uint64_t get_timestamp() {
   return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
-void print_usage(const char *prog_name) {
+void print_usage(const char* prog_name) {
   printf("Usage: %s -u <url> [-t <token>]\n", prog_name);
 }
 
-void parse_arguments(int argc, char *argv[], const char **url, const char **token) {
-
+void parse_arguments(int argc, char* argv[], const char** url, const char** token) {
   *token = NULL;
   *url = NULL;
 
@@ -75,8 +74,8 @@ void parse_arguments(int argc, char *argv[], const char **url, const char **toke
     } else if (strcmp(argv[i], "-t") == 0 && (i + 1) < argc) {
       *token = argv[++i];
     } else {
-       print_usage(argv[0]);
-       exit(1);
+      print_usage(argv[0]);
+      exit(1);
     }
   }
 
@@ -89,8 +88,8 @@ void parse_arguments(int argc, char *argv[], const char **url, const char **toke
 int main(int argc, char* argv[]) {
   uint64_t curr_time, video_time, audio_time;
   uint8_t buf[102400];
-  const char *url = NULL;
-  const char *token = NULL;
+  const char* url = NULL;
+  const char* token = NULL;
   int size;
 
   pthread_t peer_singaling_thread;
@@ -106,8 +105,7 @@ int main(int argc, char* argv[]) {
       },
       .datachannel = DATA_CHANNEL_STRING,
       .video_codec = CODEC_H264,
-      .audio_codec = CODEC_PCMA
-  };
+      .audio_codec = CODEC_PCMA};
 
   printf("=========== Parsed Arguments ===========\n");
   printf(" %-5s : %s\n", "URL", url);
