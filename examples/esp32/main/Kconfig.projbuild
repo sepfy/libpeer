@@ -1,4 +1,4 @@
-menu "ESP32 Hardware Configuration"
+menu "Peer Example Configuration"
 
     choice ESP32_CAMERA_MODEL
         prompt "Camera model"
@@ -15,4 +15,14 @@ menu "ESP32 Hardware Configuration"
             bool "ESP32S3-XIAO-SENSE"
     endchoice
 
+    config SIGNALING_URL
+        string "Signaling URL"
+        default "https://libpeer.com/public/test"
+        help
+            Enter the URL of the Peer library to use.
+    config SIGNALING_TOKEN
+        string "Signaling Token"
+        default ""
+        help
+            Enter the token of the Peer library to use.
 endmenu

@@ -6,14 +6,24 @@
 #include "dtls_srtp.h"
 #include "utils.h"
 
-#if !CONFIG_USE_USRSCTP
-
 typedef enum DecpMsgType {
 
   DATA_CHANNEL_OPEN = 0x03,
   DATA_CHANNEL_ACK = 0x02,
 
 } DecpMsgType;
+
+typedef enum DataChannelPpid {
+
+  DATA_CHANNEL_PPID_CONTROL = 50,
+  DATA_CHANNEL_PPID_DOMSTRING = 51,
+  DATA_CHANNEL_PPID_BINARY_PARTIAL = 52,
+  DATA_CHANNEL_PPID_BINARY = 53,
+  DATA_CHANNEL_PPID_DOMSTRING_PARTIAL = 54
+
+} DataChannelPpid;
+
+#if !CONFIG_USE_USRSCTP
 
 typedef struct SctpChunkParam {
   uint16_t type;
@@ -114,6 +124,11 @@ typedef struct SctpInitChunk {
 
 } SctpInitChunk;
 
+typedef struct SctpCookieEchoChunk {
+  SctpChunkCommon common;
+  uint8_t cookie[0];
+} SctpCookieEchoChunk;
+
 #endif
 
 typedef enum SctpDataPpid {
@@ -155,9 +170,9 @@ typedef struct Sctp {
   uint8_t buf[CONFIG_MTU];
 } Sctp;
 
-int sctp_create_socket(Sctp* sctp, DtlsSrtp* dtls_srtp);
+int sctp_create_association(Sctp* sctp, DtlsSrtp* dtls_srtp);
 
-void sctp_destroy_socket(Sctp* sctp);
+void sctp_destroy_association(Sctp* sctp);
 
 int sctp_is_connected(Sctp* sctp);
 

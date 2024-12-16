@@ -77,9 +77,6 @@ void peer_connection_task(void* arg) {
 }
 
 void app_main(void) {
-  static char deviceid[32] = {0};
-  uint8_t mac[8] = {0};
-
   PeerConfiguration config = {
       .ice_servers = {
           {.urls = "stun:stun.l.google.com:19302"}},
@@ -104,11 +101,6 @@ void app_main(void) {
   ESP_ERROR_CHECK(esp_event_loop_create_default());
   ESP_ERROR_CHECK(example_connect());
 
-  if (esp_read_mac(mac, ESP_MAC_WIFI_STA) == ESP_OK) {
-    sprintf(deviceid, "esp32-%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    ESP_LOGI(TAG, "Device ID: %s", deviceid);
-  }
-
   xSemaphore = xSemaphoreCreateMutex();
 
   peer_init();
@@ -122,13 +114,7 @@ void app_main(void) {
   g_pc = peer_connection_create(&config);
   peer_connection_oniceconnectionstatechange(g_pc, oniceconnectionstatechange);
   peer_connection_ondatachannel(g_pc, onmessage, onopen, onclose);
-
-  ServiceConfiguration service_config = SERVICE_CONFIG_DEFAULT();
-  service_config.client_id = deviceid;
-  service_config.pc = g_pc;
-  service_config.mqtt_url = "broker.emqx.io";
-  peer_signaling_set_config(&service_config);
-  peer_signaling_join_channel();
+  peer_signaling_connect(CONFIG_SIGNALING_URL, CONFIG_SIGNALING_TOKEN, g_pc);
 
 #if defined(CONFIG_ESP32S3_XIAO_SENSE)
   StackType_t* stack_memory = (StackType_t*)heap_caps_malloc(8192 * sizeof(StackType_t), MALLOC_CAP_SPIRAM);
@@ -143,7 +129,10 @@ void app_main(void) {
   xTaskCreatePinnedToCore(peer_connection_task, "peer_connection", 8192, NULL, 5, &xPcTaskHandle, 1);
 
   ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
-  ESP_LOGI(TAG, "open https://sepfy.github.io/webrtc?deviceId=%s", deviceid);
+  printf("============= Configuration =============\n");
+  printf(" %-5s : %s\n", "URL", CONFIG_SIGNALING_URL);
+  printf(" %-5s : %s\n", "Token", CONFIG_SIGNALING_TOKEN);
+  printf("=========================================\n");
 
   while (1) {
     peer_signaling_loop();

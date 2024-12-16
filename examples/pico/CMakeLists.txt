@@ -96,6 +96,7 @@ target_compile_definitions(peer PRIVATE
   CONFIG_MBEDTLS_2_X=1
   CONFIG_DATA_BUFFER_SIZE=512
   CONFIG_AUDIO_BUFFER_SIZE=2048
+  CONFIG_HTTP_BUFFER_SIZE=1024
   CONFIG_SDP_BUFFER_SIZE=4096
   HTTP_DO_NOT_USE_CUSTOM_CONFIG
   MQTT_DO_NOT_USE_CUSTOM_CONFIG
@@ -107,9 +108,13 @@ target_link_libraries(peer
   cjson
 )
 
+pico_generate_pio_header(pico_peer ${CMAKE_CURRENT_LIST_DIR}/rp2040_i2s_example/i2s.pio)
+
 # Build pico_peer
 add_executable(pico_peer
   main.c
+  rp2040_i2s_example/i2s.c
+  pcm-g711/pcm-g711/g711.c
 )
 
 target_compile_definitions(pico_peer PRIVATE

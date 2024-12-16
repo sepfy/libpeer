@@ -60,18 +60,42 @@ static uint64_t get_timestamp() {
   return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
+void print_usage(const char* prog_name) {
+  printf("Usage: %s -u <url> [-t <token>]\n", prog_name);
+}
+
+void parse_arguments(int argc, char* argv[], const char** url, const char** token) {
+  *token = NULL;
+  *url = NULL;
+
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "-u") == 0 && (i + 1) < argc) {
+      *url = argv[++i];
+    } else if (strcmp(argv[i], "-t") == 0 && (i + 1) < argc) {
+      *token = argv[++i];
+    } else {
+      print_usage(argv[0]);
+      exit(1);
+    }
+  }
+
+  if (*url == NULL) {
+    print_usage(argv[0]);
+    exit(1);
+  }
+}
+
 int main(int argc, char* argv[]) {
   uint64_t curr_time, video_time, audio_time;
   uint8_t buf[102400];
+  const char* url = NULL;
+  const char* token = NULL;
   int size;
 
   pthread_t peer_singaling_thread;
   pthread_t peer_connection_thread;
 
-  if (argc < 2) {
-    printf("Usage: %s <device_id>\n", argv[0]);
-    return -1;
-  }
+  parse_arguments(argc, argv, &url, &token);
 
   signal(SIGINT, signal_handler);
 
@@ -83,19 +107,17 @@ int main(int argc, char* argv[]) {
       .video_codec = CODEC_H264,
       .audio_codec = CODEC_PCMA};
 
-  ServiceConfiguration service_config = SERVICE_CONFIG_DEFAULT();
-
-  printf("open https://sepfy.github.io/webrtc?deviceId=%s\n", argv[1]);
+  printf("=========== Parsed Arguments ===========\n");
+  printf(" %-5s : %s\n", "URL", url);
+  printf(" %-5s : %s\n", "Token", token ? token : "");
+  printf("========================================\n");
 
   peer_init();
   g_pc = peer_connection_create(&config);
   peer_connection_oniceconnectionstatechange(g_pc, onconnectionstatechange);
   peer_connection_ondatachannel(g_pc, onmessage, onopen, onclose);
 
-  service_config.client_id = argv[1];
-  service_config.pc = g_pc;
-  peer_signaling_set_config(&service_config);
-  peer_signaling_join_channel();
+  peer_signaling_connect(url, token, g_pc);
 
   pthread_create(&peer_connection_thread, NULL, peer_connection_task, NULL);
   pthread_create(&peer_singaling_thread, NULL, peer_singaling_task, NULL);
@@ -130,7 +152,7 @@ int main(int argc, char* argv[]) {
 
   reader_deinit();
 
-  peer_signaling_leave_channel();
+  peer_signaling_disconnect();
   peer_connection_destroy(g_pc);
   peer_deinit();
 

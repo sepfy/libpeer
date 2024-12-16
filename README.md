@@ -1,7 +1,6 @@
 # libpeer - Portable WebRTC Library for IoT/Embedded Device
 
 ![build](https://github.com/sepfy/pear/actions/workflows/build.yml/badge.svg)
-[![Discord](https://img.shields.io/discord/1265486725967253667?logo=discord)](https://discord.gg/AsPgabeS67)
 
 libpeer is a WebRTC implementation written in C, developed with BSD socket. The library aims to integrate IoT/Embedded device video/audio streaming with WebRTC, such as ESP32 and Raspberry Pi
 
@@ -29,6 +28,8 @@ libpeer is a WebRTC implementation written in C, developed with BSD socket. The 
 * [coreMQTT](https://github.com/FreeRTOS/coreMQTT)
 
 ### Getting Started with Generic Example
+- Copy URL from the test [website](https://sepfy.github.io/libpeer)
+- Build and run the example
 ```bash
 $ sudo apt -y install git cmake
 $ git clone --recursive https://github.com/sepfy/libpeer
@@ -36,8 +37,9 @@ $ cd libpeer
 $ cmake -S . -B build && cmake --build build
 $ wget http://www.live555.com/liveMedia/public/264/test.264 # Download test video file
 $ wget https://mauvecloud.net/sounds/alaw08m.wav # Download test audio file
-$ ./generic/sample/sample
+$ ./examples/generic/sample -u <URL>
 ```
+- Click Connect button on the website
 
 ### Examples for Platforms
 - [ESP32](https://github.com/sepfy/libpeer/tree/main/examples/esp32): MJPEG over datachannel

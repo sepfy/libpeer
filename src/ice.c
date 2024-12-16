@@ -36,7 +36,8 @@ static void ice_candidate_priority(IceCandidate* candidate) {
 void ice_candidate_create(IceCandidate* candidate, int foundation, IceCandidateType type, Address* addr) {
   memcpy(&candidate->addr, addr, sizeof(Address));
   candidate->type = type;
-  candidate->foundation = foundation;
+
+  snprintf(candidate->foundation, sizeof(candidate->foundation), "%d", foundation);
   // 1: RTP, 2: RTCP
   candidate->component = 1;
 
@@ -66,7 +67,7 @@ void ice_candidate_to_description(IceCandidate* candidate, char* description, in
   }
 
   addr_to_string(&candidate->addr, addr_string, sizeof(addr_string));
-  snprintf(description, length, "a=candidate:%d %d %s %" PRIu32 " %s %d typ %s\r\n",
+  snprintf(description, length, "a=candidate:%s %d %s %" PRIu32 " %s %d typ %s\r\n",
            candidate->foundation,
            candidate->component,
            candidate->transport,
@@ -77,70 +78,56 @@ void ice_candidate_to_description(IceCandidate* candidate, char* description, in
 }
 
 int ice_candidate_from_description(IceCandidate* candidate, char* description, char* end) {
-  char* split_start = description;
-  char* split_end = NULL;
-  int index = 0;
-  char buf[64];
+  char* candidate_start = description;
+  uint32_t port;
+  char type[16];
+  char addrstring[ADDRSTRLEN];
 
-  if (strncmp("a=", split_start, strlen("a=")) == 0) {
-    split_start += strlen("a=");
+  if (strncmp("a=", candidate_start, strlen("a=")) == 0) {
+    candidate_start += strlen("a=");
   }
-  split_start += strlen("candidate:");
+  candidate_start += strlen("candidate:");
+  printf("candidate_start: %s\n", candidate_start);
 
   // a=candidate:448736988 1 udp 2122260223 172.17.0.1 49250 typ host generation 0 network-id 1 network-cost 50
   // a=candidate:udpcandidate 1 udp 120 192.168.1.102 8000 typ host
-  while ((split_end = strstr(split_start, " ")) != NULL && split_start < end) {
-    memset(buf, 0, sizeof(buf));
-    strncpy(buf, split_start, split_end - split_start);
-    switch (index) {
-      case 0:
-        candidate->foundation = atoi(buf);
-        break;
-      case 1:
-        candidate->component = atoi(buf);
-        break;
-      case 2:
-        if (strstr(buf, "UDP") == 0 && strstr(buf, "udp") == 0) {
-          // Only accept UDP candidates
-          return -1;
-        }
-        strncpy(candidate->transport, buf, strlen(buf));
-        break;
-      case 3:
-        candidate->priority = atoi(buf);
-        break;
-      case 4:
-        if (strstr(buf, "local") != 0) {
-          if (mdns_resolve_addr(buf, &candidate->addr) == 0) {
-            return -1;
-          }
-        } else if (addr_from_string(buf, &candidate->addr) == 0) {
-          return -1;
-        }
-        break;
-      case 5:
-        addr_set_port(&candidate->addr, atoi(buf));
-        break;
-      case 7:
+  if (sscanf(candidate_start, "%s %d %s %" PRIu32 " %s %" PRIu32 " typ %s",
+             candidate->foundation,
+             &candidate->component,
+             candidate->transport,
+             &candidate->priority,
+             addrstring,
+             &port,
+             type) != 7) {
+    LOGE("Failed to parse ICE candidate description");
+    return -1;
+  }
 
-        if (strncmp(buf, "host", 4) == 0) {
-          candidate->type = ICE_CANDIDATE_TYPE_HOST;
-        } else if (strncmp(buf, "srflx", 5) == 0) {
-          candidate->type = ICE_CANDIDATE_TYPE_SRFLX;
-        } else if (strncmp(buf, "relay", 5) == 0) {
-          candidate->type = ICE_CANDIDATE_TYPE_RELAY;
-        } else {
-          LOGE("Unknown candidate type: %s", buf);
-          return -1;
-        }
-        // End of description
-        return 0;
-      default:
-        break;
+  if (strncmp(candidate->transport, "UDP", 3) != 0 && strncmp(candidate->transport, "udp", 3) != 0) {
+    LOGE("Only UDP transport is supported");
+    return -1;
+  }
+
+  if (strncmp(type, "host", 4) == 0) {
+    candidate->type = ICE_CANDIDATE_TYPE_HOST;
+  } else if (strncmp(type, "srflx", 5) == 0) {
+    candidate->type = ICE_CANDIDATE_TYPE_SRFLX;
+  } else if (strncmp(type, "relay", 5) == 0) {
+    candidate->type = ICE_CANDIDATE_TYPE_RELAY;
+  } else {
+    LOGE("Unknown candidate type: %s", type);
+    return -1;
+  }
+
+  addr_set_port(&candidate->addr, port);
+
+  if (strstr(addrstring, "local") != NULL) {
+    if (mdns_resolve_addr(addrstring, &candidate->addr) == 0) {
+      LOGW("Failed to resolve mDNS address");
+      return -1;
     }
-
-    split_start = split_end + 1;
-    index++;
+  } else if (addr_from_string(addrstring, &candidate->addr) == 0) {
+    return -1;
   }
 
   return 0;

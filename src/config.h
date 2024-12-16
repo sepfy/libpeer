@@ -1,6 +1,9 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
+// uncomment this if you want to handshake with a aiortc
+#define CONFIG_DTLS_USE_ECDSA 1
+
 #define SCTP_MTU (1200)
 #define CONFIG_MTU (1300)
 
@@ -20,6 +23,10 @@
 #define RSA_KEY_LENGTH 512
 #else
 #define RSA_KEY_LENGTH 1024
+#endif
+
+#ifndef CONFIG_DTLS_USE_ECDSA
+#define CONFIG_DTLS_USE_ECDSA 0
 #endif
 
 #ifndef CONFIG_USE_USRSCTP
