@@ -25,10 +25,14 @@ $ git clone https://github.com/sepfy/libpeer
 $ cd libpeer/examples/esp32
 ```
 
+### Get Your URL
+Go to the test [website](https://sepfy.github.io/libpeer) and copy the URL
+
 ### Configure Your Build
 ```bash
 $ idf.py menuconfig
-# Choose Example Connection Configuration and change the SSID and password
+# Peer Connection Configuration -> Signaling URL
+# Example Connection Configuration -> WiFi SSID and WiFi Password
 ```
 
 ### Build the Project
@@ -40,13 +44,6 @@ $ idf.py build
 ```bash
 $ idf.py flash
 ```
-Monitor the serial port output:
-```
-I (10813) Camera: Camera Task Started
-I (10813) webrtc: peer_signaling_task started
-I (10813) webrtc: peer_connection_task started
-I (10823) webrtc: [APP] Free memory: 3882160 bytes
-I (10823) webrtc: open https://sepfy.github.io/webrtc?deviceId=esp32-xxxxxxxxxxxx
-```
-Open your browser and navigate to the URL provided in the serial port output:
-![image](https://github.com/sepfy/libpeer/assets/22016807/46df15b1-9e28-4a6b-bf0a-4f676778cf7d)
+### Connect to Your Device
+Back to the test website and click Connect button
+
