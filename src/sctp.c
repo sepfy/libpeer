@@ -259,7 +259,7 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
         sack_chunk->a_rwnd = htonl(0x02);
         length = ntohs(sack_chunk->common.length) + sizeof(SctpHeader);
 
-        LOGD("SCTP_DATA. ppid = %ld, data = %d", ntohl(data_chunk->ppid), data_chunk->data[0]);
+        LOGD("SCTP_DATA. ppid = %ld, data = %.2x", ntohl(data_chunk->ppid), data_chunk->data[0]);
         if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_CONTROL && data_chunk->data[0] == DATA_CHANNEL_OPEN) {
           data_chunk = (SctpDataChunk*)sack_chunk->blocks;
           data_chunk->type = SCTP_DATA;
@@ -271,6 +271,14 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
           data_chunk->length = htons(1 + sizeof(SctpDataChunk));
           data_chunk->data[0] = DATA_CHANNEL_ACK;
           length += ntohs(data_chunk->length);
+
+          if (!sctp->connected) {
+            sctp->connected = 1;
+            if (sctp->onopen) {
+              sctp->onopen(sctp->userdata);
+            }
+          }
+
         } else if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_DOMSTRING) {
           if (sctp->onmessage) {
             sctp->onmessage((char*)data_chunk->data, ntohs(data_chunk->length) - sizeof(SctpDataChunk),
@@ -368,16 +376,10 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
         common->length = htons(4);
         length = ntohs(common->length) + sizeof(SctpHeader);
         pos = len;  // Do not handle other msg
-
-        // XXX: Initiate the sctp association
-        if (!sctp->connected) {
-          sctp->connected = 1;
-          if (sctp->onopen) {
-            sctp->onopen(sctp->userdata);
-          }
-        }
       } break;
-      case SCTP_ABORT:
+      case SCTP_COOKIE_ACK: {
+        break;
+      } case SCTP_ABORT:
         sctp->connected = 0;
         if (sctp->onclose) {
           sctp->onclose(sctp->userdata);
