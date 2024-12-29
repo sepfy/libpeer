@@ -33,6 +33,11 @@ void buffer_free(Buffer* rb) {
 }
 
 int buffer_push_tail(Buffer* rb, const uint8_t* data, int size) {
+
+  if (!rb || !data || size <= 0) {
+    return -1;
+  }
+
   int free_space = (rb->size + rb->head - rb->tail - 1) % rb->size;
 
   int align_size = ALIGN32(size + 4);
