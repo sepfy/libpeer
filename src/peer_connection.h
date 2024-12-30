@@ -32,6 +32,15 @@ typedef enum DataChannelType {
 
 } DataChannelType;
 
+typedef enum DecpChannelType {
+  DATA_CHANNEL_RELIABLE = 0x00,
+  DATA_CHANNEL_RELIABLE_UNORDERED = 0x80,
+  DATA_CHANNEL_PARTIAL_RELIABLE_REXMIT = 0x01,
+  DATA_CHANNEL_PARTIAL_RELIABLE_REXMIT_UNORDERED = 0x81,
+  DATA_CHANNEL_PARTIAL_RELIABLE_TIMED = 0x02,
+  DATA_CHANNEL_PARTIAL_RELIABLE_TIMED_UNORDERED = 0x82,
+} DecpChannelType;
+
 typedef enum MediaCodec {
 
   CODEC_NONE = 0,
@@ -84,6 +93,11 @@ void peer_connection_destroy(PeerConnection* pc);
 void peer_connection_close(PeerConnection* pc);
 
 int peer_connection_loop(PeerConnection* pc);
+
+int peer_connection_create_datachannel(PeerConnection* pc, DecpChannelType channel_type, uint16_t priority, uint32_t reliability_parameter, char* label, char* protocol);
+
+int peer_connection_create_datachannel_sid(PeerConnection* pc, DecpChannelType channel_type, uint16_t priority, uint32_t reliability_parameter, char* label, char* protocol, uint16_t sid);
+
 /**
  * @brief send message to data channel
  * @param[in] peer connection

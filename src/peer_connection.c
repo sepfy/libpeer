@@ -268,6 +268,55 @@ int peer_connection_datachannel_send_sid(PeerConnection* pc, char* message, size
 #endif
 }
 
+int peer_connection_create_datachannel(PeerConnection* pc, DecpChannelType channel_type, uint16_t priority, uint32_t reliability_parameter, char* label, char* protocol) {
+  return peer_connection_create_datachannel_sid(pc, channel_type, priority, reliability_parameter, label, protocol, 0);
+}
+
+int peer_connection_create_datachannel_sid(PeerConnection* pc, DecpChannelType channel_type, uint16_t priority, uint32_t reliability_parameter, char* label, char* protocol, uint16_t sid) {
+  int rtrn = -1;
+
+  if (!sctp_is_connected(&pc->sctp)) {
+    LOGE("sctp not connected");
+    return rtrn;
+  }
+
+  //  0                   1                   2                   3
+  //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+  // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  // |  Message Type |  Channel Type |            Priority           |
+  // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  // |                    Reliability Parameter                      |
+  // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  // |         Label Length          |       Protocol Length         |
+  // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  // |                                                               |
+  // |                             Label                             |
+  // |                                                               |
+  // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  // |                                                               |
+  // |                            Protocol                           |
+  // |                                                               |
+  // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  int msg_size = 12 + strlen(label) + strlen(protocol);
+  uint16_t priority_big_endian = htons(priority);
+  uint32_t reliability_big_endian = ntohl(reliability_parameter);
+  uint16_t label_length = htons(strlen(label));
+  uint16_t protocol_length = htons(strlen(protocol));
+  char* msg = calloc(1, msg_size);
+
+  msg[0] = DATA_CHANNEL_OPEN;
+  memcpy(msg + 2, &priority_big_endian, sizeof(uint16_t));
+  memcpy(msg + 4, &reliability_big_endian, sizeof(uint32_t));
+  memcpy(msg + 8, &label_length, sizeof(uint16_t));
+  memcpy(msg + 10, &protocol_length, sizeof(uint16_t));
+  memcpy(msg + 12, label, strlen(label));
+  memcpy(msg + 12 + strlen(label), protocol, strlen(protocol));
+
+  rtrn = sctp_outgoing_data(&pc->sctp, msg, msg_size, PPID_CONTROL, sid);
+  free(msg);
+  return rtrn;
+}
+
 static char* peer_connection_dtls_role_setup_value(DtlsSrtpRole d) {
   return d == DTLS_SRTP_ROLE_SERVER ? "a=setup:passive" : "a=setup:active";
 }
