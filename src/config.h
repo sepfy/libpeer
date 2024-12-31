@@ -2,7 +2,7 @@
 #define CONFIG_H_
 
 // uncomment this if you want to handshake with a aiortc
-#define CONFIG_DTLS_USE_ECDSA 1
+// #define CONFIG_DTLS_USE_ECDSA 1
 
 #define SCTP_MTU (1200)
 #define CONFIG_MTU (1300)
@@ -55,6 +55,10 @@
 
 #ifndef CONFIG_HTTP_BUFFER_SIZE
 #define CONFIG_HTTP_BUFFER_SIZE 4096
+#endif
+
+#ifndef CONFIG_TLS_READ_TIMEOUT
+#define CONFIG_TLS_READ_TIMEOUT 3000
 #endif
 
 #define AUDIO_LATENCY 20  // ms

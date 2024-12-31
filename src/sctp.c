@@ -379,7 +379,8 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
       } break;
       case SCTP_COOKIE_ACK: {
         break;
-      } case SCTP_ABORT:
+      }
+      case SCTP_ABORT:
         sctp->connected = 0;
         if (sctp->onclose) {
           sctp->onclose(sctp->userdata);

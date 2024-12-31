@@ -60,9 +60,8 @@ static void peer_connection_outgoing_rtp_packet(uint8_t* data, size_t size, void
 }
 
 static int peer_connection_dtls_srtp_recv(void* ctx, unsigned char* buf, size_t len) {
-  static const int MAX_RECV = 200;
   int recv_max = 0;
-  int ret;
+  int ret = -1;
   DtlsSrtp* dtls_srtp = (DtlsSrtp*)ctx;
   PeerConnection* pc = (PeerConnection*)dtls_srtp->user_data;
 
@@ -71,7 +70,7 @@ static int peer_connection_dtls_srtp_recv(void* ctx, unsigned char* buf, size_t 
     return pc->agent_ret;
   }
 
-  while (recv_max < MAX_RECV) {
+  while (recv_max < CONFIG_TLS_READ_TIMEOUT && pc->state == PEER_CONNECTION_CONNECTED) {
     ret = agent_recv(&pc->agent, buf, len);
 
     if (ret > 0) {
