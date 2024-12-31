@@ -33,7 +33,6 @@ void buffer_free(Buffer* rb) {
 }
 
 int buffer_push_tail(Buffer* rb, const uint8_t* data, int size) {
-
   if (!rb || !data || size <= 0) {
     return -1;
   }
