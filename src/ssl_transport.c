@@ -8,6 +8,7 @@
 #include "mbedtls/entropy.h"
 #include "mbedtls/ssl.h"
 
+#include <sys/select.h>
 #include "config.h"
 #include "ports.h"
 #include "ssl_transport.h"
