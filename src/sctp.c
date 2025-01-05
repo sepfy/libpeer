@@ -271,14 +271,6 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
           data_chunk->length = htons(1 + sizeof(SctpDataChunk));
           data_chunk->data[0] = DATA_CHANNEL_ACK;
           length += ntohs(data_chunk->length);
-
-          if (!sctp->connected) {
-            sctp->connected = 1;
-            if (sctp->onopen) {
-              sctp->onopen(sctp->userdata);
-            }
-          }
-
         } else if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_DOMSTRING) {
           if (sctp->onmessage) {
             sctp->onmessage((char*)data_chunk->data, ntohs(data_chunk->length) - sizeof(SctpDataChunk),
@@ -310,6 +302,13 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
         param->length = htons(8);
         *(uint32_t*)&param->value = htonl(0x02);
         length = ntohs(init_ack->common.length) + sizeof(SctpHeader);
+
+        if (!sctp->connected) {
+          sctp->connected = 1;
+          if (sctp->onopen) {
+            sctp->onopen(sctp->userdata);
+          }
+        }
       } break;
       case SCTP_INIT_ACK: {
         SctpInitChunk* init_ack = (SctpInitChunk*)in_packet->chunks;
@@ -336,6 +335,13 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
         // param: type + length (4 bytes) + cookie
         memcpy(cookie_echo->cookie, param->value, ntohs(param->length) - 4);
         length = ntohs(cookie_echo->common.length) + sizeof(SctpHeader);
+
+        if (!sctp->connected) {
+          sctp->connected = 1;
+          if (sctp->onopen) {
+            sctp->onopen(sctp->userdata);
+          }
+        }
       } break;
       case SCTP_SACK:
 #if 0
