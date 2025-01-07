@@ -61,13 +61,25 @@
 #define CONFIG_TLS_READ_TIMEOUT 3000
 #endif
 
+#ifndef CONFIG_AGENT_READ_TIMEOUT
+#define CONFIG_AGENT_READ_TIMEOUT 1  // 1ms
+#endif
+
+#ifndef CONFIG_AGENT_RTO
+#define CONFIG_AGENT_RTO 500  // 500ms
+#endif
+
+#ifndef CONFIG_AGENT_MAX_ATTMEPTS
+#define CONFIG_AGENT_MAX_ATTEMPTS 7
+#endif
+
 #define AUDIO_LATENCY 20  // ms
 #define KEEPALIVE_CONNCHECK 10000
 #define CONFIG_IPV6 0
 // empty will use first active interface
 #define CONFIG_IFACE_PREFIX ""
 
-// #define LOG_LEVEL LEVEL_DEBUG
+/ #define LOG_LEVEL LEVEL_DEBUG
 #define LOG_REDIRECT 0
 
 // Disable MQTT and HTTP signaling

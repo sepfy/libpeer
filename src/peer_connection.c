@@ -420,10 +420,12 @@ int peer_connection_loop(PeerConnection* pc) {
       break;
 
     case PEER_CONNECTION_CHECKING:
-      if (agent_select_candidate_pair(&pc->agent) < 0) {
-        STATE_CHANGED(pc, PEER_CONNECTION_FAILED);
-      } else if (agent_connectivity_check(&pc->agent) == 0) {
+
+      agent_update_candidate_pair(&pc->agent);
+      if (!agent_connectivity_check(&pc->agent)) {
         STATE_CHANGED(pc, PEER_CONNECTION_CONNECTED);
+      } else if (agent_restore_candidate_pair(&pc->agent) < 0) {
+        STATE_CHANGED(pc, PEER_CONNECTION_FAILED);
       }
       break;
 
@@ -646,10 +648,6 @@ char* peer_connection_lookup_sid_label(PeerConnection* pc, uint16_t sid) {
 
 int peer_connection_add_ice_candidate(PeerConnection* pc, char* candidate) {
   Agent* agent = &pc->agent;
-  if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], candidate, candidate + strlen(candidate)) != 0) {
-    return -1;
-  }
-
-  agent->remote_candidates_count++;
+  agent_add_remote_candidate(agent, candidate, candidate + strlen(candidate));
   return 0;
 }

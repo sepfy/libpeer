@@ -70,6 +70,7 @@ struct Agent {
   int candidate_pairs_num;
   int use_candidate;
   uint32_t transaction_id[3];
+  int conncheck;
 };
 
 void agent_gather_candidate(Agent* agent, const char* urls, const char* username, const char* credential);
@@ -82,7 +83,9 @@ int agent_recv(Agent* agent, uint8_t* buf, int len);
 
 void agent_set_remote_description(Agent* agent, char* description);
 
-int agent_select_candidate_pair(Agent* agent);
+void agent_update_candidate_pair(Agent* agent);
+
+int agent_restore_candidate_pair(Agent* agent);
 
 int agent_connectivity_check(Agent* agent);
 
@@ -91,5 +94,7 @@ void agent_clear_candidates(Agent* agent);
 int agent_create(Agent* agent);
 
 void agent_destroy(Agent* agent);
+
+void agent_add_remote_candidate(Agent* agent, char* start, char* end);
 
 #endif  // AGENT_H_
