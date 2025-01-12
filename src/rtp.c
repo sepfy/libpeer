@@ -26,8 +26,8 @@ typedef struct FuHeader {
   uint8_t s : 1;
 } FuHeader;
 
-#define RTP_PAYLOAD_SIZE (CONFIG_MTU - sizeof(RtpHeader))
-#define FU_PAYLOAD_SIZE (CONFIG_MTU - sizeof(RtpHeader) - sizeof(FuHeader) - sizeof(NaluHeader))
+#define RTP_PAYLOAD_SIZE (CONFIG_LIBPEER_MTU - sizeof(RtpHeader))
+#define FU_PAYLOAD_SIZE (CONFIG_LIBPEER_MTU - sizeof(RtpHeader) - sizeof(FuHeader) - sizeof(NaluHeader))
 
 int rtp_packet_validate(uint8_t* packet, size_t size) {
   if (size < 12)
@@ -113,7 +113,7 @@ static int rtp_encoder_encode_h264_fu_a(RtpEncoder* rtp_encoder, uint8_t* buf, s
     fu_header->e = 0;
 
     memcpy(rtp_packet->payload + sizeof(NaluHeader) + sizeof(FuHeader), buf, FU_PAYLOAD_SIZE);
-    rtp_encoder->on_packet(rtp_encoder->buf, CONFIG_MTU, rtp_encoder->user_data);
+    rtp_encoder->on_packet(rtp_encoder->buf, CONFIG_LIBPEER_MTU, rtp_encoder->user_data);
     size -= FU_PAYLOAD_SIZE;
     buf += FU_PAYLOAD_SIZE;
 
@@ -195,19 +195,19 @@ void rtp_encoder_init(RtpEncoder* rtp_encoder, MediaCodec codec, RtpOnPacket on_
     case CODEC_PCMA:
       rtp_encoder->type = PT_PCMA;
       rtp_encoder->ssrc = SSRC_PCMA;
-      rtp_encoder->timestamp_increment = CONFIG_AUDIO_DURATION * 8000 / 1000;
+      rtp_encoder->timestamp_increment = CONFIG_LIBPEER_AUDIO_DURATION * 8000 / 1000;
       rtp_encoder->encode_func = rtp_encoder_encode_generic;
       break;
     case CODEC_PCMU:
       rtp_encoder->type = PT_PCMU;
       rtp_encoder->ssrc = SSRC_PCMU;
-      rtp_encoder->timestamp_increment = CONFIG_AUDIO_DURATION * 8000 / 1000;
+      rtp_encoder->timestamp_increment = CONFIG_LIBPEER_AUDIO_DURATION * 8000 / 1000;
       rtp_encoder->encode_func = rtp_encoder_encode_generic;
       break;
     case CODEC_OPUS:
       rtp_encoder->type = PT_OPUS;
       rtp_encoder->ssrc = SSRC_OPUS;
-      rtp_encoder->timestamp_increment = CONFIG_AUDIO_DURATION * 48000 / 1000;
+      rtp_encoder->timestamp_increment = CONFIG_LIBPEER_AUDIO_DURATION * 48000 / 1000;
       rtp_encoder->encode_func = rtp_encoder_encode_generic;
       break;
     default:

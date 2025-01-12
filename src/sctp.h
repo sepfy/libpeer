@@ -23,7 +23,7 @@ typedef enum DataChannelPpid {
 
 } DataChannelPpid;
 
-#if !CONFIG_USE_USRSCTP
+#if !CONFIG_LIBPEER_USE_USRSCTP
 
 typedef struct SctpChunkParam {
   uint16_t type;
@@ -167,7 +167,7 @@ typedef struct Sctp {
   void (*onclose)(void* userdata);
 
   void* userdata;
-  uint8_t buf[CONFIG_MTU];
+  uint8_t buf[CONFIG_LIBPEER_MTU];
 } Sctp;
 
 int sctp_create_association(Sctp* sctp, DtlsSrtp* dtls_srtp);

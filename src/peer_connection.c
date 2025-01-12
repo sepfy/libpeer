@@ -35,8 +35,8 @@ struct PeerConnection {
   void (*on_connected)(void* userdata);
   void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void* user_data);
 
-  uint8_t temp_buf[CONFIG_MTU];
-  uint8_t agent_buf[CONFIG_MTU];
+  uint8_t temp_buf[CONFIG_LIBPEER_MTU];
+  uint8_t agent_buf[CONFIG_LIBPEER_MTU];
   int agent_ret;
   int b_local_description_created;
 
@@ -70,7 +70,7 @@ static int peer_connection_dtls_srtp_recv(void* ctx, unsigned char* buf, size_t 
     return pc->agent_ret;
   }
 
-  while (recv_max < CONFIG_TLS_READ_TIMEOUT && pc->state == PEER_CONNECTION_CONNECTED) {
+  while (recv_max < CONFIG_LIBPEER_TLS_READ_TIMEOUT && pc->state == PEER_CONNECTION_CONNECTED) {
     ret = agent_recv(&pc->agent, buf, len);
 
     if (ret > 0) {
@@ -171,16 +171,16 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
   memset(&pc->sctp, 0, sizeof(pc->sctp));
 
   if (pc->config.datachannel) {
-#if (CONFIG_DATA_BUFFER_SIZE) > 0
-    LOGI("Datachannel allocates heap size: %d", CONFIG_DATA_BUFFER_SIZE);
-    pc->data_rb = buffer_new(CONFIG_DATA_BUFFER_SIZE);
+#if (CONFIG_LIBPEER_DATA_BUFFER_SIZE) > 0
+    LOGI("Datachannel allocates heap size: %d", CONFIG_LIBPEER_DATA_BUFFER_SIZE);
+    pc->data_rb = buffer_new(CONFIG_LIBPEER_DATA_BUFFER_SIZE);
 #endif
   }
 
   if (pc->config.audio_codec) {
-#if (CONFIG_AUDIO_BUFFER_SIZE) > 0
-    LOGI("Audio allocates heap size: %d", CONFIG_AUDIO_BUFFER_SIZE);
-    pc->audio_rb = buffer_new(CONFIG_AUDIO_BUFFER_SIZE);
+#if (CONFIG_LIBPEER_AUDIO_BUFFER_SIZE) > 0
+    LOGI("Audio allocates heap size: %d", CONFIG_LIBPEER_AUDIO_BUFFER_SIZE);
+    pc->audio_rb = buffer_new(CONFIG_LIBPEER_AUDIO_BUFFER_SIZE);
 #endif
 
     rtp_encoder_init(&pc->artp_encoder, pc->config.audio_codec,
@@ -191,9 +191,9 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
   }
 
   if (pc->config.video_codec) {
-#if (CONFIG_VIDEO_BUFFER_SIZE) > 0
-    LOGI("Video allocates heap size: %d", CONFIG_VIDEO_BUFFER_SIZE);
-    pc->video_rb = buffer_new(CONFIG_VIDEO_BUFFER_SIZE);
+#if (CONFIG_LIBPEER_VIDEO_BUFFER_SIZE) > 0
+    LOGI("Video allocates heap size: %d", CONFIG_LIBPEER_VIDEO_BUFFER_SIZE);
+    pc->video_rb = buffer_new(CONFIG_LIBPEER_VIDEO_BUFFER_SIZE);
 #endif
     rtp_encoder_init(&pc->vrtp_encoder, pc->config.video_codec,
                      peer_connection_outgoing_rtp_packet, (void*)pc);
@@ -228,7 +228,7 @@ int peer_connection_send_audio(PeerConnection* pc, const uint8_t* buf, size_t le
     // LOGE("dtls_srtp not connected");
     return -1;
   }
-#if (CONFIG_AUDIO_BUFFER_SIZE) > 0
+#if (CONFIG_LIBPEER_AUDIO_BUFFER_SIZE) > 0
   return buffer_push_tail(pc->audio_rb, buf, len);
 #else
   return rtp_encoder_encode(&pc->artp_encoder, buf, len);
@@ -240,7 +240,7 @@ int peer_connection_send_video(PeerConnection* pc, const uint8_t* buf, size_t le
     // LOGE("dtls_srtp not connected");
     return -1;
   }
-#if (CONFIG_VIDEO_BUFFER_SIZE) > 0
+#if (CONFIG_LIBPEER_VIDEO_BUFFER_SIZE) > 0
   return buffer_push_tail(pc->video_rb, buf, len);
 #else
   return rtp_encoder_encode(&pc->vrtp_encoder, data, bytes);
@@ -257,7 +257,7 @@ int peer_connection_datachannel_send_sid(PeerConnection* pc, char* message, size
     return -1;
   }
 
-#if (CONFIG_DATA_BUFFER_SIZE) > 0
+#if (CONFIG_LIBPEER_DATA_BUFFER_SIZE) > 0
   return buffer_push_tail(pc->data_rb, (uint8_t*)message, len);
 #else
   if (pc->config.datachannel == DATA_CHANNEL_STRING)
@@ -443,7 +443,7 @@ int peer_connection_loop(PeerConnection* pc) {
       break;
     case PEER_CONNECTION_COMPLETED:
 
-#if (CONFIG_VIDEO_BUFFER_SIZE) > 0
+#if (CONFIG_LIBPEER_VIDEO_BUFFER_SIZE) > 0
       data = buffer_peak_head(pc->video_rb, &bytes);
       if (data) {
         rtp_encoder_encode(&pc->vrtp_encoder, data, bytes);
@@ -451,7 +451,7 @@ int peer_connection_loop(PeerConnection* pc) {
       }
 #endif
 
-#if (CONFIG_AUDIO_BUFFER_SIZE) > 0
+#if (CONFIG_LIBPEER_AUDIO_BUFFER_SIZE) > 0
       data = buffer_peak_head(pc->audio_rb, &bytes);
       if (data) {
         rtp_encoder_encode(&pc->artp_encoder, data, bytes);
@@ -459,7 +459,7 @@ int peer_connection_loop(PeerConnection* pc) {
       }
 #endif
 
-#if (CONFIG_DATA_BUFFER_SIZE) > 0
+#if (CONFIG_LIBPEER_DATA_BUFFER_SIZE) > 0
       data = buffer_peak_head(pc->data_rb, &bytes);
       if (data) {
         if (pc->config.datachannel == DATA_CHANNEL_STRING)
@@ -503,7 +503,7 @@ int peer_connection_loop(PeerConnection* pc) {
         }
       }
 
-      if (CONFIG_KEEPALIVE_TIMEOUT > 0 && (ports_get_epoch_time() - pc->agent.binding_request_time) > CONFIG_KEEPALIVE_TIMEOUT) {
+      if (CONFIG_LIBPEER_KEEPALIVE_TIMEOUT > 0 && (ports_get_epoch_time() - pc->agent.binding_request_time) > CONFIG_LIBPEER_KEEPALIVE_TIMEOUT) {
         LOGI("binding request timeout");
         STATE_CHANGED(pc, PEER_CONNECTION_CLOSED);
       }
