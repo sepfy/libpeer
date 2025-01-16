@@ -438,7 +438,6 @@ int agent_recv(Agent* agent, uint8_t* buf, int len) {
         agent_process_stun_request(agent, &stun_msg, &addr);
         break;
       case STUN_CLASS_RESPONSE:
-        LOGD("STUN_CLASS_RESPONSE");
         agent_process_stun_response(agent, &stun_msg);
         break;
       case STUN_CLASS_ERROR:
