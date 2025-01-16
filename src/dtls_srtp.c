@@ -345,7 +345,6 @@ static void dtls_srtp_key_derivation_cb(void* context,
                                         mbedtls_tls_prf_types tls_prf_type) {
 #endif
   DtlsSrtp* dtls_srtp = (DtlsSrtp*)context;
-  LOGI("&&&&&&&&&&&&&&&&&&&&&dtls_srtp_key_derivation_cb");
   unsigned char master_secret[48];
   unsigned char randbytes[64];
 
