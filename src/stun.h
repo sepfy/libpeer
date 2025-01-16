@@ -31,6 +31,12 @@ typedef enum StunMethod {
   STUN_METHOD_BINDING = 0x0001,
   STUN_METHOD_ALLOCATE = 0x0003,
 
+  STUN_METHOD_REFRESH = 0x0004,
+  STUN_METHOD_SEND = 0x0006,
+  STUN_METHOD_DATA = 0x0007,
+  STUN_METHOD_CREATE_PERMISSION = 0x0008,
+  STUN_METHOD_CHANNEL_BIND = 0x0009,
+
 } StunMethod;
 
 typedef enum StunAttrType {
@@ -38,7 +44,9 @@ typedef enum StunAttrType {
   STUN_ATTR_TYPE_MAPPED_ADDRESS = 0x0001,
   STUN_ATTR_TYPE_USERNAME = 0x0006,
   STUN_ATTR_TYPE_MESSAGE_INTEGRITY = 0x0008,
+  STUN_ATTR_TYPE_CHANNEL_NUMBER = 0x000c,
   STUN_ATTR_TYPE_LIFETIME = 0x000d,
+  STUN_ATTR_TYPE_XOR_PEER_ADDRESS = 0x0012,
   STUN_ATTR_TYPE_REALM = 0x0014,
   STUN_ATTR_TYPE_NONCE = 0x0015,
   STUN_ATTR_TYPE_XOR_RELAYED_ADDRESS = 0x0016,
@@ -99,6 +107,7 @@ struct StunMessage {
 void stun_msg_create(StunMessage* msg, uint16_t type);
 
 int stun_set_mapped_address(char* value, uint8_t* mask, Address* addr);
+int stun_set_mapped_address_test(char* value, uint8_t* mask, Address* addr);
 
 void stun_get_mapped_address(char* value, uint8_t* mask, Address* addr);
 

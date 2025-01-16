@@ -40,6 +40,14 @@ struct IceCandidate {
   IceCandidateState state;
   Address addr;
   Address raddr;
+
+  Address serv_addr;
+
+  const char* username;
+  const char* credential;
+
+  char realm[64];
+  char nonce[64];
 };
 
 typedef struct IceCandidatePair IceCandidatePair;
@@ -50,6 +58,8 @@ struct IceCandidatePair {
   IceCandidate* remote;
   int conncheck;
   uint64_t priority;
+
+  uint16_t channel_number;
 };
 
 void ice_candidate_create(IceCandidate* ice_candidate, int foundation, IceCandidateType type, Address* addr);

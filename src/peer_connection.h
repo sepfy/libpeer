@@ -61,7 +61,6 @@ typedef struct IceServer {
   const char* urls;
   const char* username;
   const char* credential;
-
 } IceServer;
 
 typedef struct PeerConfiguration {

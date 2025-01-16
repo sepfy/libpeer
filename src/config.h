@@ -2,7 +2,7 @@
 #define CONFIG_H_
 
 // uncomment this if you want to handshake with a aiortc
-// #define CONFIG_DTLS_USE_ECDSA 1
+#define CONFIG_DTLS_USE_ECDSA 1
 
 #define SCTP_MTU (1200)
 #define CONFIG_MTU (1300)
