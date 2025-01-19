@@ -61,8 +61,14 @@
 #define CONFIG_TLS_READ_TIMEOUT 3000
 #endif
 
-#define AUDIO_LATENCY 20  // ms
-#define KEEPALIVE_CONNCHECK 10000
+#ifndef CONFIG_KEEPALIVE_TIMEOUT
+#define CONFIG_KEEPALIVE_TIMEOUT 10000
+#endif
+
+#ifndef CONFIG_AUDIO_DURATION
+#define CONFIG_AUDIO_DURATION 20
+#endif
+
 #define CONFIG_IPV6 0
 // empty will use first active interface
 #define CONFIG_IFACE_PREFIX ""
