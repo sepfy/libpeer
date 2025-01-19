@@ -86,7 +86,7 @@ static int peer_connection_dtls_srtp_send(void* ctx, const uint8_t* buf, size_t 
   DtlsSrtp* dtls_srtp = (DtlsSrtp*)ctx;
   PeerConnection* pc = (PeerConnection*)dtls_srtp->user_data;
 
-  // LOGD("send %.4x %.4x, %ld", *(uint16_t*)buf, *(uint16_t*)(buf + 2), len);
+  LOGD("peer_connection_dtls_srtp_send %4x %4x, %d", *(uint16_t*)buf, *(uint16_t*)(buf + 2), (int)len);
   return agent_send(&pc->agent, buf, len);
 }
 
@@ -331,7 +331,6 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int
   pc->dtls_srtp.udp_send = peer_connection_dtls_srtp_send;
 
   pc->sctp.connected = 0;
-
   if (isOfferer) {
     agent_clear_candidates(&pc->agent);
     pc->agent.mode = AGENT_MODE_CONTROLLING;
@@ -410,12 +409,11 @@ int peer_connection_loop(PeerConnection* pc) {
   uint32_t ssrc = 0;
   memset(pc->agent_buf, 0, sizeof(pc->agent_buf));
   pc->agent_ret = -1;
-
   switch (pc->state) {
     case PEER_CONNECTION_NEW:
 
       if (!pc->b_local_description_created) {
-        peer_connection_state_new(pc, DTLS_SRTP_ROLE_SERVER, 1);
+        peer_connection_state_new(pc, DTLS_SRTP_ROLE_CLIENT, 1);
       }
       break;
 
@@ -429,6 +427,7 @@ int peer_connection_loop(PeerConnection* pc) {
 
     case PEER_CONNECTION_CONNECTED:
 
+      LOGD("DTLS-SRTP handshake start");
       if (dtls_srtp_handshake(&pc->dtls_srtp, NULL) == 0) {
         LOGD("DTLS-SRTP handshake done");
 
@@ -508,6 +507,8 @@ int peer_connection_loop(PeerConnection* pc) {
         STATE_CHANGED(pc, PEER_CONNECTION_CLOSED);
       }
 
+      if (pc->agent.selected_pair->local->type == ICE_CANDIDATE_TYPE_RELAY)
+        agent_refresh_relay_channel(&pc->agent);
       break;
     case PEER_CONNECTION_FAILED:
       break;
@@ -574,6 +575,7 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
   }
 
   agent_set_remote_description(&pc->agent, (char*)sdp_text);
+  
   STATE_CHANGED(pc, PEER_CONNECTION_CHECKING);
 }
 

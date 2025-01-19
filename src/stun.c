@@ -59,6 +59,7 @@ void stun_msg_create(StunMessage* msg, uint16_t type) {
 int stun_set_mapped_address(char* value, uint8_t* mask, Address* addr) {
   int ret, i;
   char addr_string[ADDRSTRLEN];
+  value[0] = 0;
   uint8_t* family = (uint8_t*)(value + 1);
   uint16_t* port = (uint16_t*)(value + 2);
   uint32_t* val32 = (uint32_t*)(value + 4);
