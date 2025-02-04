@@ -403,6 +403,133 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int
   }
 }
 
+int peer_connection_recv(PeerConnection* pc) {
+    if (!pc) return -1;
+
+    int total_bytes = 0;
+
+    switch (pc->state) {
+        case PEER_CONNECTION_NEW:
+            if (!pc->b_local_description_created) {
+                peer_connection_state_new(pc, DTLS_SRTP_ROLE_SERVER, 1);
+            }
+            break;
+
+        case PEER_CONNECTION_CHECKING:
+            if (agent_select_candidate_pair(&pc->agent) < 0) {
+                STATE_CHANGED(pc, PEER_CONNECTION_FAILED);
+                return -1;
+            }
+            if (agent_connectivity_check(&pc->agent) == 0) {
+                STATE_CHANGED(pc, PEER_CONNECTION_CONNECTED);
+            }
+            break;
+
+        case PEER_CONNECTION_CONNECTED:
+            if (dtls_srtp_handshake(&pc->dtls_srtp, NULL) == 0) {
+                if (pc->config.datachannel) {
+                    // Close any existing SCTP association first
+                    if (pc->sctp.sock) {
+                        sctp_destroy_association(&pc->sctp);
+                    }
+                    sctp_create_association(&pc->sctp, &pc->dtls_srtp);
+                    pc->sctp.userdata = pc->config.user_data;
+                }
+                STATE_CHANGED(pc, PEER_CONNECTION_COMPLETED);
+            }
+            break;
+
+        case PEER_CONNECTION_COMPLETED: {
+            // Process incoming data
+            int ret;
+            while ((ret = agent_recv(&pc->agent, pc->agent_buf, sizeof(pc->agent_buf))) > 0) {
+                pc->agent_ret = ret;
+                total_bytes += ret;
+
+                if (rtcp_probe(pc->agent_buf, pc->agent_ret)) {
+                    dtls_srtp_decrypt_rtcp_packet(&pc->dtls_srtp, pc->agent_buf, &pc->agent_ret);
+                    peer_connection_incoming_rtcp(pc, pc->agent_buf, pc->agent_ret);
+                } else if (dtls_srtp_probe(pc->agent_buf)) {
+                    // Check if the packet is a data channel packet
+                    ret = dtls_srtp_read(&pc->dtls_srtp, pc->temp_buf, sizeof(pc->temp_buf));
+                    if (ret > 0) {
+                      sctp_incoming_data(&pc->sctp, (char*)pc->temp_buf, ret);
+                    }
+                } else if (rtp_packet_validate(pc->agent_buf, pc->agent_ret)) {
+                    dtls_srtp_decrypt_rtp_packet(&pc->dtls_srtp, pc->agent_buf, &pc->agent_ret);
+                    uint32_t ssrc = rtp_get_ssrc(pc->agent_buf);
+                    if (ssrc == pc->remote_assrc) {
+                        rtp_decoder_decode(&pc->artp_decoder, pc->agent_buf, pc->agent_ret);
+                    } else if (ssrc == pc->remote_vssrc) {
+                        rtp_decoder_decode(&pc->vrtp_decoder, pc->agent_buf, pc->agent_ret);
+                    }
+                }
+            }
+
+            // Check connection timeout
+            if (KEEPALIVE_CONNCHECK > 0 &&
+                (ports_get_epoch_time() - pc->agent.binding_request_time) > KEEPALIVE_CONNCHECK) {
+                STATE_CHANGED(pc, PEER_CONNECTION_CLOSED);
+                return -1;
+            }
+            break;
+        }
+
+        case PEER_CONNECTION_FAILED:
+        case PEER_CONNECTION_DISCONNECTED:
+        case PEER_CONNECTION_CLOSED:
+            return -1;
+
+        default:
+            break;
+    }
+    return total_bytes;
+}
+
+int peer_connection_send(PeerConnection* pc) {
+    if (!pc) return -1;
+
+    // Only send data in COMPLETED state
+    if (pc->state == PEER_CONNECTION_COMPLETED) {
+        uint8_t* data;
+        int bytes;
+        int total_bytes = 0;
+
+#if (CONFIG_VIDEO_BUFFER_SIZE) > 0
+        data = buffer_peak_head(pc->video_rb, &bytes);
+        if (data) {
+            rtp_encoder_encode(&pc->vrtp_encoder, data, bytes);
+            buffer_pop_head(pc->video_rb);
+            total_bytes += bytes;
+        }
+#endif
+
+#if (CONFIG_AUDIO_BUFFER_SIZE) > 0
+        data = buffer_peak_head(pc->audio_rb, &bytes);
+        if (data) {
+            rtp_encoder_encode(&pc->artp_encoder, data, bytes);
+            buffer_pop_head(pc->audio_rb);
+            total_bytes += bytes;
+        }
+#endif
+
+#if (CONFIG_DATA_BUFFER_SIZE) > 0
+        data = buffer_peak_head(pc->data_rb, &bytes);
+        if (data) {
+            if (pc->config.datachannel == DATA_CHANNEL_STRING) {
+                sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_STRING, 0);
+            } else {
+                sctp_outgoing_data(&pc->sctp, (char*)data, bytes, PPID_BINARY, 0);
+            }
+            buffer_pop_head(pc->data_rb);
+            total_bytes += bytes;
+        }
+#endif
+        return total_bytes;
+    }
+    return 0;
+}
+
 int peer_connection_loop(PeerConnection* pc) {
   int bytes;
   uint8_t* data = NULL;
