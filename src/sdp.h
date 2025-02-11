@@ -11,7 +11,7 @@
 #endif
 
 typedef struct Sdp {
-  char content[CONFIG_SDP_BUFFER_SIZE];
+  char content[CONFIG_LIBPEER_SDP_BUFFER_SIZE];
 
 } Sdp;
 

@@ -99,7 +99,7 @@ int ssl_transport_connect(NetworkContext_t* net_ctx,
     return -1;
   }
 
-  mbedtls_ssl_conf_read_timeout(&net_ctx->conf, CONFIG_TLS_READ_TIMEOUT);
+  mbedtls_ssl_conf_read_timeout(&net_ctx->conf, CONFIG_LIBPEER_TLS_READ_TIMEOUT);
   mbedtls_ssl_set_bio(&net_ctx->ssl, &net_ctx->tcp_socket,
                       ssl_transport_mbedlts_send, NULL, ssl_transport_mbedtls_recv_timeout);
 

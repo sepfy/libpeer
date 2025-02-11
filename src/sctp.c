@@ -4,7 +4,7 @@
 #include "dtls_srtp.h"
 #include "sctp.h"
 #include "utils.h"
-#if CONFIG_USE_USRSCTP
+#if CONFIG_LIBPEER_USE_USRSCTP
 #include <usrsctp.h>
 #endif
 
@@ -94,7 +94,7 @@ static int sctp_outgoing_data_cb(void* userdata, void* buf, size_t len, uint8_t 
 }
 
 int sctp_outgoing_data(Sctp* sctp, char* buf, size_t len, SctpDataPpid ppid, uint16_t sid) {
-#if CONFIG_USE_USRSCTP
+#if CONFIG_LIBPEER_USE_USRSCTP
   int res;
   struct sctp_sendv_spa spa = {0};
 
@@ -111,7 +111,7 @@ int sctp_outgoing_data(Sctp* sctp, char* buf, size_t len, SctpDataPpid ppid, uin
   return res;
 #else
   size_t padding_len = 0;
-  size_t payload_max = SCTP_MTU - sizeof(SctpPacket) - sizeof(SctpDataChunk);
+  size_t payload_max = CONFIG_LIBPEER_SCTP_MTU - sizeof(SctpPacket) - sizeof(SctpDataChunk);
   size_t pos = 0;
   static uint16_t sqn = 0;
 
@@ -134,9 +134,9 @@ int sctp_outgoing_data(Sctp* sctp, char* buf, size_t len, SctpDataPpid ppid, uin
     memcpy(chunk->data, buf + pos, payload_max);
     packet->header.checksum = 0;
 
-    packet->header.checksum = sctp_get_checksum(sctp, (const uint8_t*)sctp->buf, SCTP_MTU);
+    packet->header.checksum = sctp_get_checksum(sctp, (const uint8_t*)sctp->buf, CONFIG_LIBPEER_SCTP_MTU);
 
-    sctp_outgoing_data_cb(sctp, sctp->buf, SCTP_MTU, 0, 0);
+    sctp_outgoing_data_cb(sctp, sctp->buf, CONFIG_LIBPEER_SCTP_MTU, 0, 0);
     chunk->iube = 0x04;
     len -= payload_max;
     pos += payload_max;
@@ -216,7 +216,7 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
   if (!sctp)
     return;
 
-#if CONFIG_USE_USRSCTP
+#if CONFIG_LIBPEER_USE_USRSCTP
   sctp_handle_sctp_packet(sctp, buf, len);
   usrsctp_conninput(sctp, buf, len, 0);
 #else
@@ -416,7 +416,7 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
 }
 
 static int sctp_handle_incoming_data(Sctp* sctp, char* data, size_t len, uint32_t ppid, uint16_t sid, int flags) {
-#if CONFIG_USE_USRSCTP
+#if CONFIG_LIBPEER_USE_USRSCTP
   switch (ppid) {
     case DATA_CHANNEL_PPID_CONTROL:
       break;
@@ -439,7 +439,7 @@ static int sctp_handle_incoming_data(Sctp* sctp, char* data, size_t len, uint32_
   return 0;
 }
 
-#if CONFIG_USE_USRSCTP
+#if CONFIG_LIBPEER_USE_USRSCTP
 
 static void sctp_process_notification(Sctp* sctp, union sctp_notification* notification, size_t len) {
   if (notification->sn_header.sn_length != (uint32_t)len) {
@@ -497,7 +497,7 @@ int sctp_create_association(Sctp* sctp, DtlsSrtp* dtls_srtp) {
   sctp->local_port = 5000;
   sctp->remote_port = 5000;
   sctp->tsn = 1234;
-#if CONFIG_USE_USRSCTP
+#if CONFIG_LIBPEER_USE_USRSCTP
   int ret = -1;
   usrsctp_init(0, sctp_outgoing_data_cb, NULL);
   usrsctp_sysctl_set_sctp_ecn_enable(0);
@@ -624,7 +624,7 @@ int sctp_create_association(Sctp* sctp, DtlsSrtp* dtls_srtp) {
 }
 
 void sctp_destroy_association(Sctp* sctp) {
-#if CONFIG_USE_USRSCTP
+#if CONFIG_LIBPEER_USE_USRSCTP
   if (sctp && sctp->sock) {
     usrsctp_shutdown(sctp->sock, SHUT_RDWR);
     usrsctp_close(sctp->sock);

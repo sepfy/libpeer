@@ -43,8 +43,8 @@ typedef struct PeerSignaling {
   TransportInterface_t transport;
   NetworkContext_t net_ctx;
 
-  uint8_t mqtt_buf[CONFIG_MQTT_BUFFER_SIZE];
-  uint8_t http_buf[CONFIG_HTTP_BUFFER_SIZE];
+  uint8_t mqtt_buf[CONFIG_LIBPEER_MQTT_BUFFER_SIZE];
+  uint8_t http_buf[CONFIG_LIBPEER_HTTP_BUFFER_SIZE];
 
   char subtopic[TOPIC_MAX_LEN];
   char pubtopic[TOPIC_MAX_LEN];
