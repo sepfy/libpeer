@@ -270,6 +270,22 @@ static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* ma
   printf("\n");
 #endif
 
+  const uint8_t* client_key = key_material;
+  const uint8_t* server_key = client_key + SRTP_MASTER_KEY_LENGTH;
+  const uint8_t* client_salt = server_key + SRTP_MASTER_KEY_LENGTH;
+  const uint8_t* server_salt = client_salt + SRTP_MASTER_SALT_LENGTH;
+  uint8_t *local_key, *remote_key, *local_salt, *remote_salt;
+  if (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) {
+    local_key = server_key;
+    local_salt = server_salt;
+    remote_key = client_key;
+    remote_salt = client_salt;
+  } else {
+    local_key = client_key;
+    local_salt = client_salt;
+    remote_key = server_key;
+    remote_salt = server_salt;
+  }
   // derive inbounds keys
 
   memset(&dtls_srtp->remote_policy, 0, sizeof(dtls_srtp->remote_policy));
@@ -277,8 +293,8 @@ static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* ma
   srtp_crypto_policy_set_rtp_default(&dtls_srtp->remote_policy.rtp);
   srtp_crypto_policy_set_rtcp_default(&dtls_srtp->remote_policy.rtcp);
 
-  memcpy(dtls_srtp->remote_policy_key, key_material, SRTP_MASTER_KEY_LENGTH);
-  memcpy(dtls_srtp->remote_policy_key + SRTP_MASTER_KEY_LENGTH, key_material + SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_KEY_LENGTH, SRTP_MASTER_SALT_LENGTH);
+  memcpy(dtls_srtp->remote_policy_key, remote_key, SRTP_MASTER_KEY_LENGTH);
+  memcpy(dtls_srtp->remote_policy_key + SRTP_MASTER_KEY_LENGTH, remote_salt, SRTP_MASTER_SALT_LENGTH);
 
   dtls_srtp->remote_policy.ssrc.type = ssrc_any_inbound;
   dtls_srtp->remote_policy.key = dtls_srtp->remote_policy_key;
@@ -297,8 +313,8 @@ static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* ma
   srtp_crypto_policy_set_rtp_default(&dtls_srtp->local_policy.rtp);
   srtp_crypto_policy_set_rtcp_default(&dtls_srtp->local_policy.rtcp);
 
-  memcpy(dtls_srtp->local_policy_key, key_material + SRTP_MASTER_KEY_LENGTH, SRTP_MASTER_KEY_LENGTH);
-  memcpy(dtls_srtp->local_policy_key + SRTP_MASTER_KEY_LENGTH, key_material + SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_SALT_LENGTH, SRTP_MASTER_SALT_LENGTH);
+  memcpy(dtls_srtp->local_policy_key, local_key, SRTP_MASTER_KEY_LENGTH);
+  memcpy(dtls_srtp->local_policy_key + SRTP_MASTER_KEY_LENGTH, local_salt, SRTP_MASTER_SALT_LENGTH);
 
   dtls_srtp->local_policy.ssrc.type = ssrc_any_outbound;
   dtls_srtp->local_policy.key = dtls_srtp->local_policy_key;
