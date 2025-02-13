@@ -582,6 +582,11 @@ void peer_connection_create_offer(PeerConnection* pc) {
   pc->b_local_description_created = 0;
 }
 
+char* peer_connection_create_answer(PeerConnection* pc, const char* sdp_text) {
+  peer_connection_set_remote_description(pc, sdp_text);
+  return pc->local_sdp.content;
+}
+
 int peer_connection_send_rtcp_pil(PeerConnection* pc, uint32_t ssrc) {
   int ret = -1;
   uint8_t plibuf[128];

@@ -393,6 +393,7 @@ static int dtls_srtp_handshake_server(DtlsSrtp* dtls_srtp) {
   int ret;
 
   while (1) {
+    LOGD("dtls_srtp_handshake_server");
     unsigned char client_ip[] = "test";
 
     mbedtls_ssl_session_reset(&dtls_srtp->ssl);
@@ -400,7 +401,6 @@ static int dtls_srtp_handshake_server(DtlsSrtp* dtls_srtp) {
     mbedtls_ssl_set_client_transport_id(&dtls_srtp->ssl, client_ip, sizeof(client_ip));
 
     ret = dtls_srtp_do_handshake(dtls_srtp);
-
     if (ret == MBEDTLS_ERR_SSL_HELLO_VERIFY_REQUIRED) {
       LOGD("DTLS hello verification requested");
 
@@ -421,6 +421,7 @@ static int dtls_srtp_handshake_server(DtlsSrtp* dtls_srtp) {
 
 static int dtls_srtp_handshake_client(DtlsSrtp* dtls_srtp) {
   int ret;
+  LOGD("dtls_srtp_handshake_client");
 
   ret = dtls_srtp_do_handshake(dtls_srtp);
   if (ret != 0) {
@@ -435,12 +436,14 @@ static int dtls_srtp_handshake_client(DtlsSrtp* dtls_srtp) {
 int dtls_srtp_handshake(DtlsSrtp* dtls_srtp, Address* addr) {
   int ret;
   dtls_srtp->remote_addr = addr;
+  LOGD("dtls_srtp_handshake role: %d", dtls_srtp->role);
 
   if (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) {
     ret = dtls_srtp_handshake_server(dtls_srtp);
   } else {
     ret = dtls_srtp_handshake_client(dtls_srtp);
   }
+  LOGD("dtls_srtp_handshake ret: %d", ret);
 
   const mbedtls_x509_crt* remote_crt;
   if ((remote_crt = mbedtls_ssl_get_peer_cert(&dtls_srtp->ssl)) != NULL) {

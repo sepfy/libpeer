@@ -14,6 +14,7 @@
 #include "ports.h"
 #include "ssl_transport.h"
 #include "utils.h"
+#include "peer_connection.h"
 
 #define KEEP_ALIVE_TIMEOUT_SECONDS 60
 #define CONNACK_RECV_TIMEOUT_MS 1000
@@ -209,9 +210,17 @@ static void peer_signaling_on_pub_event(const char* msg, size_t size) {
         break;
       }
 
-      if (state == PEER_CONNECTION_NEW) {
-        peer_connection_set_remote_description(g_ps.pc, item->valuestring);
-        result = cJSON_CreateString("");
+      switch (state) {
+        case PEER_CONNECTION_NEW:
+        case PEER_CONNECTION_DISCONNECTED:
+        case PEER_CONNECTION_FAILED:
+        case PEER_CONNECTION_CLOSED: {
+          g_ps.id = id;
+          peer_connection_set_remote_description(g_ps.pc, item->valuestring);
+        } break;
+        default: {
+          error = cJSON_CreateRaw(RPC_ERROR_INTERNAL_ERROR);
+        } break;
       }
 
     } else if (strcmp(item->valuestring, RPC_METHOD_STATE) == 0) {

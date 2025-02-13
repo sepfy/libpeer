@@ -1,6 +1,6 @@
 project(lib)
 
-file(GLOB SRCS "*.c")
+file(GLOB SRCS "dtls_srtp.c" "*.c")
 
 file(GLOB HEADERS "peer.h" "peer_connection.h" "peer_signaling.h")
 
