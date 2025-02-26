@@ -84,7 +84,7 @@ void agent_set_remote_description(Agent* agent, char* description);
 
 int agent_select_candidate_pair(Agent* agent);
 
-int agent_connectivity_check(Agent* agent);
+int agent_connectivity_check(Agent* agent, int is_heartbeat);
 
 void agent_clear_candidates(Agent* agent);
 
