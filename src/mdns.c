@@ -33,7 +33,7 @@ typedef struct DnsQuery {
   uint16_t class;
 } DnsQuery;
 
-static int mdns_add_hostname(const char *hostname, uint8_t *buf, int size) {
+static int mdns_add_hostname(const char* hostname, uint8_t* buf, int size) {
   const char *label, *dot;
   int len, offset;
 
