@@ -33,11 +33,31 @@ typedef struct DnsQuery {
   uint16_t class;
 } DnsQuery;
 
-static int mdns_parse_answer(uint8_t* buf, int size, Address* addr) {
-  char* pos;
-  int flags_qr;
+static int mdns_add_hostname(const char* hostname, uint8_t* buf, int size) {
+  const char *label, *dot;
+  int len, offset;
+
+  offset = 0;
+  label = hostname;
+  while (*label) {
+    dot = strchr(label, '.');
+    if (!dot) {
+      dot = label + strlen(label);
+    }
+    len = dot - label;
+    buf[offset++] = len;
+    memcpy(buf + offset, label, len);
+    offset += len;
+    label = *dot ? dot + 1 : dot;
+  }
+  buf[offset++] = 0x00;
+  return offset;
+}
+static int mdns_parse_answer(uint8_t* buf, int size, Address* addr, const char* hostname) {
+  int flags_qr, offset;
   DnsHeader* header;
   DnsAnswer* answer;
+  uint8_t name[256];
 
   if (size < sizeof(DnsHeader)) {
     LOGE("response too short");
@@ -52,14 +72,14 @@ static int mdns_parse_answer(uint8_t* buf, int size, Address* addr) {
   }
 
   buf += sizeof(DnsHeader);
-  pos = strstr((char*)buf, "local");
-  if (pos == NULL) {
+  offset = mdns_add_hostname(hostname, name, sizeof(name));
+  // compare hostname
+  if (memcmp(buf, name, offset)) {
     LOGI("not a mDNS response");
     return -1;
   }
 
-  pos += 6;
-  answer = (DnsAnswer*)pos;
+  answer = (DnsAnswer*)(buf + offset);
   LOGD("type: %" PRIu16 ", class: %" PRIu16 ", ttl: %" PRIu32 ", length: %" PRIu16 "", ntohs(answer->type), ntohs(answer->class), ntohl(answer->ttl), ntohs(answer->length));
   if (ntohs(answer->length) != 4) {
     LOGI("invalid length");
@@ -71,8 +91,7 @@ static int mdns_parse_answer(uint8_t* buf, int size, Address* addr) {
 }
 
 static int mdns_build_query(const char* hostname, uint8_t* buf, int size) {
-  int total_size, len, offset;
-  const char *label, *dot;
+  int total_size, offset;
   DnsHeader* dns_header;
   DnsQuery* dns_query;
 
@@ -88,20 +107,7 @@ static int mdns_build_query(const char* hostname, uint8_t* buf, int size) {
   offset = sizeof(DnsHeader);
 
   // Append hostname to query
-  label = hostname;
-  while (*label) {
-    dot = strchr(label, '.');
-    if (!dot) {
-      dot = label + strlen(label);
-    }
-    len = dot - label;
-    buf[offset++] = len;
-    memcpy(buf + offset, label, len);
-    offset += len;
-    label = *dot ? dot + 1 : dot;
-  }
-
-  buf[offset++] = 0x00;
+  offset += mdns_add_hostname(hostname, buf + offset, size - offset);
 
   dns_query = (DnsQuery*)(buf + offset);
   dns_query->type = 0x0100;
@@ -145,7 +151,7 @@ int mdns_resolve_addr(const char* hostname, Address* addr) {
         break;
       } else if (ret > 0 && FD_ISSET(udp_socket.fd, &rfds)) {
         ret = udp_socket_recvfrom(&udp_socket, NULL, buf, sizeof(buf));
-        if (!mdns_parse_answer(buf, ret, addr)) {
+        if (!mdns_parse_answer(buf, ret, addr, hostname)) {
           addr_to_string(addr, addr_string, sizeof(addr_string));
           addr_set_family(addr, AF_INET);
           LOGI("Resolved %s -> %s", hostname, addr_string);
