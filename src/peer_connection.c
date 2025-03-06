@@ -446,10 +446,9 @@ int peer_connection_loop(PeerConnection* pc) {
     case PEER_CONNECTION_COMPLETED:
 
       time_t current_time = time(NULL);
-      if (current_time - pc->last_binding_request_time >= 4) {
-        if (agent_connectivity_check(&pc->agent, 1) == 0) {
-          LOGI("heartbeat ok");
-        }
+      if (current_time - pc->last_binding_request_time >= 8) {
+        agent_connectivity_check(&pc->agent, 1);
+        LOGI("heartbeat sent!");
         pc->last_binding_request_time = current_time;
       }
 
@@ -512,7 +511,6 @@ int peer_connection_loop(PeerConnection* pc) {
           LOGW("Unknown data");
         }
       }
-
       if (CONFIG_KEEPALIVE_TIMEOUT > 0 && (ports_get_epoch_time() - pc->agent.binding_request_time) > CONFIG_KEEPALIVE_TIMEOUT) {
         LOGI("binding request timeout");
         STATE_CHANGED(pc, PEER_CONNECTION_CLOSED);

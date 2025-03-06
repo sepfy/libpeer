@@ -482,7 +482,6 @@ int agent_connectivity_check(Agent* agent, int is_heartbeat) {
   } else {
     agent_create_binding_request(agent, &msg, 1);
     agent_socket_send(agent, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
-    agent_recv(agent, buf, sizeof(buf));
   }
   return -1;
 }
