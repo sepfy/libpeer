@@ -359,7 +359,7 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int
     sdp_append_h264(&pc->local_sdp);
     sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
     sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
-    strcat(pc->local_sdp.content, description);
+    memmove(pc->local_sdp.content + strlen(pc->local_sdp.content), description, sizeof(pc->local_sdp.content) - strlen(pc->local_sdp.content) - 1);
   }
 
   switch (pc->config.audio_codec) {
@@ -368,7 +368,7 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int
       sdp_append_pcma(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
       sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
-      strcat(pc->local_sdp.content, description);
+      memmove(pc->local_sdp.content + strlen(pc->local_sdp.content), description, sizeof(pc->local_sdp.content) - strlen(pc->local_sdp.content) - 1);
       break;
 
     case CODEC_PCMU:
@@ -376,14 +376,14 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int
       sdp_append_pcmu(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
       sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
-      strcat(pc->local_sdp.content, description);
+      memmove(pc->local_sdp.content + strlen(pc->local_sdp.content), description, sizeof(pc->local_sdp.content) - strlen(pc->local_sdp.content) - 1);
       break;
 
     case CODEC_OPUS:
       sdp_append_opus(&pc->local_sdp);
       sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
       sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
-      strcat(pc->local_sdp.content, description);
+      memmove(pc->local_sdp.content + strlen(pc->local_sdp.content), description, sizeof(pc->local_sdp.content) - strlen(pc->local_sdp.content) - 1);
 
     default:
       break;
@@ -393,7 +393,7 @@ static void peer_connection_state_new(PeerConnection* pc, DtlsSrtpRole role, int
     sdp_append_datachannel(&pc->local_sdp);
     sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
     sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
-    strcat(pc->local_sdp.content, description);
+    memmove(pc->local_sdp.content + strlen(pc->local_sdp.content), description, sizeof(pc->local_sdp.content) - strlen(pc->local_sdp.content) - 1);
   }
 
   pc->b_local_description_created = 1;
@@ -507,8 +507,11 @@ int peer_connection_loop(PeerConnection* pc) {
         STATE_CHANGED(pc, PEER_CONNECTION_CLOSED);
       }
 
-      if (pc->agent.selected_pair->local->type == ICE_CANDIDATE_TYPE_RELAY)
-        agent_refresh_relay_channel(&pc->agent);
+      if (pc->agent.selected_pair->local->type == ICE_CANDIDATE_TYPE_RELAY &&
+          REFRESH_RELAY_SESSION > 0 &&
+          (ports_get_epoch_time() - pc->agent.refresh_relay_time) > REFRESH_RELAY_SESSION) {
+            agent_refresh_relay_channel(&pc->agent);
+      }
       break;
     case PEER_CONNECTION_FAILED:
       break;
@@ -575,7 +578,7 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
   }
 
   agent_set_remote_description(&pc->agent, (char*)sdp_text);
-  
+
   STATE_CHANGED(pc, PEER_CONNECTION_CHECKING);
 }
 

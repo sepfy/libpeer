@@ -59,6 +59,7 @@ struct Agent {
   Address host_addr;
   int b_host_addr;
   uint64_t binding_request_time;
+  uint64_t refresh_relay_time;
   AgentState state;
 
   AgentMode mode;
@@ -70,8 +71,6 @@ struct Agent {
   int candidate_pairs_num;
   int use_candidate;
   uint32_t transaction_id[3];
-
-  uint32_t relay_channel_refresh_cnt;
 };
 
 void agent_gather_candidate(Agent* agent, const char* urls, const char* username, const char* credential);

@@ -44,6 +44,7 @@ typedef enum StunAttrType {
   STUN_ATTR_TYPE_MAPPED_ADDRESS = 0x0001,
   STUN_ATTR_TYPE_USERNAME = 0x0006,
   STUN_ATTR_TYPE_MESSAGE_INTEGRITY = 0x0008,
+  STUN_ATTR_TYPE_ERROR_CODE = 0x0009,
   STUN_ATTR_TYPE_CHANNEL_NUMBER = 0x000c,
   STUN_ATTR_TYPE_LIFETIME = 0x000d,
   STUN_ATTR_TYPE_XOR_PEER_ADDRESS = 0x0012,
@@ -102,6 +103,7 @@ struct StunMessage {
   Address relayed_addr;
   uint8_t buf[STUN_ATTR_BUF_SIZE];
   size_t size;
+  int16_t error_code;
 };
 
 void stun_msg_create(StunMessage* msg, uint16_t type);

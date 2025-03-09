@@ -21,8 +21,6 @@ void agent_clear_candidates(Agent* agent) {
   agent->local_candidates_count = 0;
   agent->remote_candidates_count = 0;
   agent->candidate_pairs_num = 0;
-
-  agent->relay_channel_refresh_cnt = 0;
 }
 
 int agent_create(Agent* agent) {
@@ -244,6 +242,39 @@ static int agent_create_turn_addr(Agent* agent, Address* serv_addr, const char* 
 
   ice_candidate->username = username;
   ice_candidate->credential = credential;
+  return ret;
+}
+
+static int agent_refresh_turn(Agent* agent, IceCandidatePair* pair) {
+  int ret = -1;
+  StunMessage send_msg;
+  StunMessage recv_msg;
+  memset(&recv_msg, 0, sizeof(recv_msg));
+  memset(&send_msg, 0, sizeof(send_msg));
+  stun_msg_create(&send_msg, STUN_METHOD_REFRESH);
+  stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_USERNAME, strlen(pair->local->username), (char*)pair->local->username);
+  stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_REALM, strlen(pair->local->realm), (char*)pair->local->realm);
+  stun_msg_write_attr(&send_msg, STUN_ATTR_TYPE_NONCE, strlen(pair->local->nonce), (char*)pair->local->nonce);
+  stun_msg_finish(&send_msg, STUN_CREDENTIAL_LONG_TERM, pair->local->credential, strlen(pair->local->credential));
+
+  ret = agent_socket_send(agent, &pair->local->serv_addr, send_msg.buf, send_msg.size);
+  if (ret < 0) {
+    LOGE("Failed to send TURN Refresh Request.");
+    return -1;
+  }
+
+  ret = agent_socket_recv_attempts(agent, NULL, recv_msg.buf, sizeof(recv_msg.buf), AGENT_STUN_RECV_MAXTIMES);
+  if (ret <= 0) {
+    LOGD("Failed to receive TURN Refresh Response.");
+    return ret;
+  }
+
+  stun_parse_msg_buf(&recv_msg);
+  if (recv_msg.error_code == 438) {
+    strcpy(pair->local->nonce, recv_msg.nonce);
+    return 0;
+  }
+
   return ret;
 }
 
@@ -528,6 +559,7 @@ void agent_set_remote_description(Agent* agent, char* description) {
         if (agent->local_candidates[i].type == ICE_CANDIDATE_TYPE_RELAY) {
           agent->candidate_pairs[agent->candidate_pairs_num].channel_number = 0x4000 + j;
           agent_create_relay_channel(agent, &agent->candidate_pairs[agent->candidate_pairs_num], 1);
+          agent->refresh_relay_time = ports_get_epoch_time();
         }
         agent->candidate_pairs_num++;
       }
@@ -591,8 +623,10 @@ int agent_select_candidate_pair(Agent* agent) {
 }
 
 void agent_refresh_relay_channel(Agent* agent) {
-  agent->relay_channel_refresh_cnt++;
+  int ret = agent_refresh_turn(agent, agent->selected_pair);
+  if (ret == 0)
+    agent_refresh_turn(agent, agent->selected_pair);
+  agent_create_relay_channel(agent, agent->selected_pair, 0);
 
-  if (agent->relay_channel_refresh_cnt % 300000 == 0) // ~5 minutes
-    agent_create_relay_channel(agent, agent->selected_pair, 0);
+  agent->refresh_relay_time = ports_get_epoch_time();
 }
