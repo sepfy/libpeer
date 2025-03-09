@@ -20,7 +20,7 @@
 #define LOG_LEVEL LEVEL_INFO
 #endif
 
-#if LOG_REDIRECT
+#if CONFIG_LIBPEER_LOG_REDIRECT
 void peer_log(char* level_tag, const char* file_name, int line_number, const char* fmt, ...);
 #define LOG_PRINT(level_tag, fmt, ...) \
   peer_log(level_tag, __FILE__, __LINE__, fmt, ##__VA_ARGS__)

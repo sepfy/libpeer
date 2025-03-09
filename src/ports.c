@@ -6,7 +6,7 @@
 
 #include "config.h"
 
-#if CONFIG_USE_LWIP
+#if CONFIG_LIBPEER_USE_LWIP
 #include "lwip/ip_addr.h"
 #include "lwip/netdb.h"
 #include "lwip/netif.h"
@@ -24,7 +24,7 @@
 int ports_get_host_addr(Address* addr, const char* iface_prefix) {
   int ret = 0;
 
-#if CONFIG_USE_LWIP
+#if CONFIG_LIBPEER_USE_LWIP
   struct netif* netif;
   int i;
   for (netif = netif_list; netif != NULL; netif = netif->next) {
@@ -149,7 +149,7 @@ uint32_t ports_get_epoch_time() {
 }
 
 void ports_sleep_ms(int ms) {
-#if CONFIG_USE_LWIP
+#if CONFIG_LIBPEER_USE_LWIP
   sys_msleep(ms);
 #else
   usleep(ms * 1000);
