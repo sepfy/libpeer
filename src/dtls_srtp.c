@@ -6,7 +6,7 @@
 #include "address.h"
 #include "config.h"
 #include "dtls_srtp.h"
-#if CONFIG_MBEDTLS_DEBUG
+#if CONFIG_LIBPEER_MBEDTLS_DEBUG
 #include "mbedtls/debug.h"
 #endif
 #include "mbedtls/sha256.h"
@@ -72,7 +72,7 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp* dtls_srtp) {
   mbedtls_x509write_cert crt;
 
   unsigned char* cert_buf = NULL;
-#if CONFIG_MBEDTLS_2_X
+#if CONFIG_LIBPEER_MBEDTLS_2_X
   mbedtls_mpi serial;
 #else
   const char* serial = "peer";
@@ -87,7 +87,7 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp* dtls_srtp) {
 
   mbedtls_ctr_drbg_seed(&dtls_srtp->ctr_drbg, mbedtls_entropy_func, &dtls_srtp->entropy, (const unsigned char*)pers, strlen(pers));
 
-#if CONFIG_DTLS_USE_ECDSA
+#if CONFIG_LIBPEER_DTLS_USE_ECDSA
   mbedtls_pk_setup(&dtls_srtp->pkey, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
   mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(dtls_srtp->pkey), mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
 #else
@@ -111,7 +111,7 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp* dtls_srtp) {
 
   mbedtls_x509write_crt_set_issuer_name(&crt, "CN=dtls_srtp");
 
-#if CONFIG_MBEDTLS_2_X
+#if CONFIG_LIBPEER_MBEDTLS_2_X
   mbedtls_mpi_init(&serial);
   mbedtls_mpi_fill_random(&serial, 16, mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
   ret = mbedtls_x509write_crt_set_serial(&crt, &serial);
@@ -139,7 +139,7 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp* dtls_srtp) {
   return ret;
 }
 
-#if CONFIG_MBEDTLS_DEBUG
+#if CONFIG_LIBPEER_MBEDTLS_DEBUG
 static void dtls_srtp_debug(void* ctx, int level, const char* file, int line, const char* str) {
   LOGD("%s:%04d: %s", file, line, str);
 }
@@ -166,7 +166,7 @@ int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
   mbedtls_pk_init(&dtls_srtp->pkey);
   mbedtls_entropy_init(&dtls_srtp->entropy);
   mbedtls_ctr_drbg_init(&dtls_srtp->ctr_drbg);
-#if CONFIG_MBEDTLS_DEBUG
+#if CONFIG_LIBPEER_MBEDTLS_DEBUG
   mbedtls_debug_set_threshold(3);
   mbedtls_ssl_conf_dbg(&dtls_srtp->conf, dtls_srtp_debug, NULL);
 #endif
@@ -330,7 +330,7 @@ static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* ma
   return 0;
 }
 
-#if CONFIG_MBEDTLS_2_X
+#if CONFIG_LIBPEER_MBEDTLS_2_X
 static int dtls_srtp_key_derivation_cb(void* context,
                                        const unsigned char* ms,
                                        const unsigned char* kb,
@@ -357,7 +357,7 @@ static void dtls_srtp_key_derivation_cb(void* context,
   memcpy(randbytes, client_random, 32);
   memcpy(randbytes + 32, server_random, 32);
 
-#if CONFIG_MBEDTLS_2_X
+#if CONFIG_LIBPEER_MBEDTLS_2_X
   memcpy(master_secret, ms, sizeof(master_secret));
   return dtls_srtp_key_derivation(dtls_srtp, master_secret, sizeof(master_secret), randbytes, sizeof(randbytes), tls_prf_type);
 #else
@@ -373,7 +373,7 @@ static int dtls_srtp_do_handshake(DtlsSrtp* dtls_srtp) {
 
   mbedtls_ssl_set_timer_cb(&dtls_srtp->ssl, &timer, mbedtls_timing_set_delay, mbedtls_timing_get_delay);
 
-#if CONFIG_MBEDTLS_2_X
+#if CONFIG_LIBPEER_MBEDTLS_2_X
   mbedtls_ssl_conf_export_keys_ext_cb(&dtls_srtp->conf, dtls_srtp_key_derivation_cb, dtls_srtp);
 #else
   mbedtls_ssl_set_export_keys_cb(&dtls_srtp->ssl, dtls_srtp_key_derivation_cb, dtls_srtp);
