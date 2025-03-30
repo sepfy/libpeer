@@ -92,6 +92,35 @@ void peer_connection_destroy(PeerConnection* pc);
 
 void peer_connection_close(PeerConnection* pc);
 
+/**
+ * @brief recv data from peer connection
+ *
+ * This function can be called in a loop to keep receiving data from peer connection.
+ *
+ * @param[in] peer connection
+ * @return 0 if success, -1 if error
+ */
+int peer_connection_recv(PeerConnection* pc);
+
+/**
+ * @brief send data to peer connection
+ *
+ * This function can be called in a loop to keep sending data to peer connection.
+ *
+ * @param[in] peer connection
+ * @return 0 if success, -1 if error
+ */
+int peer_connection_send(PeerConnection* pc);
+
+/**
+ * @brief loop peer connection
+ *
+ * This function is used to loop peer connection.
+ * This handles both incoming and outgoing data in a single loop.
+ *
+ * @param[in] peer connection
+ * @note More efficient than calling peer_connection_recv() and peer_connection_send() separately.
+ */
 int peer_connection_loop(PeerConnection* pc);
 
 int peer_connection_create_datachannel(PeerConnection* pc, DecpChannelType channel_type, uint16_t priority, uint32_t reliability_parameter, char* label, char* protocol);
