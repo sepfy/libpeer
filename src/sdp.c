@@ -6,18 +6,19 @@
 int sdp_append(Sdp* sdp, const char* format, ...) {
   va_list argptr;
 
-  char attr[SDP_ATTR_LENGTH];
-
-  memset(attr, 0, sizeof(attr));
-
   va_start(argptr, format);
 
-  vsnprintf(attr, sizeof(attr), format, argptr);
+  if (sdp->content[0] == '\0') {
+    vsnprintf(sdp->content, sizeof(sdp->content), format, argptr);
+  } else {
+    vsnprintf(sdp->content + strlen(sdp->content), sizeof(sdp->content) - strlen(sdp->content), format, argptr);
+  }
+
+  if (sdp->content[strlen(sdp->content) - 1] != '\n') {
+    strcat(sdp->content, "\r\n");
+  }
 
   va_end(argptr);
-
-  strcat(sdp->content, attr);
-  strcat(sdp->content, "\r\n");
   return 0;
 }
 
