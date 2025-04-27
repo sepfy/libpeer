@@ -87,7 +87,7 @@ void parse_arguments(int argc, char* argv[], const char** url, const char** toke
 
 int main(int argc, char* argv[]) {
   uint64_t curr_time, video_time, audio_time;
-  uint8_t buf[102400];
+  uint8_t* buf = NULL;
   const char* url = NULL;
   const char* token = NULL;
   int size;
@@ -131,14 +131,18 @@ int main(int argc, char* argv[]) {
       // FPS 25
       if (curr_time - video_time > 40) {
         video_time = curr_time;
-        if (reader_get_video_frame(buf, &size) == 0) {
+        if ((buf = reader_get_video_frame(&size)) != NULL) {
           peer_connection_send_video(g_pc, buf, size);
+          // need to free the buffer
+          free(buf);
+          buf = NULL;
         }
       }
 
       if (curr_time - audio_time > 20) {
-        if (reader_get_audio_frame(buf, &size) == 0) {
+        if ((buf = reader_get_audio_frame(&size)) != NULL) {
           peer_connection_send_audio(g_pc, buf, size);
+          buf = NULL;
         }
         audio_time = curr_time;
       }

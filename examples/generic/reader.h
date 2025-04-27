@@ -5,8 +5,8 @@
 
 int reader_init();
 
-int reader_get_video_frame(uint8_t* buf, int* size);
+uint8_t* reader_get_video_frame(int* size);
 
-int reader_get_audio_frame(uint8_t* buf, int* size);
+uint8_t* reader_get_audio_frame(int* size);
 
 void reader_deinit();

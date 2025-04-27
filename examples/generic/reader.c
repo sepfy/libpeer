@@ -8,6 +8,17 @@ static int g_video_size = 0;
 static int g_audio_size = 0;
 static uint8_t* g_video_buf = NULL;
 static uint8_t* g_audio_buf = NULL;
+static uint8_t* g_pps_buf = NULL;
+static uint8_t* g_sps_buf = NULL;
+static const uint32_t nalu_start_4bytecode = 0x01000000;
+static const uint32_t nalu_start_3bytecode = 0x010000;
+
+typedef enum H264_NALU_TYPE {
+  NALU_TYPE_SPS = 7,
+  NALU_TYPE_PPS = 8,
+  NALU_TYPE_IDR = 5,
+  NALU_TYPE_NON_IDR = 1,
+} H264_NALU_TYPE;
 
 int reader_init() {
   FILE* video_fp = NULL;
@@ -47,24 +58,22 @@ int reader_init() {
 }
 
 uint8_t* reader_h264_find_nalu(uint8_t* buf_start, uint8_t* buf_end) {
-  static const uint32_t nalu_start_code = 0x01000000;
   uint8_t* p = buf_start;
 
-  while ((p + 4) < buf_end) {
-    if (memcmp(p, &nalu_start_code, 4) == 0) {
+  while ((p + 3) < buf_end) {
+    if (memcmp(p, &nalu_start_4bytecode, 4) == 0) {
+      return p;
+    } else if (memcmp(p, &nalu_start_3bytecode, 3) == 0) {
       return p;
     }
-
     p++;
   }
 
   return buf_end;
 }
 
-int reader_get_video_frame(uint8_t* buf, int* size) {
-  int ret = -1;
-  static uint8_t pps_frame[128];
-  static uint8_t sps_frame[128];
+uint8_t* reader_get_video_frame(int* size) {
+  uint8_t* buf = NULL;
   static int pps_size = 0;
   static int sps_size = 0;
   uint8_t* buf_end = g_video_buf + g_video_size;
@@ -76,56 +85,85 @@ int reader_get_video_frame(uint8_t* buf, int* size) {
   if (!pstart)
     pstart = g_video_buf;
 
-  pend = reader_h264_find_nalu(pstart + 1, buf_end);
+  pend = reader_h264_find_nalu(pstart + 2, buf_end);
 
   if (pend == buf_end) {
     pstart = NULL;
-    return -1;
+    return NULL;
   }
 
   nalu_size = pend - pstart;
+  int start_code_offset = memcmp(pstart, &nalu_start_3bytecode, 3) == 0 ? 3 : 4;
+  H264_NALU_TYPE nalu_type = (H264_NALU_TYPE)(pstart[start_code_offset] & 0x1f);
 
-  if ((pstart[4] & 0x1f) == 0x07) {
-    sps_size = nalu_size;
-    memcpy(sps_frame, pstart, nalu_size);
+  switch (nalu_type) {
+    case NALU_TYPE_SPS:
+      sps_size = nalu_size;
+      if (g_sps_buf != NULL) {
+        free(g_sps_buf);
+        g_sps_buf = NULL;
+      }
+      g_sps_buf = (uint8_t*)calloc(1, sps_size);
+      memcpy(g_sps_buf, pstart, sps_size);
+      break;
+    case NALU_TYPE_PPS:
+      pps_size = nalu_size;
+      if (g_pps_buf != NULL) {
+        free(g_pps_buf);
+        g_pps_buf = NULL;
+      }
+      g_pps_buf = (uint8_t*)calloc(1, pps_size);
+      memcpy(g_pps_buf, pstart, pps_size);
 
-  } else if ((pstart[4] & 0x1f) == 0x08) {
-    pps_size = nalu_size;
-    memcpy(pps_frame, pstart, nalu_size);
+      break;
+    case NALU_TYPE_IDR:
+      *size = sps_size + pps_size + nalu_size;
+      buf = (uint8_t*)calloc(1, *size);
+      memcpy(buf, g_sps_buf, sps_size);
+      memcpy(buf + sps_size, g_pps_buf, pps_size);
+      memcpy(buf + sps_size + pps_size, pstart, nalu_size);
 
-  } else if ((pstart[4] & 0x1f) == 0x05) {
-    *size = sps_size + pps_size + nalu_size;
-    memcpy(buf, sps_frame, sps_size);
-    memcpy(buf + sps_size, pps_frame, pps_size);
-    memcpy(buf + sps_size + pps_size, pstart, nalu_size);
-    ret = 0;
+      break;
+    case NALU_TYPE_NON_IDR:
+    default:
+      *size = nalu_size;
+      buf = (uint8_t*)calloc(1, *size);
+      memcpy(buf, pstart, nalu_size);
 
-  } else {
-    *size = nalu_size;
-    memcpy(buf, pstart, nalu_size);
-    ret = 0;
+      break;
   }
 
   pstart = pend;
 
-  return ret;
+  return buf;
 }
 
-int reader_get_audio_frame(uint8_t* buf, int* size) {
+uint8_t* reader_get_audio_frame(int* size) {
   // sample-rate=8000 channels=1 format=S16LE duration=20ms alaw-size=160
+  uint8_t* buf = NULL;
   static int pos = 0;
   *size = 160;
   if ((pos + *size) > g_audio_size) {
     pos = 0;
   }
 
-  memcpy(buf, g_audio_buf + pos, *size);
+  buf = g_audio_buf + pos;
   pos += *size;
 
-  return 0;
+  return buf;
 }
 
 void reader_deinit() {
+  if (g_sps_buf != NULL) {
+    free(g_sps_buf);
+    g_sps_buf = NULL;
+  }
+
+  if (g_pps_buf != NULL) {
+    free(g_pps_buf);
+    g_pps_buf = NULL;
+  }
+
   if (g_video_buf != NULL) {
     free(g_video_buf);
     g_video_buf = NULL;
