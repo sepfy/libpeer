@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-#ifndef DISABLE_PEER_SIGNALING
+#ifndef CONFIG_LIBPEER_DISABLE_PEER_SIGNALING
 
 int peer_signaling_connect(const char* url, const char* token, PeerConnection* pc);
 
@@ -15,7 +15,7 @@ void peer_signaling_disconnect();
 
 int peer_signaling_loop();
 
-#endif  // DISABLE_PEER_SIGNALING
+#endif  // CONFIG_LIBPEER_DISABLE_PEER_SIGNALING
 
 #ifdef __cplusplus
 }

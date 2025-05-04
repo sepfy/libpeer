@@ -1,0 +1,61 @@
+menu "libpeer"
+    config LIBPEER_SCTP_MTU
+        int "SCTP MTU"
+        default 1200
+        help
+            The SCTP MTU.
+    config LIBPEER_MTU
+        int "MTU"
+        default 1300
+        help
+            The MTU.
+    config LIBPEER_VIDEO_BUFFER_SIZE_MTUS
+        int "Video Buffer Size in MTUs"
+        default 7
+        help
+            The Video RB Data MTUs.
+    config LIBPEER_AUDIO_BUFFER_SIZE_MTUS
+        int "Audio Buffer Size in MTUs"
+        default 7
+        help
+            The Audio RB Data MTUs.
+    config LIBPEER_DATA_BUFFER_SIZE_MTUS
+        int "Data Buffer Size in MTUs"
+        default 86
+        help
+            The Data RB Data MTUs.
+    config LIBPEER_SDP_BUFFER_SIZE
+        int "SDP Buffer Size"
+        default 8096
+        help
+            The SDP Buffer Size.
+    config LIBPEER_MQTT_BUFFER_SIZE
+        int "MQTT Buffer Size"
+        default 8096
+        help
+            The MQTT Buffer Size.
+    config LIBPEER_AUDIO_LATENCY_MS
+        int "Audio Latency (ms)"
+        default 20
+        help
+            The Audio Latency in milliseconds.
+    config LIBPEER_KEEPALIVE_CONNCHECK
+        int "Keepalive Conncheck interval"
+        default 0
+        help
+            The Keepalive Conncheck.
+    choice LIBPEER_LOG_LEVEL
+        prompt "Log Level"
+        default LIBPEER_LOG_LEVEL_INFO
+        help
+            The Log Level.
+        config LIBPEER_LOG_LEVEL_DEBUG
+            bool "Debug"
+        config LIBPEER_LOG_LEVEL_INFO
+            bool "Info"
+        config LIBPEER_LOG_LEVEL_WARN
+            bool "Warn"
+        config LIBPEER_LOG_LEVEL_ERROR
+            bool "Error"
+    endchoice
+endmenu
