@@ -146,9 +146,8 @@ int main(int argc, char* argv[]) {
         }
         audio_time = curr_time;
       }
-
-      usleep(1000);
     }
+    usleep(1000);
   }
 
   pthread_join(peer_singaling_thread, NULL);
