@@ -136,9 +136,16 @@ int32_t ssl_transport_recv(NetworkContext_t* net_ctx, void* buf, size_t len) {
 int32_t ssl_transport_send(NetworkContext_t* net_ctx, const void* buf, size_t len) {
   int ret;
 
+  int retry_count = 0;
+  const int max_retry = 5;
   while ((ret = mbedtls_ssl_write(&net_ctx->ssl, buf, len)) <= 0) {
     if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE) {
       LOGE("ssl write error: -0x%x", (unsigned int)-ret);
+    }
+
+    if (++retry_count >= max_retry) {
+      LOGE("ssl write max retry reached");
+      return -1;
     }
   }
 
