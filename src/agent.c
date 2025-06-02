@@ -320,22 +320,28 @@ static void agent_create_binding_response(Agent* agent, StunMessage* msg, Addres
   stun_msg_finish(msg, STUN_CREDENTIAL_SHORT_TERM, agent->local_upwd, strlen(agent->local_upwd));
 }
 
-static void agent_create_binding_request(Agent* agent, StunMessage* msg) {
-  uint64_t tie_breaker = 0;  // always be controlled
+static void agent_create_binding_request(Agent* agent, StunMessage* msg, int is_heartbeat) {
   // send binding request
-  stun_msg_create(msg, STUN_CLASS_REQUEST | STUN_METHOD_BINDING);
-  char username[584];
-  memset(username, 0, sizeof(username));
-  snprintf(username, sizeof(username), "%s:%s", agent->remote_ufrag, agent->local_ufrag);
-  stun_msg_write_attr(msg, STUN_ATTR_TYPE_USERNAME, strlen(username), username);
-  stun_msg_write_attr(msg, STUN_ATTR_TYPE_PRIORITY, 4, (char*)&agent->nominated_pair->priority);
-  if (agent->mode == AGENT_MODE_CONTROLLING) {
-    stun_msg_write_attr(msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
-    stun_msg_write_attr(msg, STUN_ATTR_TYPE_ICE_CONTROLLING, 8, (char*)&tie_breaker);
-  } else {
-    stun_msg_write_attr(msg, STUN_ATTR_TYPE_ICE_CONTROLLED, 8, (char*)&tie_breaker);
+  if (!is_heartbeat) {
+    uint64_t tie_breaker = 0;  // always be controlled
+    stun_msg_create(msg, STUN_CLASS_REQUEST | STUN_METHOD_BINDING);
+    char username[584];
+    memset(username, 0, sizeof(username));
+    snprintf(username, sizeof(username), "%s:%s", agent->remote_ufrag, agent->local_ufrag);
+    stun_msg_write_attr(msg, STUN_ATTR_TYPE_USERNAME, strlen(username), username);
+    stun_msg_write_attr(msg, STUN_ATTR_TYPE_PRIORITY, 4, (char*)&agent->nominated_pair->priority);
+    if (agent->mode == AGENT_MODE_CONTROLLING) {
+      stun_msg_write_attr(msg, STUN_ATTR_TYPE_USE_CANDIDATE, 0, NULL);
+      stun_msg_write_attr(msg, STUN_ATTR_TYPE_ICE_CONTROLLING, 8, (char*)&tie_breaker);
+    } else {
+      stun_msg_write_attr(msg, STUN_ATTR_TYPE_ICE_CONTROLLED, 8, (char*)&tie_breaker);
+    }
+    stun_msg_finish(msg, STUN_CREDENTIAL_SHORT_TERM, agent->remote_upwd, strlen(agent->remote_upwd));
   }
-  stun_msg_finish(msg, STUN_CREDENTIAL_SHORT_TERM, agent->remote_upwd, strlen(agent->remote_upwd));
+  else{
+    stun_msg_create(msg, STUN_CLASS_REQUEST | STUN_METHOD_BINDING);
+    stun_msg_finish(msg, STUN_CREDENTIAL_SHORT_TERM, agent->remote_upwd, strlen(agent->remote_upwd));
+  }
 }
 
 void agent_process_stun_request(Agent* agent, StunMessage* stun_msg, Address* addr) {
@@ -447,32 +453,36 @@ void agent_set_remote_description(Agent* agent, char* description) {
   LOGD("candidate pairs num: %d", agent->candidate_pairs_num);
 }
 
-int agent_connectivity_check(Agent* agent) {
+int agent_connectivity_check(Agent* agent, int is_heartbeat) {
   char addr_string[ADDRSTRLEN];
   uint8_t buf[1400];
   StunMessage msg;
+  if (!is_heartbeat) { 
+    if (agent->nominated_pair->state != ICE_CANDIDATE_STATE_INPROGRESS) {
+      LOGI("nominated pair is not in progress");
+      return -1;
+    }
+  
 
-  if (agent->nominated_pair->state != ICE_CANDIDATE_STATE_INPROGRESS) {
-    LOGI("nominated pair is not in progress");
-    return -1;
-  }
+    memset(&msg, 0, sizeof(msg));
 
-  memset(&msg, 0, sizeof(msg));
+    if (agent->nominated_pair->conncheck % AGENT_CONNCHECK_PERIOD == 0) {
+      addr_to_string(&agent->nominated_pair->remote->addr, addr_string, sizeof(addr_string));
+      LOGD("send binding request to remote ip: %s, port: %d", addr_string, agent->nominated_pair->remote->addr.port);
+      agent_create_binding_request(agent, &msg, 0);
+      agent_socket_send(agent, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
+    }
 
-  if (agent->nominated_pair->conncheck % AGENT_CONNCHECK_PERIOD == 0) {
-    addr_to_string(&agent->nominated_pair->remote->addr, addr_string, sizeof(addr_string));
-    LOGD("send binding request to remote ip: %s, port: %d", addr_string, agent->nominated_pair->remote->addr.port);
-    agent_create_binding_request(agent, &msg);
+    agent_recv(agent, buf, sizeof(buf));
+
+    if (agent->nominated_pair->state == ICE_CANDIDATE_STATE_SUCCEEDED) {
+      agent->selected_pair = agent->nominated_pair;
+      return 0;
+    }
+  } else {
+    agent_create_binding_request(agent, &msg, 1);
     agent_socket_send(agent, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
   }
-
-  agent_recv(agent, buf, sizeof(buf));
-
-  if (agent->nominated_pair->state == ICE_CANDIDATE_STATE_SUCCEEDED) {
-    agent->selected_pair = agent->nominated_pair;
-    return 0;
-  }
-
   return -1;
 }
 
