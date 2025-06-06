@@ -74,6 +74,8 @@ struct Agent {
 
 void agent_gather_candidate(Agent* agent, const char* urls, const char* username, const char* credential);
 
+void agent_create_ice_credential(Agent* agent);
+
 void agent_get_local_description(Agent* agent, char* description, int length);
 
 int agent_send(Agent* agent, const uint8_t* buf, int len);

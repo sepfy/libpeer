@@ -40,6 +40,8 @@ int agent_create(Agent* agent) {
 #endif
 
   agent_clear_candidates(agent);
+  memset(agent->remote_ufrag, 0, sizeof(agent->remote_ufrag));
+  memset(agent->remote_upwd, 0, sizeof(agent->remote_upwd));
   return 0;
 }
 
@@ -279,15 +281,15 @@ void agent_gather_candidate(Agent* agent, const char* urls, const char* username
   }
 }
 
-void agent_get_local_description(Agent* agent, char* description, int length) {
-  memset(description, 0, length);
+void agent_create_ice_credential(Agent* agent) {
   memset(agent->local_ufrag, 0, sizeof(agent->local_ufrag));
   memset(agent->local_upwd, 0, sizeof(agent->local_upwd));
 
   utils_random_string(agent->local_ufrag, 4);
   utils_random_string(agent->local_upwd, 24);
+}
 
-  snprintf(description, length, "a=ice-ufrag:%s\r\na=ice-pwd:%s\r\n", agent->local_ufrag, agent->local_upwd);
+void agent_get_local_description(Agent* agent, char* description, int length) {
 
   for (int i = 0; i < agent->local_candidates_count; i++) {
     ice_candidate_to_description(&agent->local_candidates[i], description + strlen(description), length - strlen(description));

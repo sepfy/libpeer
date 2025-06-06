@@ -27,14 +27,12 @@ void sdp_reset(Sdp* sdp) {
 }
 
 void sdp_append_h264(Sdp* sdp) {
-  sdp_append(sdp, "m=video 9 UDP/TLS/RTP/SAVPF 96 102");
+  sdp_append(sdp, "m=video 9 UDP/TLS/RTP/SAVPF 96");
   sdp_append(sdp, "c=IN IP4 0.0.0.0");
-  sdp_append(sdp, "a=rtcp-fb:102 nack");
-  sdp_append(sdp, "a=rtcp-fb:102 nack pli");
+  sdp_append(sdp, "a=rtcp-fb:96 nack");
+  sdp_append(sdp, "a=rtcp-fb:96 nack pli");
   sdp_append(sdp, "a=fmtp:96 profile-level-id=42e01f;level-asymmetry-allowed=1");
-  sdp_append(sdp, "a=fmtp:102 profile-level-id=42e01f;packetization-mode=1;level-asymmetry-allowed=1");
   sdp_append(sdp, "a=rtpmap:96 H264/90000");
-  sdp_append(sdp, "a=rtpmap:102 H264/90000");
   sdp_append(sdp, "a=ssrc:1 cname:webrtc-h264");
   sdp_append(sdp, "a=sendrecv");
   sdp_append(sdp, "a=mid:video");

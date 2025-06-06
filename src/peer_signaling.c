@@ -209,10 +209,7 @@ static void peer_signaling_on_pub_event(const char* msg, size_t size) {
         break;
       }
 
-      if (state == PEER_CONNECTION_NEW) {
-        peer_connection_set_remote_description(g_ps.pc, item->valuestring);
-        result = cJSON_CreateString("");
-      }
+      peer_connection_set_remote_description(g_ps.pc, item->valuestring, SDP_TYPE_ANSWER);
 
     } else if (strcmp(item->valuestring, RPC_METHOD_STATE) == 0) {
       result = cJSON_CreateString(peer_connection_state_to_string(state));
@@ -344,7 +341,7 @@ static int peer_signaling_http_post(const char* hostname, const char* path, int 
       hostname, path, res.pHeaders, res.statusCode, res.pBody);
 
   if (res.statusCode == 201) {
-    peer_connection_set_remote_description(g_ps.pc, (const char*)res.pBody);
+    peer_connection_set_remote_description(g_ps.pc, (const char*)res.pBody, SDP_TYPE_ANSWER);
   }
   return 0;
 }

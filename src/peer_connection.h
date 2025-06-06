@@ -12,6 +12,11 @@
 extern "C" {
 #endif
 
+typedef enum SdpType {
+  SDP_TYPE_OFFER = 0,
+  SDP_TYPE_ANSWER,
+} SdpType;
+
 typedef enum PeerConnectionState {
 
   PEER_CONNECTION_CLOSED = 0,
@@ -112,9 +117,13 @@ int peer_connection_send_audio(PeerConnection* pc, const uint8_t* packet, size_t
 
 int peer_connection_send_video(PeerConnection* pc, const uint8_t* packet, size_t bytes);
 
-void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp);
+void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp, SdpType sdp_type);
 
-void peer_connection_create_offer(PeerConnection* pc);
+void peer_connection_set_local_description(PeerConnection* pc, const char* sdp, SdpType sdp_type);
+
+const char* peer_connection_create_offer(PeerConnection* pc);
+
+const char* peer_connection_create_answer(PeerConnection* pc);
 
 /**
  * @brief register callback function to handle packet loss from RTCP receiver report
