@@ -215,8 +215,8 @@ void rtp_encoder_init(RtpEncoder* rtp_encoder, MediaCodec codec, RtpOnPacket on_
   }
 }
 
-int rtp_encoder_encode(RtpEncoder* rtp_encoder, uint8_t* buf, size_t size) {
-  return rtp_encoder->encode_func(rtp_encoder, buf, size);
+int rtp_encoder_encode(RtpEncoder* rtp_encoder, const uint8_t* buf, size_t size) {
+  return rtp_encoder->encode_func(rtp_encoder, (uint8_t*)buf, size);
 }
 
 static int rtp_decode_generic(RtpDecoder* rtp_decoder, uint8_t* buf, size_t size) {
@@ -245,8 +245,8 @@ void rtp_decoder_init(RtpDecoder* rtp_decoder, MediaCodec codec, RtpOnPacket on_
   }
 }
 
-int rtp_decoder_decode(RtpDecoder* rtp_decoder, uint8_t* buf, size_t size) {
+int rtp_decoder_decode(RtpDecoder* rtp_decoder, const uint8_t* buf, size_t size) {
   if (rtp_decoder->decode_func == NULL)
     return -1;
-  return rtp_decoder->decode_func(rtp_decoder, buf, size);
+  return rtp_decoder->decode_func(rtp_decoder, (uint8_t*)buf, size);
 }

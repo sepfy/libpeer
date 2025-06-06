@@ -97,11 +97,11 @@ int rtp_packet_validate(uint8_t* packet, size_t size);
 
 void rtp_encoder_init(RtpEncoder* rtp_encoder, MediaCodec codec, RtpOnPacket on_packet, void* user_data);
 
-int rtp_encoder_encode(RtpEncoder* rtp_encoder, uint8_t* data, size_t size);
+int rtp_encoder_encode(RtpEncoder* rtp_encoder, const uint8_t* data, size_t size);
 
 void rtp_decoder_init(RtpDecoder* rtp_decoder, MediaCodec codec, RtpOnPacket on_packet, void* user_data);
 
-int rtp_decoder_decode(RtpDecoder* rtp_decoder, uint8_t* data, size_t size);
+int rtp_decoder_decode(RtpDecoder* rtp_decoder, const uint8_t* data, size_t size);
 
 uint32_t rtp_get_ssrc(uint8_t* packet);
 

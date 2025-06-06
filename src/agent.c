@@ -290,7 +290,6 @@ void agent_create_ice_credential(Agent* agent) {
 }
 
 void agent_get_local_description(Agent* agent, char* description, int length) {
-
   for (int i = 0; i < agent->local_candidates_count; i++) {
     ice_candidate_to_description(&agent->local_candidates[i], description + strlen(description), length - strlen(description));
   }
