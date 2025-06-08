@@ -26,8 +26,7 @@ struct PeerConnection {
   DtlsSrtp dtls_srtp;
   Sctp sctp;
 
-  Sdp local_sdp;
-  Sdp remote_sdp;
+  char sdp[CONFIG_SDP_BUFFER_SIZE];
 
   void (*onicecandidate)(char* sdp, void* user_data);
   void (*oniceconnectionstatechange)(PeerConnectionState state, void* user_data);
@@ -366,8 +365,8 @@ int peer_connection_loop(PeerConnection* pc) {
   return 0;
 }
 
-void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_text, SdpType type) {
-  char* start = (char*)sdp_text;
+void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp, SdpType type) {
+  char* start = (char*)sdp;
   char* line = NULL;
   char buf[256];
   char* val_start = NULL;
@@ -413,7 +412,7 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
     return;
   }
 
-  agent_set_remote_description(&pc->agent, (char*)sdp_text);
+  agent_set_remote_description(&pc->agent, (char*)sdp);
   if (type == SDP_TYPE_ANSWER) {
     agent_update_candidate_pairs(&pc->agent);
     STATE_CHANGED(pc, PEER_CONNECTION_CHECKING);
@@ -447,38 +446,38 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
   pc->dtls_srtp.udp_recv = peer_connection_dtls_srtp_recv;
   pc->dtls_srtp.udp_send = peer_connection_dtls_srtp_send;
 
-  memset(&pc->local_sdp, 0, sizeof(pc->local_sdp));
+  memset(pc->sdp, 0, sizeof(pc->sdp));
   // TODO: check if we have video or audio codecs
-  sdp_create(&pc->local_sdp,
+  sdp_create(pc->sdp,
              pc->config.video_codec != CODEC_NONE,
              pc->config.audio_codec != CODEC_NONE,
              pc->config.datachannel);
 
   agent_create_ice_credential(&pc->agent);
-  sdp_append(&pc->local_sdp, "a=ice-ufrag:%s", pc->agent.local_ufrag);
-  sdp_append(&pc->local_sdp, "a=ice-pwd:%s", pc->agent.local_upwd);
-  sdp_append(&pc->local_sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-  sdp_append(&pc->local_sdp, peer_connection_dtls_role_setup_value(role));
+  sdp_append(pc->sdp, "a=ice-ufrag:%s", pc->agent.local_ufrag);
+  sdp_append(pc->sdp, "a=ice-pwd:%s", pc->agent.local_upwd);
+  sdp_append(pc->sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
+  sdp_append(pc->sdp, peer_connection_dtls_role_setup_value(role));
 
   if (pc->config.video_codec == CODEC_H264) {
-    sdp_append_h264(&pc->local_sdp);
+    sdp_append_h264(pc->sdp);
   }
 
   switch (pc->config.audio_codec) {
     case CODEC_PCMA:
-      sdp_append_pcma(&pc->local_sdp);
+      sdp_append_pcma(pc->sdp);
       break;
     case CODEC_PCMU:
-      sdp_append_pcmu(&pc->local_sdp);
+      sdp_append_pcmu(pc->sdp);
       break;
     case CODEC_OPUS:
-      sdp_append_opus(&pc->local_sdp);
+      sdp_append_opus(pc->sdp);
     default:
       break;
   }
 
   if (pc->config.datachannel) {
-    sdp_append_datachannel(&pc->local_sdp);
+    sdp_append_datachannel(pc->sdp);
   }
 
   pc->b_local_description_created = 1;
@@ -492,13 +491,13 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
   }
 
   agent_get_local_description(&pc->agent, description, sizeof(pc->temp_buf));
-  sdp_append(&pc->local_sdp, description);
+  sdp_append(pc->sdp, description);
 
   if (pc->onicecandidate) {
-    pc->onicecandidate(pc->local_sdp.content, pc->config.user_data);
+    pc->onicecandidate(pc->sdp, pc->config.user_data);
   }
 
-  return pc->local_sdp.content;
+  return pc->sdp;
 }
 
 const char* peer_connection_create_offer(PeerConnection* pc) {
@@ -535,7 +534,7 @@ void peer_connection_on_receiver_packet_loss(PeerConnection* pc,
   pc->on_receiver_packet_loss = on_receiver_packet_loss;
 }
 
-void peer_connection_onicecandidate(PeerConnection* pc, void (*onicecandidate)(char* sdp_text, void* userdata)) {
+void peer_connection_onicecandidate(PeerConnection* pc, void (*onicecandidate)(char* sdp, void* userdata)) {
   pc->onicecandidate = onicecandidate;
 }
 
