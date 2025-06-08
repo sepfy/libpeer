@@ -94,4 +94,6 @@ int agent_create(Agent* agent);
 
 void agent_destroy(Agent* agent);
 
+void agent_update_candidate_pairs(Agent* agent);
+
 #endif  // AGENT_H_

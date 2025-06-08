@@ -415,6 +415,7 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp_
 
   agent_set_remote_description(&pc->agent, (char*)sdp_text);
   if (type == SDP_TYPE_ANSWER) {
+    agent_update_candidate_pairs(&pc->agent);
     STATE_CHANGED(pc, PEER_CONNECTION_CHECKING);
   }
 }
@@ -506,6 +507,7 @@ const char* peer_connection_create_offer(PeerConnection* pc) {
 
 const char* peer_connection_create_answer(PeerConnection* pc) {
   const char* sdp = peer_connection_create_sdp(pc, SDP_TYPE_ANSWER);
+  agent_update_candidate_pairs(&pc->agent);
   STATE_CHANGED(pc, PEER_CONNECTION_CHECKING);
   return sdp;
 }

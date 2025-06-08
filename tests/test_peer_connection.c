@@ -26,13 +26,9 @@ static void onconnectionstatechange_answerer_peer_connection(PeerConnectionState
 }
 
 static void onicecandidate_offerer_peer_connection(char* description, void* user_data) {
-  TestUserData* test_user_data = (TestUserData*)user_data;
-  peer_connection_set_remote_description(test_user_data->answer_peer_connection, description);
 }
 
 static void onicecandidate_answerer_peer_connection(char* description, void* user_data) {
-  TestUserData* test_user_data = (TestUserData*)user_data;
-  peer_connection_set_remote_description(test_user_data->offer_peer_connection, description);
 }
 
 static void ondatachannel_onmessage_offerer_peer_connection(char* msg, size_t len, void* userdata, uint16_t sid) {
@@ -95,10 +91,13 @@ int main(int argc, char* argv[]) {
   peer_connection_ondatachannel(test_user_data.offer_peer_connection, ondatachannel_onmessage_offerer_peer_connection, NULL, NULL);
   peer_connection_ondatachannel(test_user_data.answer_peer_connection, ondatachannel_onmessage_answerer_peer_connection, NULL, NULL);
 
-  peer_connection_create_offer(test_user_data.offer_peer_connection);
-
   pthread_create(&offer_thread, NULL, peer_connection_task, test_user_data.offer_peer_connection);
   pthread_create(&answer_thread, NULL, peer_connection_task, test_user_data.answer_peer_connection);
+
+  const char* offer = peer_connection_create_offer(test_user_data.offer_peer_connection);
+  peer_connection_set_remote_description(test_user_data.answer_peer_connection, offer, SDP_TYPE_OFFER);
+  const char* answer = peer_connection_create_answer(test_user_data.answer_peer_connection);
+  peer_connection_set_remote_description(test_user_data.offer_peer_connection, answer, SDP_TYPE_ANSWER);
 
   int attempts = 0, datachannel_created = 0;
   while (attempts < MAX_CONNECTION_ATTEMPTS) {
@@ -127,6 +126,8 @@ int main(int argc, char* argv[]) {
   }
 
   test_complete = 1;
+  pthread_join(offer_thread, NULL);
+  pthread_join(answer_thread, NULL);
   peer_connection_destroy(test_user_data.offer_peer_connection);
   peer_connection_destroy(test_user_data.answer_peer_connection);
 

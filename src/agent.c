@@ -400,7 +400,7 @@ void agent_set_remote_description(Agent* agent, char* description) {
   a=ice-pwd:IexbSoY7JulyMbjKwISsG9
   a=candidate:1 1 UDP 1 36.231.28.50 38143 typ srflx
   */
-  int i, j;
+  int i;
 
   LOGD("Set remote description:\n%s", description);
 
@@ -432,7 +432,10 @@ void agent_set_remote_description(Agent* agent, char* description) {
 
   LOGD("remote ufrag: %s", agent->remote_ufrag);
   LOGD("remote upwd: %s", agent->remote_upwd);
+}
 
+void agent_update_candidate_pairs(Agent* agent) {
+  int i, j;
   // Please set gather candidates before set remote description
   for (i = 0; i < agent->local_candidates_count; i++) {
     for (j = 0; j < agent->remote_candidates_count; j++) {
