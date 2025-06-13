@@ -172,6 +172,10 @@ int sctp_create_association(Sctp* sctp, DtlsSrtp* dtls_srtp);
 
 void sctp_destroy_association(Sctp* sctp);
 
+void sctp_usrsctp_init();
+
+void sctp_usrsctp_deinit();
+
 int sctp_is_connected(Sctp* sctp);
 
 void sctp_incoming_data(Sctp* sctp, char* buf, size_t len);
