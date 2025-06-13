@@ -492,6 +492,18 @@ static int sctp_incoming_data_cb(struct socket* sock, union sctp_sockstore addr,
 }
 #endif
 
+void sctp_usrsctp_init() {
+#if CONFIG_USE_USRSCTP
+  usrsctp_init(0, sctp_outgoing_data_cb, NULL);
+#endif
+}
+
+void sctp_usrsctp_deinit() {
+#if CONFIG_USE_USRSCTP
+  usrsctp_finish();
+#endif
+}
+
 int sctp_create_association(Sctp* sctp, DtlsSrtp* dtls_srtp) {
   sctp->dtls_srtp = dtls_srtp;
   sctp->local_port = 5000;
@@ -499,7 +511,6 @@ int sctp_create_association(Sctp* sctp, DtlsSrtp* dtls_srtp) {
   sctp->tsn = 1234;
 #if CONFIG_USE_USRSCTP
   int ret = -1;
-  usrsctp_init(0, sctp_outgoing_data_cb, NULL);
   usrsctp_sysctl_set_sctp_ecn_enable(0);
   usrsctp_register_address(sctp);
 
@@ -628,7 +639,6 @@ void sctp_destroy_association(Sctp* sctp) {
   if (sctp && sctp->sock) {
     usrsctp_shutdown(sctp->sock, SHUT_RDWR);
     usrsctp_close(sctp->sock);
-    usrsctp_finish();
     sctp->sock = NULL;
   }
 #endif

@@ -57,6 +57,10 @@
 #define CONFIG_AUDIO_DURATION 20
 #endif
 
+#ifndef CONFIG_MAX_NALU_SIZE
+#define CONFIG_MAX_NALU_SIZE (10 * 1024)  // 10KB
+#endif
+
 #define CONFIG_IPV6 0
 // empty will use first active interface
 #define CONFIG_IFACE_PREFIX ""
