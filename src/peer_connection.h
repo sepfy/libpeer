@@ -174,6 +174,20 @@ char* peer_connection_lookup_sid_label(PeerConnection* pc, uint16_t sid);
  */
 int peer_connection_add_ice_candidate(PeerConnection* pc, char* ice_candidate);
 
+/**
+ * @brief update audio ssrc
+ * @param[in] peer connection
+ * @param[in] assrc audio ssrc
+ */
+void peer_connection_update_remote_assrc(PeerConnection* pc, uint32_t assrc);
+
+/**
+ * @brief update video ssrc
+ * @param[in] peer connection
+ * @param[in] vssrc video ssrc
+ */
+void peer_connection_update_remote_vssrc(PeerConnection* pc, uint32_t vssrc);
+
 #ifdef __cplusplus
 }
 #endif
