@@ -6,7 +6,7 @@ libpeer is a WebRTC implementation written in C, developed with BSD socket. The 
 
 ### Features
 
-- Vdieo/Audio Codec
+- Video/Audio Codec
   - H264
   - G.711 PCM (A-law)
   - G.711 PCM (µ-law)
