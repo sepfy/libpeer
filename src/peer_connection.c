@@ -36,7 +36,6 @@ struct PeerConnection {
   uint8_t temp_buf[CONFIG_MTU];
   uint8_t agent_buf[CONFIG_MTU];
   int agent_ret;
-  int b_local_description_created;
 
   RtpEncoder artp_encoder;
   RtpEncoder vrtp_encoder;
@@ -446,42 +445,7 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
   pc->dtls_srtp.udp_recv = peer_connection_dtls_srtp_recv;
   pc->dtls_srtp.udp_send = peer_connection_dtls_srtp_send;
 
-  memset(pc->sdp, 0, sizeof(pc->sdp));
-  // TODO: check if we have video or audio codecs
-  sdp_create(pc->sdp,
-             pc->config.video_codec != CODEC_NONE,
-             pc->config.audio_codec != CODEC_NONE,
-             pc->config.datachannel);
-
   agent_create_ice_credential(&pc->agent);
-  sdp_append(pc->sdp, "a=ice-ufrag:%s", pc->agent.local_ufrag);
-  sdp_append(pc->sdp, "a=ice-pwd:%s", pc->agent.local_upwd);
-  sdp_append(pc->sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
-  sdp_append(pc->sdp, peer_connection_dtls_role_setup_value(role));
-
-  if (pc->config.video_codec == CODEC_H264) {
-    sdp_append_h264(pc->sdp);
-  }
-
-  switch (pc->config.audio_codec) {
-    case CODEC_PCMA:
-      sdp_append_pcma(pc->sdp);
-      break;
-    case CODEC_PCMU:
-      sdp_append_pcmu(pc->sdp);
-      break;
-    case CODEC_OPUS:
-      sdp_append_opus(pc->sdp);
-    default:
-      break;
-  }
-
-  if (pc->config.datachannel) {
-    sdp_append_datachannel(pc->sdp);
-  }
-
-  pc->b_local_description_created = 1;
-
   agent_gather_candidate(&pc->agent, NULL, NULL, NULL);  // host address
   for (int i = 0; i < sizeof(pc->config.ice_servers) / sizeof(pc->config.ice_servers[0]); ++i) {
     if (pc->config.ice_servers[i].urls) {
@@ -489,9 +453,45 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
       agent_gather_candidate(&pc->agent, pc->config.ice_servers[i].urls, pc->config.ice_servers[i].username, pc->config.ice_servers[i].credential);
     }
   }
-
   agent_get_local_description(&pc->agent, description, sizeof(pc->temp_buf));
-  sdp_append(pc->sdp, description);
+  
+  memset(pc->sdp, 0, sizeof(pc->sdp));
+  // TODO: check if we have video or audio codecs
+  sdp_create(pc->sdp,
+             pc->config.video_codec != CODEC_NONE,
+             pc->config.audio_codec != CODEC_NONE,
+             pc->config.datachannel);
+  sdp_append(pc->sdp, "a=ice-ufrag:%s", pc->agent.local_ufrag);
+  sdp_append(pc->sdp, "a=ice-pwd:%s", pc->agent.local_upwd);
+  sdp_append(pc->sdp, "a=fingerprint:sha-256 %s", pc->dtls_srtp.local_fingerprint);
+  sdp_append(pc->sdp, peer_connection_dtls_role_setup_value(role));
+
+  if (pc->config.video_codec == CODEC_H264) {
+    sdp_append_h264(pc->sdp);
+    sdp_append(pc->sdp, description);
+  }
+
+  switch (pc->config.audio_codec) {
+    case CODEC_PCMA:
+      sdp_append_pcma(pc->sdp);
+      sdp_append(pc->sdp, description);
+      break;
+    case CODEC_PCMU:
+      sdp_append_pcmu(pc->sdp);
+      sdp_append(pc->sdp, description);
+      break;
+    case CODEC_OPUS:
+      sdp_append_opus(pc->sdp);
+      sdp_append(pc->sdp, description);
+      break;
+    default:
+      break;
+  }
+
+  if (pc->config.datachannel) {
+    sdp_append_datachannel(pc->sdp);
+    sdp_append(pc->sdp, description);
+  }
 
   if (pc->onicecandidate) {
     pc->onicecandidate(pc->sdp, pc->config.user_data);
