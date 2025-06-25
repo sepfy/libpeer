@@ -454,7 +454,7 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
     }
   }
   agent_get_local_description(&pc->agent, description, sizeof(pc->temp_buf));
-  
+
   memset(pc->sdp, 0, sizeof(pc->sdp));
   // TODO: check if we have video or audio codecs
   sdp_create(pc->sdp,
