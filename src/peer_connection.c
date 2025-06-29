@@ -582,3 +582,11 @@ int peer_connection_add_ice_candidate(PeerConnection* pc, char* candidate) {
   agent->remote_candidates_count++;
   return 0;
 }
+
+void peer_connection_update_remote_assrc(PeerConnection* pc, uint32_t assrc) {
+  pc->remote_assrc = assrc;
+}
+
+void peer_connection_update_remote_vssrc(PeerConnection* pc, uint32_t vssrc) {
+  pc->remote_vssrc = vssrc;
+}
