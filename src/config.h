@@ -58,7 +58,7 @@
 #endif
 
 #ifndef CONFIG_MAX_NALU_SIZE
-#define CONFIG_MAX_NALU_SIZE (10 * 1024)  // 10KB
+#define CONFIG_MAX_NALU_SIZE (100 * 1024)  // 100KB
 #endif
 
 #define CONFIG_IPV6 0
