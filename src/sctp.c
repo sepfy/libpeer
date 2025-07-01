@@ -302,13 +302,6 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
         param->length = htons(8);
         *(uint32_t*)&param->value = htonl(0x02);
         length = ntohs(init_ack->common.length) + sizeof(SctpHeader);
-
-        if (!sctp->connected) {
-          sctp->connected = 1;
-          if (sctp->onopen) {
-            sctp->onopen(sctp->userdata);
-          }
-        }
       } break;
       case SCTP_INIT_ACK: {
         SctpInitChunk* init_ack = (SctpInitChunk*)in_packet->chunks;
@@ -335,13 +328,6 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
         // param: type + length (4 bytes) + cookie
         memcpy(cookie_echo->cookie, param->value, ntohs(param->length) - 4);
         length = ntohs(cookie_echo->common.length) + sizeof(SctpHeader);
-
-        if (!sctp->connected) {
-          sctp->connected = 1;
-          if (sctp->onopen) {
-            sctp->onopen(sctp->userdata);
-          }
-        }
       } break;
       case SCTP_SACK:
 #if 0
@@ -382,8 +368,20 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
         common->length = htons(4);
         length = ntohs(common->length) + sizeof(SctpHeader);
         pos = len;  // Do not handle other msg
+        if (!sctp->connected) {
+          sctp->connected = 1;
+          if (sctp->onopen) {
+            sctp->onopen(sctp->userdata);
+          }
+        }
       } break;
       case SCTP_COOKIE_ACK: {
+        if (!sctp->connected) {
+          sctp->connected = 1;
+          if (sctp->onopen) {
+            sctp->onopen(sctp->userdata);
+          }
+        }
         break;
       }
       case SCTP_ABORT:
