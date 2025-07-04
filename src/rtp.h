@@ -8,6 +8,7 @@
 #define __LITTLE_ENDIAN 1234
 #elif __APPLE__
 #include <machine/endian.h>
+#elif WIN32
 #else
 #include <endian.h>
 #endif
@@ -53,13 +54,13 @@ typedef struct RtpHeader {
   uint16_t seq_number;
   uint32_t timestamp;
   uint32_t ssrc;
-  uint32_t csrc[0];
+  //uint32_t csrc[0];
 
 } RtpHeader;
 
 typedef struct RtpPacket {
   RtpHeader header;
-  uint8_t payload[0];
+  uint8_t payload[1];
 
 } RtpPacket;
 
