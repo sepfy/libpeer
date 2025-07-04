@@ -1,7 +1,6 @@
 #include <srtp2/srtp.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 
 #include "peer.h"
 #include "sctp.h"
