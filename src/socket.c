@@ -1,9 +1,10 @@
 #include <errno.h>
 #include <string.h>
-#include <unistd.h>
-
 #include "socket.h"
 #include "utils.h"
+#ifndef WIN32
+#include <unistd.h>
+#endif
 
 int udp_socket_add_multicast_group(UdpSocket* udp_socket, Address* mcast_addr) {
   int ret = 0;

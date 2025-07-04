@@ -6,6 +6,7 @@
 #define __LITTLE_ENDIAN 1234
 #elif __APPLE__
 #include <machine/endian.h>
+#elif WIN32
 #else
 #include <endian.h>
 #endif

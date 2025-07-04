@@ -2,8 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef WIN32
 #include <sys/select.h>
 #include <unistd.h>
+#endif
 #include "address.h"
 #include "socket.h"
 #include "utils.h"
