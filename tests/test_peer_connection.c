@@ -1,9 +1,17 @@
-#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
-
 #include "peer.h"
+#include "ports.h"
+#ifdef WIN32
+#include <windows.h>
+#define pthread_t HANDLE
+#define pthread_create(th, attr, func, arg) (*(th) = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(func), (arg), 0, NULL))
+#define pthread_join(th, res) WaitForSingleObject((th), INFINITE)
+#define pthread_exit(res) ExitThread(0)
+#else
+#include <unistd.h>
+#include <pthread.h>
+#endif
 
 #define MAX_CONNECTION_ATTEMPTS 25
 #define OFFER_DATACHANNEL_MESSAGE "Hello World"
@@ -52,7 +60,7 @@ static void* peer_connection_task(void* user_data) {
 
   while (!test_complete) {
     peer_connection_loop(peer_connection);
-    usleep(1000);
+    ports_sleep_ms(1);
   }
 
   pthread_exit(NULL);
@@ -118,7 +126,7 @@ int main(int argc, char* argv[]) {
     peer_connection_datachannel_send(test_user_data.answer_peer_connection, ANSWER_DATACHANNEL_MESSAGE, sizeof(ANSWER_DATACHANNEL_MESSAGE));
 
     attempts++;
-    usleep(250000);
+    ports_sleep_ms(250);
   }
 
   if (strcmp(DATACHANNEL_NAME, peer_connection_lookup_sid_label(test_user_data.answer_peer_connection, 0)) != 0) {

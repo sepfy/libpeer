@@ -3,7 +3,6 @@
 #include <cJSON.h>
 #include <signal.h>
 #include <string.h>
-#include <unistd.h>
 
 #include <core_http_client.h>
 #include <core_mqtt.h>
