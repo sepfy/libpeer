@@ -24,14 +24,6 @@
 #define AGENT_MAX_CANDIDATE_PAIRS 100
 #endif
 
-typedef enum AgentState {
-
-  AGENT_STATE_GATHERING_ENDED = 0,
-  AGENT_STATE_GATHERING_STARTED,
-  AGENT_STATE_GATHERING_COMPLETED,
-
-} AgentState;
-
 typedef enum AgentMode {
 
   AGENT_MODE_CONTROLLED = 0,
@@ -59,7 +51,6 @@ struct Agent {
   Address host_addr;
   int b_host_addr;
   uint64_t binding_request_time;
-  AgentState state;
 
   AgentMode mode;
 

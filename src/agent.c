@@ -437,6 +437,7 @@ void agent_set_remote_description(Agent* agent, char* description) {
 void agent_update_candidate_pairs(Agent* agent) {
   int i, j;
   // Please set gather candidates before set remote description
+  agent->candidate_pairs_num = 0;
   for (i = 0; i < agent->local_candidates_count; i++) {
     for (j = 0; j < agent->remote_candidates_count; j++) {
       if (agent->local_candidates[i].addr.family == agent->remote_candidates[j].addr.family) {
@@ -448,7 +449,8 @@ void agent_update_candidate_pairs(Agent* agent) {
       }
     }
   }
-  LOGD("candidate pairs num: %d", agent->candidate_pairs_num);
+  LOGD("candidate pairs num: %d, local candidates: %d, remote candidates: %d",
+       agent->candidate_pairs_num, agent->local_candidates_count, agent->remote_candidates_count);
 }
 
 int agent_connectivity_check(Agent* agent) {
@@ -456,6 +458,10 @@ int agent_connectivity_check(Agent* agent) {
   uint8_t buf[1400];
   StunMessage msg;
 
+  if (agent_select_candidate_pair(agent) < 0) {
+    agent_update_candidate_pairs(agent);
+    return -1;
+  }
   if (agent->nominated_pair->state != ICE_CANDIDATE_STATE_INPROGRESS) {
     LOGI("nominated pair is not in progress");
     return -1;

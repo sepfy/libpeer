@@ -12,6 +12,8 @@
 
 void sdp_append_h264(char* sdp);
 
+void sdp_append_vp8(char* sdp);
+
 void sdp_append_pcma(char* sdp);
 
 void sdp_append_pcmu(char* sdp);

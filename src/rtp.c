@@ -300,7 +300,6 @@ static int rtp_decode_h264(RtpDecoder* rtp_decoder, uint8_t* buf, size_t size) {
   static int offset = 0;
   RtpPacket* rtp_packet = (RtpPacket*)buf;
   uint8_t nalu_type = *rtp_packet->payload & 0x1f;
-  LOGI("type: %d, size: %zu", nalu_type, size);
   int payload_size = size - sizeof(RtpHeader);
 
   switch (nalu_type) {

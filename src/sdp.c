@@ -35,7 +35,19 @@ void sdp_append_h264(char* sdp) {
   sdp_append(sdp, "a=rtpmap:96 H264/90000");
   sdp_append(sdp, "a=ssrc:1 cname:webrtc-h264");
   sdp_append(sdp, "a=sendrecv");
-  sdp_append(sdp, "a=mid:video");
+  sdp_append(sdp, "a=mid:1");
+  sdp_append(sdp, "a=rtcp-mux");
+}
+
+void sdp_append_vp8(char* sdp) {
+  sdp_append(sdp, "m=video 9 UDP/TLS/RTP/SAVPF 97");
+  sdp_append(sdp, "c=IN IP4 0.0.0.0");
+  sdp_append(sdp, "a=rtcp-fb:97 nack");
+  sdp_append(sdp, "a=rtcp-fb:97 nack pli");
+  sdp_append(sdp, "a=rtpmap:97 VP8/90000");
+  sdp_append(sdp, "a=ssrc:1 cname:webrtc-vp8");
+  sdp_append(sdp, "a=sendrecv");
+  sdp_append(sdp, "a=mid:1");
   sdp_append(sdp, "a=rtcp-mux");
 }
 
@@ -72,7 +84,7 @@ void sdp_append_opus(char* sdp) {
 void sdp_append_datachannel(char* sdp) {
   sdp_append(sdp, "m=application 50712 UDP/DTLS/SCTP webrtc-datachannel");
   sdp_append(sdp, "c=IN IP4 0.0.0.0");
-  sdp_append(sdp, "a=mid:datachannel");
+  sdp_append(sdp, "a=mid:0");
   sdp_append(sdp, "a=sctp-port:5000");
   sdp_append(sdp, "a=max-message-size:262144");
 }
@@ -91,16 +103,16 @@ void sdp_create(char* sdp, int b_video, int b_audio, int b_datachannel) {
 
   strcat(bundle, "a=group:BUNDLE");
 
+  if (b_datachannel) {
+    strcat(bundle, " 0");
+  }
+
   if (b_video) {
-    strcat(bundle, " video");
+    strcat(bundle, " 1");
   }
 
   if (b_audio) {
-    strcat(bundle, " audio");
-  }
-
-  if (b_datachannel) {
-    strcat(bundle, " datachannel");
+    strcat(bundle, " 2");
   }
 
   sdp_append(sdp, bundle);
