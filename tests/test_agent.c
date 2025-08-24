@@ -20,9 +20,9 @@ int main(int argc, char* argv[]) {
   Agent agent;
 
   char stunserver[] = "stun:stun.l.google.com:19302";
-  char turnserver[] = "";
-  char username[] = "";
-  char credential[] = "";
+  //char turnserver[] = "";
+  //char username[] = "";
+  //char credential[] = "";
   char description[1024];
   memset(&description, 0, sizeof(description));
 
@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
 
   test_gather_host(&agent);
   test_gather_stun(&agent, stunserver);
-  test_gather_turn(&agent, turnserver, username, credential);
+  //test_gather_turn(&agent, turnserver, username, credential);
   agent_get_local_description(&agent, description, sizeof(description));
 
   printf("sdp:\n%s\n", description);

@@ -64,7 +64,7 @@ static int peer_connection_dtls_srtp_recv(void* ctx, unsigned char* buf, size_t 
     return pc->agent_ret;
   }
 
-  while (recv_max < CONFIG_TLS_READ_TIMEOUT && pc->state == PEER_CONNECTION_CONNECTED) {
+  while (recv_max < CONFIG_TLS_READ_TIMEOUT && pc->state == PEER_CONNECTION_CHECKING) {
     ret = agent_recv(&pc->agent, buf, len);
 
     if (ret > 0) {
@@ -131,8 +131,6 @@ const char* peer_connection_state_to_string(PeerConnectionState state) {
       return "checking";
     case PEER_CONNECTION_CONNECTED:
       return "connected";
-    case PEER_CONNECTION_COMPLETED:
-      return "completed";
     case PEER_CONNECTION_FAILED:
       return "failed";
     case PEER_CONNECTION_CLOSED:
@@ -198,7 +196,7 @@ void peer_connection_close(PeerConnection* pc) {
 }
 
 int peer_connection_send_audio(PeerConnection* pc, const uint8_t* buf, size_t len) {
-  if (pc->state != PEER_CONNECTION_COMPLETED) {
+  if (pc->state != PEER_CONNECTION_CONNECTED) {
     // LOGE("dtls_srtp not connected");
     return -1;
   }
@@ -206,7 +204,7 @@ int peer_connection_send_audio(PeerConnection* pc, const uint8_t* buf, size_t le
 }
 
 int peer_connection_send_video(PeerConnection* pc, const uint8_t* buf, size_t len) {
-  if (pc->state != PEER_CONNECTION_COMPLETED) {
+  if (pc->state != PEER_CONNECTION_CONNECTED) {
     // LOGE("dtls_srtp not connected");
     return -1;
   }
@@ -285,31 +283,30 @@ int peer_connection_loop(PeerConnection* pc) {
   uint32_t ssrc = 0;
   memset(pc->agent_buf, 0, sizeof(pc->agent_buf));
   pc->agent_ret = -1;
-
   switch (pc->state) {
     case PEER_CONNECTION_NEW:
       break;
 
     case PEER_CONNECTION_CHECKING:
-      if (agent_connectivity_check(&pc->agent) == 0) {
-        STATE_CHANGED(pc, PEER_CONNECTION_CONNECTED);
+      if (pc->agent.selected_pair) {
+        // if ice candidate pass the connectivity check, then we can start DTLS-SRTP handshake
+        dtls_srtp_handshake(&pc->dtls_srtp, NULL);
+      } else {
+        agent_connectivity_check(&pc->agent);
       }
-      break;
-    case PEER_CONNECTION_CONNECTED:
 
-      if (dtls_srtp_handshake(&pc->dtls_srtp, NULL) == 0) {
+      if (pc->dtls_srtp.state == DTLS_SRTP_STATE_CONNECTED) {
         LOGD("DTLS-SRTP handshake done");
-
         if (pc->config.datachannel) {
-          LOGI("SCTP create socket");
+          LOGI("Creating SCTP association");
           sctp_create_association(&pc->sctp, &pc->dtls_srtp);
           pc->sctp.userdata = pc->config.user_data;
         }
 
-        STATE_CHANGED(pc, PEER_CONNECTION_COMPLETED);
+        STATE_CHANGED(pc, PEER_CONNECTION_CONNECTED);
       }
       break;
-    case PEER_CONNECTION_COMPLETED:
+    case PEER_CONNECTION_CONNECTED:
       if ((pc->agent_ret = agent_recv(&pc->agent, pc->agent_buf, sizeof(pc->agent_buf))) > 0) {
         LOGD("agent_recv %d", pc->agent_ret);
 
@@ -411,13 +408,17 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp,
   }
 
   agent_set_remote_description(&pc->agent, (char*)sdp);
-  if (type == SDP_TYPE_ANSWER) {
-    agent_update_candidate_pairs(&pc->agent);
+  agent_update_candidate_pairs(&pc->agent);
+  if (pc->state == PEER_CONNECTION_NEW) {
     STATE_CHANGED(pc, PEER_CONNECTION_CHECKING);
   }
 }
 
-static void peer_connection_gather(PeerConnection* pc, SdpType sdp_type) {
+void peer_connection_set_local_description(PeerConnection* pc, const char* sdp, SdpType sdp_type) {
+  // just for gathering ICE candidates
+  if (pc->state == PEER_CONNECTION_CONNECTED) {
+    return;
+  }
   pc->sctp.connected = 0;
 
   switch (sdp_type) {
@@ -457,8 +458,7 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
   int sdp_audio = (pc->config.audio_codec != CODEC_NONE) && (sdp_type == SDP_TYPE_OFFER || pc->remote_assrc > 0);
   int sdp_video = (pc->config.video_codec != CODEC_NONE) && (sdp_type == SDP_TYPE_OFFER || pc->remote_vssrc > 0);
 
-
-  sdp_create(pc->sdp, sdp_audio, sdp_video, pc->config.datachannel);
+  sdp_create(pc->sdp, sdp_video, sdp_audio, pc->config.datachannel);
 
   sdp_append(pc->sdp, "a=ice-ufrag:%s", pc->agent.local_ufrag);
   sdp_append(pc->sdp, "a=ice-pwd:%s", pc->agent.local_upwd);
@@ -505,21 +505,13 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
 }
 
 const char* peer_connection_create_offer(PeerConnection* pc) {
-  peer_connection_gather(pc, SDP_TYPE_OFFER);
+  peer_connection_set_local_description(pc, NULL, SDP_TYPE_OFFER);
   return peer_connection_create_sdp(pc, SDP_TYPE_OFFER);
 }
 
 const char* peer_connection_create_answer(PeerConnection* pc) {
-  const char* sdp = NULL;
-  if (pc->state == PEER_CONNECTION_CLOSED) {
-    peer_connection_gather(pc, SDP_TYPE_ANSWER);
-    sdp = peer_connection_create_sdp(pc, SDP_TYPE_ANSWER);
-    agent_update_candidate_pairs(&pc->agent);
-    STATE_CHANGED(pc, PEER_CONNECTION_CHECKING);
-  } else {
-    sdp = peer_connection_create_sdp(pc, SDP_TYPE_ANSWER);
-  }
-  return sdp;
+  peer_connection_set_local_description(pc, NULL, SDP_TYPE_ANSWER);
+  return peer_connection_create_sdp(pc, SDP_TYPE_ANSWER);
 }
 
 int peer_connection_send_rtcp_pil(PeerConnection* pc, uint32_t ssrc) {

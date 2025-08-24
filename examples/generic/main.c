@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
   reader_init();
 
   while (!g_interrupted) {
-    if (g_state == PEER_CONNECTION_COMPLETED) {
+    if (g_state == PEER_CONNECTION_CONNECTED) {
       curr_time = get_timestamp();
 
       // FPS 25

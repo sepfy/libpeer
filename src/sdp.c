@@ -57,7 +57,7 @@ void sdp_append_pcma(char* sdp) {
   sdp_append(sdp, "a=rtpmap:8 PCMA/8000");
   sdp_append(sdp, "a=ssrc:4 cname:webrtc-pcma");
   sdp_append(sdp, "a=sendrecv");
-  sdp_append(sdp, "a=mid:audio");
+  sdp_append(sdp, "a=mid:2");
   sdp_append(sdp, "a=rtcp-mux");
 }
 
@@ -67,7 +67,7 @@ void sdp_append_pcmu(char* sdp) {
   sdp_append(sdp, "a=rtpmap:0 PCMU/8000");
   sdp_append(sdp, "a=ssrc:5 cname:webrtc-pcmu");
   sdp_append(sdp, "a=sendrecv");
-  sdp_append(sdp, "a=mid:audio");
+  sdp_append(sdp, "a=mid:2");
   sdp_append(sdp, "a=rtcp-mux");
 }
 
@@ -77,7 +77,7 @@ void sdp_append_opus(char* sdp) {
   sdp_append(sdp, "a=rtpmap:111 opus/48000/2");
   sdp_append(sdp, "a=ssrc:6 cname:webrtc-opus");
   sdp_append(sdp, "a=sendrecv");
-  sdp_append(sdp, "a=mid:audio");
+  sdp_append(sdp, "a=mid:2");
   sdp_append(sdp, "a=rtcp-mux");
 }
 

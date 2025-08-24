@@ -173,8 +173,8 @@ static int agent_create_stun_addr(Agent* agent, Address* serv_addr) {
 
   stun_parse_msg_buf(&recv_msg);
   memcpy(&bind_addr, &recv_msg.mapped_addr, sizeof(Address));
-  IceCandidate* ice_candidate = agent->local_candidates + agent->local_candidates_count++;
-  ice_candidate_create(ice_candidate, agent->local_candidates_count, ICE_CANDIDATE_TYPE_SRFLX, &bind_addr);
+  IceCandidate* ice_candidate = agent->local_candidates + agent->local_candidates_count;
+  ice_candidate_create(ice_candidate, agent->local_candidates_count++, ICE_CANDIDATE_TYPE_SRFLX, &bind_addr);
   return ret;
 }
 
@@ -257,6 +257,7 @@ void agent_gather_candidate(Agent* agent, const char* urls, const char* username
   }
 
   port = atoi(pos + 1);
+  printf("port => %s\n", pos + 1);
   if (port <= 0) {
     LOGE("Cannot parse port");
     return;
@@ -436,6 +437,9 @@ void agent_set_remote_description(Agent* agent, char* description) {
 
 void agent_update_candidate_pairs(Agent* agent) {
   int i, j;
+  char local_addr_string[ADDRSTRLEN];
+  char remote_addr_string[ADDRSTRLEN];
+  int candidate_pairs_num = agent->candidate_pairs_num;
   // Please set gather candidates before set remote description
   agent->candidate_pairs_num = 0;
   for (i = 0; i < agent->local_candidates_count; i++) {
@@ -449,8 +453,15 @@ void agent_update_candidate_pairs(Agent* agent) {
       }
     }
   }
-  LOGD("candidate pairs num: %d, local candidates: %d, remote candidates: %d",
-       agent->candidate_pairs_num, agent->local_candidates_count, agent->remote_candidates_count);
+
+  if (candidate_pairs_num != agent->candidate_pairs_num) {
+    LOGI("candidate pairs num %d:", agent->candidate_pairs_num);
+    for (i = 0; i < agent->candidate_pairs_num; i++) {
+      addr_to_string(&agent->candidate_pairs[i].local->addr, local_addr_string, sizeof(local_addr_string));
+      addr_to_string(&agent->candidate_pairs[i].remote->addr, remote_addr_string, sizeof(remote_addr_string));
+      LOGI("[%d] %s > %s", i, local_addr_string, remote_addr_string);
+    }
+  }
 }
 
 int agent_connectivity_check(Agent* agent) {
@@ -503,7 +514,7 @@ int agent_select_candidate_pair(Agent* agent) {
       agent->candidate_pairs[i].state = ICE_CANDIDATE_STATE_FAILED;
     } else if (agent->candidate_pairs[i].state == ICE_CANDIDATE_STATE_FAILED) {
     } else if (agent->candidate_pairs[i].state == ICE_CANDIDATE_STATE_SUCCEEDED) {
-      agent->selected_pair = &agent->candidate_pairs[i];
+      //agent->selected_pair = &agent->candidate_pairs[i];
       return 0;
     }
   }

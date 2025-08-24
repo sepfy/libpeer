@@ -101,14 +101,14 @@ int main(int argc, char* argv[]) {
 
   int attempts = 0, datachannel_created = 0;
   while (attempts < MAX_CONNECTION_ATTEMPTS) {
-    if (!datachannel_created && peer_connection_get_state(test_user_data.offer_peer_connection) == PEER_CONNECTION_COMPLETED) {
+    if (!datachannel_created && peer_connection_get_state(test_user_data.offer_peer_connection) == PEER_CONNECTION_CONNECTED) {
       if (peer_connection_create_datachannel(test_user_data.offer_peer_connection, DATA_CHANNEL_RELIABLE, 0, 0, DATACHANNEL_NAME, "bar") == 18) {
         datachannel_created = 1;
       }
     }
 
-    if (peer_connection_get_state(test_user_data.offer_peer_connection) == PEER_CONNECTION_COMPLETED &&
-        peer_connection_get_state(test_user_data.answer_peer_connection) == PEER_CONNECTION_COMPLETED &&
+    if (peer_connection_get_state(test_user_data.offer_peer_connection) == PEER_CONNECTION_CONNECTED &&
+        peer_connection_get_state(test_user_data.answer_peer_connection) == PEER_CONNECTION_CONNECTED &&
         test_user_data.onmessage_offer_called == 1 &&
         test_user_data.onmessage_answer_called == 1) {
       break;

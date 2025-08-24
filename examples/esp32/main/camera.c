@@ -138,7 +138,7 @@ void camera_task(void* pvParameters) {
   last_time = get_timestamp();
 
   for (;;) {
-    if ((eState == PEER_CONNECTION_COMPLETED) && gDataChannelOpened) {
+    if ((eState == PEER_CONNECTION_CONNECTED) && gDataChannelOpened) {
       fb = esp_camera_fb_get();
 
       if (!fb) {

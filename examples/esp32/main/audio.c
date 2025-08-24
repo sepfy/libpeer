@@ -122,7 +122,7 @@ void audio_task(void* arg) {
   ESP_LOGI(TAG, "audio task started");
 
   for (;;) {
-    if (eState == PEER_CONNECTION_COMPLETED) {
+    if (eState == PEER_CONNECTION_CONNECTED) {
       ret = audio_get_samples(aenc_in_frame.buffer, aenc_in_frame.len);
 
       if (ret == aenc_in_frame.len) {

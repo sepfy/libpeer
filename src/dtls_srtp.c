@@ -274,7 +274,7 @@ static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* ma
   const uint8_t* server_key = client_key + SRTP_MASTER_KEY_LENGTH;
   const uint8_t* client_salt = server_key + SRTP_MASTER_KEY_LENGTH;
   const uint8_t* server_salt = client_salt + SRTP_MASTER_SALT_LENGTH;
-  uint8_t *local_key, *remote_key, *local_salt, *remote_salt;
+  const uint8_t *local_key, *remote_key, *local_salt, *remote_salt;
   if (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) {
     local_key = server_key;
     local_salt = server_salt;
@@ -435,6 +435,10 @@ static int dtls_srtp_handshake_client(DtlsSrtp* dtls_srtp) {
 int dtls_srtp_handshake(DtlsSrtp* dtls_srtp, Address* addr) {
   int ret;
   dtls_srtp->remote_addr = addr;
+  if (dtls_srtp->state != DTLS_SRTP_STATE_INIT) {
+    LOGE("DTLS-SRTP already initialized");
+    return -1;
+  }
 
   if (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) {
     ret = dtls_srtp_handshake_server(dtls_srtp);

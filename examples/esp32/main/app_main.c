@@ -45,7 +45,7 @@ static void oniceconnectionstatechange(PeerConnectionState state, void* user_dat
   ESP_LOGI(TAG, "PeerConnectionState: %d", state);
   eState = state;
   // not support datachannel close event
-  if (eState != PEER_CONNECTION_COMPLETED) {
+  if (eState != PEER_CONNECTION_CONNECTED) {
     gDataChannelOpened = 0;
   }
 }

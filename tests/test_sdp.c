@@ -3,11 +3,11 @@
 #include <string.h>
 
 #include "agent.h"
-
+#if 0
 void on_agent_state_changed(AgentState state, void* user_data) {
   printf("Agent state changed: %d\n", state);
 }
-
+#endif
 int main(int argc, char* argv[]) {
 #if 0
   Agent agent;

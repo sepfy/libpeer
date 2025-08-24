@@ -77,7 +77,7 @@ static void dma_i2s_in_handler(void) {
   }
 #endif
 
-  if (eState == PEER_CONNECTION_COMPLETED) {
+  if (eState == PEER_CONNECTION_CONNECTED) {
     peer_connection_send_audio(g_pc, alaw, AUDIO_BUFFER_FRAMES);
   }
 
