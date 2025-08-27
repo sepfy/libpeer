@@ -66,7 +66,9 @@
 #define CONFIG_IFACE_PREFIX ""
 
 // #define LOG_LEVEL LEVEL_DEBUG
+#ifndef LOG_REDIRECT
 #define LOG_REDIRECT 0
+#endif
 
 // Disable MQTT and HTTP signaling
 // #define DISABLE_PEER_SIGNALING 1
