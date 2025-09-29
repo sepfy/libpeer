@@ -7,8 +7,9 @@
 #include "mbedtls/debug.h"
 #include "mbedtls/entropy.h"
 #include "mbedtls/ssl.h"
-
+#ifndef WIN32
 #include <sys/select.h>
+#endif
 #include "config.h"
 #include "ports.h"
 #include "ssl_transport.h"

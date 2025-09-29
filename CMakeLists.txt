@@ -59,7 +59,12 @@ if(UNDEFINED_BEHAVIOR_SANITIZER)
   enableSanitizer("undefined")
 endif()
 
-add_definitions("-Wunused-variable -Werror=sequence-point -Werror=pointer-sign -Werror=return-type -Werror=sizeof-pointer-memaccess -Wincompatible-pointer-types -DHTTP_DO_NOT_USE_CUSTOM_CONFIG -DMQTT_DO_NOT_USE_CUSTOM_CONFIG")
+add_definitions("-DHTTP_DO_NOT_USE_CUSTOM_CONFIG -DMQTT_DO_NOT_USE_CUSTOM_CONFIG")
+if(NOT WIN32)
+add_definitions("-Wunused-variable -Werror=sequence-point -Werror=pointer-sign -Werror=return-type -Werror=sizeof-pointer-memaccess -Wincompatible-pointer-types")
+else()
+add_definitions("-D__BYTE_ORDER=1234")
+endif()
 
 add_subdirectory(src)
 add_subdirectory(examples)
@@ -105,6 +110,7 @@ ExternalProject_Add(usrsctp
   CMAKE_ARGS
     -DCMAKE_C_FLAGS="-fPIC"
     -Dsctp_build_programs=off
+    -Dsctp_werror=off
     -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/dist
     -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
 )

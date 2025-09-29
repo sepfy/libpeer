@@ -1,12 +1,18 @@
-#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
-#include <unistd.h>
-
+#include "ports.h"
 #include "peer.h"
 #include "reader.h"
+#ifdef WIN32
+#include <windows.h>
+#define pthread_t HANDLE
+#define pthread_create(th, attr, func, arg) (*(th) = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(func), (arg), 0, NULL))
+#define pthread_join(th, res) WaitForSingleObject((th), INFINITE)
+#define pthread_exit(res) ExitThread(0)
+#else
+#include <pthread.h>
+#endif
 
 int g_interrupted = 0;
 PeerConnection* g_pc = NULL;
@@ -39,25 +45,17 @@ static void signal_handler(int signal) {
 static void* peer_singaling_task(void* data) {
   while (!g_interrupted) {
     peer_signaling_loop();
-    usleep(1000);
+    ports_sleep_ms(1);
   }
-
   pthread_exit(NULL);
 }
 
 static void* peer_connection_task(void* data) {
   while (!g_interrupted) {
     peer_connection_loop(g_pc);
-    usleep(1000);
+    ports_sleep_ms(1);
   }
-
   pthread_exit(NULL);
-}
-
-static uint64_t get_timestamp() {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
 void print_usage(const char* prog_name) {
@@ -126,7 +124,7 @@ int main(int argc, char* argv[]) {
 
   while (!g_interrupted) {
     if (g_state == PEER_CONNECTION_COMPLETED) {
-      curr_time = get_timestamp();
+      curr_time = ports_get_epoch_time();
 
       // FPS 25
       if (curr_time - video_time > 40) {
@@ -147,7 +145,7 @@ int main(int argc, char* argv[]) {
         audio_time = curr_time;
       }
     }
-    usleep(1000);
+    ports_sleep_ms(1);
   }
 
   pthread_join(peer_singaling_thread, NULL);

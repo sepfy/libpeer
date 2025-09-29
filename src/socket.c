@@ -1,7 +1,5 @@
 #include <errno.h>
 #include <string.h>
-#include <unistd.h>
-
 #include "socket.h"
 #include "utils.h"
 

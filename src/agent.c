@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef WIN32
 #include <sys/select.h>
-#include <unistd.h>
+#endif
 
 #include "agent.h"
 #include "base64.h"
