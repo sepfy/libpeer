@@ -263,6 +263,9 @@ int peer_connection_create_datachannel_sid(PeerConnection* pc, DecpChannelType c
   uint16_t label_length = htons(strlen(label));
   uint16_t protocol_length = htons(strlen(protocol));
   char* msg = calloc(1, msg_size);
+  if (!msg) {
+    return rtrn;
+  }
 
   msg[0] = DATA_CHANNEL_OPEN;
   memcpy(msg + 2, &priority_big_endian, sizeof(uint16_t));
