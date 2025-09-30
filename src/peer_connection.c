@@ -374,7 +374,6 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp,
   char buf[256];
   char* val_start = NULL;
   uint32_t* ssrc = NULL;
-  DtlsSrtpRole role = DTLS_SRTP_ROLE_SERVER;
   int is_update = 0;
   Agent* agent = &pc->agent;
 
@@ -382,10 +381,6 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp,
     line = strstr(start, "\r\n");
     strncpy(buf, start, line - start);
     buf[line - start] = '\0';
-
-    if (strstr(buf, "a=setup:passive")) {
-      role = DTLS_SRTP_ROLE_CLIENT;
-    }
 
     if (strstr(buf, "a=fingerprint")) {
       strncpy(pc->dtls_srtp.remote_fingerprint, buf + 22, DTLS_SRTP_FINGERPRINT_LENGTH);
