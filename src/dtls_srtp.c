@@ -430,6 +430,11 @@ int dtls_srtp_handshake(DtlsSrtp* dtls_srtp, Address* addr) {
   int ret;
   dtls_srtp->remote_addr = addr;
 
+  if ((ret = mbedtls_ssl_set_hostname(&dtls_srtp->ssl, "dtls_srtp")) != 0) {
+    LOGE("mbedtls_ssl_set_hostname returned -0x%.4x", (unsigned int)-ret);
+    return ret;
+  }
+
   if (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) {
     ret = dtls_srtp_handshake_server(dtls_srtp);
   } else {

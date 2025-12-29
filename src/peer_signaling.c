@@ -80,8 +80,8 @@ static int peer_signaling_resolve_token(const char* token, char* username, char*
     return -1;
   }
 
-  strncpy(username, plaintext, colon - plaintext);
-  strncpy(password, colon + 1, strlen(colon + 1));
+  snprintf(username, TOKEN_MAX_LEN, "%.*s", (int)(colon - plaintext), plaintext);
+  snprintf(password, TOKEN_MAX_LEN, "%s", colon + 1);
   LOGD("Username: %s, Password: %s", username, password);
   return 0;
 }
@@ -118,17 +118,17 @@ static int peer_signaling_resolve_url(const char* url, char* host, int* port, ch
   path_start = strchr(url, '/');
 
   if (port_start != NULL && path_start != NULL && port_start < path_start) {
-    strncpy(host, url, port_start - url);
-    strncpy(path, path_start, strlen(path_start));
+    snprintf(host, HOST_MAX_LEN, "%.*s", (int)(port_start - url), url);
+    snprintf(path, PATH_MAX_LEN, "%s", path_start);
     *port = atoi(port_start + 1);
   } else if (port_start == NULL && path_start != NULL) {
-    strncpy(host, url, path_start - url);
-    strncpy(path, path_start, strlen(path_start));
+    snprintf(host, HOST_MAX_LEN, "%.*s", (int)(path_start - url), url);
+    snprintf(path, PATH_MAX_LEN, "%s", path_start);
   } else if (port_start != NULL && path_start == NULL) {
-    strncpy(host, url, port_start - url);
+    snprintf(host, HOST_MAX_LEN, "%.*s", (int)(port_start - url), url);
     *port = atoi(port_start + 1);
   } else {
-    strncpy(host, url, strlen(url));
+    snprintf(host, HOST_MAX_LEN, "%s", url);
   }
 
   LOGI("Host: %s, Port: %d, Path: %s", host, *port, path);
@@ -508,7 +508,7 @@ int peer_signaling_connect(const char* url, const char* token, PeerConnection* p
   }
 
   if (token && strlen(token) > 0) {
-    strncpy(g_ps.token, token, sizeof(g_ps.token));
+    snprintf(g_ps.token, sizeof(g_ps.token), "%s", token);
   }
 
   g_ps.pc = pc;

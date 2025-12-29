@@ -13,8 +13,8 @@
 #include "utils.h"
 
 #define AGENT_POLL_TIMEOUT 1
-#define AGENT_CONNCHECK_MAX 500
-#define AGENT_CONNCHECK_PERIOD 100
+#define AGENT_CONNCHECK_MAX 100
+#define AGENT_CONNCHECK_PERIOD 20
 #define AGENT_STUN_RECV_MAXTIMES 1000
 
 void agent_clear_candidates(Agent* agent) {
