@@ -2,7 +2,7 @@
 #define CONFIG_H_
 
 // uncomment this if you want to handshake with a aiortc
-// #define CONFIG_DTLS_USE_ECDSA 1
+#define CONFIG_DTLS_USE_ECDSA 1
 
 #define SCTP_MTU (1200)
 #define CONFIG_MTU (1300)
@@ -66,9 +66,7 @@
 #define CONFIG_IFACE_PREFIX ""
 
 // #define LOG_LEVEL LEVEL_DEBUG
-#ifndef LOG_REDIRECT
 #define LOG_REDIRECT 0
-#endif
 
 // Disable MQTT and HTTP signaling
 // #define DISABLE_PEER_SIGNALING 1

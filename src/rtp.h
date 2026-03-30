@@ -8,6 +8,10 @@
 #define __LITTLE_ENDIAN 1234
 #elif __APPLE__
 #include <machine/endian.h>
+// macOS defines BYTE_ORDER, not __BYTE_ORDER
+#define __BYTE_ORDER BYTE_ORDER
+#define __BIG_ENDIAN BIG_ENDIAN
+#define __LITTLE_ENDIAN LITTLE_ENDIAN
 #else
 #include <endian.h>
 #endif

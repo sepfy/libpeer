@@ -129,6 +129,14 @@ int udp_socket_sendto(UdpSocket* udp_socket, Address* addr, const uint8_t* buf, 
     return -1;
   }
 
+#if LOG_LEVEL >= LEVEL_DEBUG
+  {
+    char addr_string[ADDRSTRLEN];
+    addr_to_string(addr, addr_string, sizeof(addr_string));
+    LOGD("udp_socket_sendto: fd=%d bytes=%d to=%s:%u", udp_socket->fd, ret, addr_string, (unsigned)addr->port);
+  }
+#endif
+
   return ret;
 }
 
@@ -167,17 +175,48 @@ int udp_socket_recvfrom(UdpSocket* udp_socket, Address* addr, uint8_t* buf, int 
     switch (udp_socket->bind_addr.family) {
       case AF_INET6:
         addr->family = AF_INET6;
-        addr->port = htons(sin6.sin6_port);
+        // sin6_port is already in network byte order; store host-order port in addr->port
+        addr->port = ntohs(sin6.sin6_port);
         memcpy(&addr->sin6, &sin6, sizeof(struct sockaddr_in6));
         break;
       case AF_INET:
       default:
         addr->family = AF_INET;
-        addr->port = htons(sin.sin_port);
+        // sin_port is already in network byte order; store host-order port in addr->port
+        addr->port = ntohs(sin.sin_port);
         memcpy(&addr->sin, &sin, sizeof(struct sockaddr_in));
         break;
     }
   }
+
+#if LOG_LEVEL >= LEVEL_DEBUG
+  {
+    Address src_addr;
+    memset(&src_addr, 0, sizeof(src_addr));
+    switch (udp_socket->bind_addr.family) {
+      case AF_INET6:
+        src_addr.family = AF_INET6;
+        src_addr.port = ntohs(sin6.sin6_port);
+        memcpy(&src_addr.sin6, &sin6, sizeof(struct sockaddr_in6));
+        break;
+      case AF_INET:
+      default:
+        src_addr.family = AF_INET;
+        src_addr.port = ntohs(sin.sin_port);
+        memcpy(&src_addr.sin, &sin, sizeof(struct sockaddr_in));
+        break;
+    }
+    char addr_string[ADDRSTRLEN];
+    addr_to_string(&src_addr, addr_string, sizeof(addr_string));
+    const char* kind = "udp";
+    if (ret >= 1) {
+      if ((buf[0] & 0xC0) == 0x00) kind = "stun?";
+      else if ((buf[0] & 0xC0) == 0x40) kind = "chan";
+    }
+    LOGD("udp_socket_recvfrom: fd=%d bytes=%d from=%s:%u kind=%s",
+         udp_socket->fd, ret, addr_string, (unsigned)src_addr.port, kind);
+  }
+#endif
 
   return ret;
 }

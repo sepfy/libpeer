@@ -51,9 +51,11 @@ void stun_msg_create(StunMessage* msg, uint16_t type) {
   header->type = htons(type);
   header->length = 0;
   header->magic_cookie = htonl(MAGIC_COOKIE);
-  header->transaction_id[0] = htonl(CRC32_TABLE[1]);
-  header->transaction_id[1] = htonl(CRC32_TABLE[2]);
-  header->transaction_id[2] = htonl(CRC32_TABLE[3]);
+  // RFC 5389: Transaction ID MUST be uniformly and randomly chosen
+  // Use rand() to generate unique IDs for each message
+  header->transaction_id[0] = htonl((uint32_t)rand());
+  header->transaction_id[1] = htonl((uint32_t)rand());
+  header->transaction_id[2] = htonl((uint32_t)rand());
   msg->size = sizeof(StunHeader);
 }
 
@@ -132,23 +134,19 @@ void stun_parse_msg_buf(StunMessage* msg) {
 
   uint8_t mask[16];
 
-  msg->stunclass = ntohs(header->type);
-  if ((msg->stunclass & STUN_CLASS_ERROR) == STUN_CLASS_ERROR) {
-    msg->stunclass = STUN_CLASS_ERROR;
-  } else if ((msg->stunclass & STUN_CLASS_INDICATION) == STUN_CLASS_INDICATION) {
-    msg->stunclass = STUN_CLASS_INDICATION;
-  } else if ((msg->stunclass & STUN_CLASS_RESPONSE) == STUN_CLASS_RESPONSE) {
-    msg->stunclass = STUN_CLASS_RESPONSE;
-  } else if ((msg->stunclass & STUN_CLASS_REQUEST) == STUN_CLASS_REQUEST) {
-    msg->stunclass = STUN_CLASS_REQUEST;
-  }
-
-  msg->stunmethod = ntohs(header->type) & 0x0FFF;
-  if ((msg->stunmethod & STUN_METHOD_ALLOCATE) == STUN_METHOD_ALLOCATE) {
-    msg->stunmethod = STUN_METHOD_ALLOCATE;
-  } else if ((msg->stunmethod & STUN_METHOD_BINDING) == STUN_METHOD_BINDING) {
-    msg->stunmethod = STUN_METHOD_BINDING;
-  }
+  // Extract class and method according to RFC 5389
+  // Type field encoding: M11 M10 M9 M8 M7 C1 M6 M5 M4 C0 M3 M2 M1 M0
+  // where M0-M11 are method bits and C0-C1 are class bits
+  uint16_t raw_type = ntohs(header->type);
+  
+  // Extract class: C0 at bit 4, C1 at bit 8
+  // STUN_CLASS constants use these same bit positions
+  msg->stunclass = raw_type & 0x0110;
+  
+  // Extract method: M0-M3 from bits 0-3, M4-M6 from bits 5-7, M7-M11 from bits 9-13
+  msg->stunmethod = (raw_type & 0x000F) |           // M0-M3 stay in bits 0-3
+                    ((raw_type & 0x00E0) >> 1) |    // M4-M6 from bits 5-7 to bits 4-6
+                    ((raw_type & 0x3E00) >> 2);     // M7-M11 from bits 9-13 to bits 7-11
 
   while (pos < length) {
     StunAttribute* attr = (StunAttribute*)(msg->buf + pos);
@@ -160,11 +158,18 @@ void stun_parse_msg_buf(StunMessage* msg) {
       case STUN_ATTR_TYPE_MAPPED_ADDRESS:
         stun_get_mapped_address(attr->value, mask, &msg->mapped_addr);
         break;
-      case STUN_ATTR_TYPE_USERNAME:
+      case STUN_ATTR_TYPE_USERNAME: {
+        uint16_t attr_len = ntohs(attr->length);
         memset(msg->username, 0, sizeof(msg->username));
-        memcpy(msg->username, attr->value, ntohs(attr->length));
-        // LOGD("length = %d, Username %s", ntohs(attr->length), msg->username);
+        if (attr_len >= sizeof(msg->username)) {
+          LOGE("USERNAME truncated! attr_len=%u, buf_size=%zu", attr_len, sizeof(msg->username));
+          attr_len = sizeof(msg->username) - 1;
+        }
+        memcpy(msg->username, attr->value, attr_len);
+        msg->username_len = attr_len;
+        // LOGD("length = %d, Username %s", attr_len, msg->username);
         break;
+      }
       case STUN_ATTR_TYPE_MESSAGE_INTEGRITY:
         memcpy(msg->message_integrity, attr->value, ntohs(attr->length));
 
@@ -177,21 +182,53 @@ void stun_parse_msg_buf(StunMessage* msg) {
         break;
       case STUN_ATTR_TYPE_LIFETIME:
         break;
-      case STUN_ATTR_TYPE_REALM:
+      case STUN_ATTR_TYPE_REALM: {
+        uint16_t attr_len = ntohs(attr->length);
         memset(msg->realm, 0, sizeof(msg->realm));
-        memcpy(msg->realm, attr->value, ntohs(attr->length));
-        LOGD("Realm %s", msg->realm);
+        if (attr_len >= sizeof(msg->realm)) {
+          LOGE("REALM truncated! attr_len=%u, buf_size=%zu", attr_len, sizeof(msg->realm));
+          attr_len = sizeof(msg->realm) - 1;
+        }
+        memcpy(msg->realm, attr->value, attr_len);
+        msg->realm_len = attr_len;
+        LOGD("Realm (len=%zu): %s", msg->realm_len, msg->realm);
         break;
-      case STUN_ATTR_TYPE_NONCE:
+      }
+      case STUN_ATTR_TYPE_NONCE: {
+        uint16_t attr_len = ntohs(attr->length);
         memset(msg->nonce, 0, sizeof(msg->nonce));
-        memcpy(msg->nonce, attr->value, ntohs(attr->length));
-        LOGD("Nonce %s", msg->nonce);
+        if (attr_len >= sizeof(msg->nonce)) {
+          LOGE("NONCE truncated! attr_len=%u, buf_size=%zu -- THIS BREAKS TURN AUTH!", attr_len, sizeof(msg->nonce));
+          attr_len = sizeof(msg->nonce) - 1;
+        }
+        memcpy(msg->nonce, attr->value, attr_len);
+        msg->nonce_len = attr_len;
         break;
+      }
+      case STUN_ATTR_TYPE_XOR_PEER_ADDRESS: {
+        *((uint32_t*)mask) = htonl(MAGIC_COOKIE);
+        memcpy(mask + 4, header->transaction_id, sizeof(header->transaction_id));
+        stun_get_mapped_address(attr->value, mask, &msg->peer_addr);
+        break;
+      }
+      case STUN_ATTR_TYPE_DATA: {
+        size_t copy_len = ntohs(attr->length);
+        if (copy_len > sizeof(msg->data)) {
+          LOGW("STUN DATA truncated from %zu to %zu", copy_len, sizeof(msg->data));
+          copy_len = sizeof(msg->data);
+        }
+        memcpy(msg->data, attr->value, copy_len);
+        msg->data_len = copy_len;
+        break;
+      }
       case STUN_ATTR_TYPE_XOR_RELAYED_ADDRESS:
         *((uint32_t*)mask) = htonl(MAGIC_COOKIE);
         memcpy(mask + 4, header->transaction_id, sizeof(header->transaction_id));
         LOGD("XOR Relayed Address");
         stun_get_mapped_address(attr->value, mask, &msg->relayed_addr);
+        break;
+      case STUN_ATTR_TYPE_CHANNEL_NUMBER:
+        // TURN ChannelBind CHANNEL-NUMBER attribute (2-byte channel, 2-byte RFFU). No-op parse.
         break;
       case STUN_ATTR_TYPE_XOR_MAPPED_ADDRESS:
         *((uint32_t*)mask) = htonl(MAGIC_COOKIE);
@@ -207,6 +244,30 @@ void stun_parse_msg_buf(StunMessage* msg) {
         memcpy(&msg->fingerprint, attr->value, ntohs(attr->length));
         // LOGD("Fingerprint: 0x%.4x", msg->fingerprint);
         break;
+      case STUN_ATTR_TYPE_ERROR_CODE: {
+        // Parse ERROR-CODE attribute to see why TURN failed
+        // Format: 21-bit padding, 3-bit class, 8-bit number
+        // Followed by UTF-8 reason phrase
+        if (ntohs(attr->length) >= 4) {
+          uint8_t *err_data = (uint8_t *)(attr + 1);
+          uint8_t err_class = err_data[2] & 0x07;  // Bits 0-2 of byte 2
+          uint8_t err_number = err_data[3];         // Byte 3
+          uint16_t err_code = err_class * 100 + err_number;
+          
+          // Reason phrase starts at byte 4
+          int reason_len = ntohs(attr->length) - 4;
+          char reason[128] = {0};
+          if (reason_len > 0 && reason_len < sizeof(reason)) {
+            memcpy(reason, &err_data[4], reason_len);
+            reason[reason_len] = '\0';
+          }
+          
+          LOGE("TURN ERROR-CODE %d: %s", err_code, reason[0] ? reason : "(no reason)");
+        } else {
+          LOGE("Malformed ERROR-CODE attribute (len=%d)", ntohs(attr->length));
+        }
+        break;
+      }
       case STUN_ATTR_TYPE_ICE_CONTROLLED:
       case STUN_ATTR_TYPE_ICE_CONTROLLING:
       case STUN_ATTR_TYPE_NETWORK_COST:
@@ -237,25 +298,45 @@ int stun_msg_write_attr(StunMessage* msg, StunAttrType type, uint16_t length, ch
 
   StunAttribute* stun_attr = (StunAttribute*)(msg->buf + msg->size);
 
+  uint16_t padded_len = 4 * ((length + 3) / 4);
+  if (msg->size + sizeof(StunAttribute) + padded_len > STUN_ATTR_BUF_SIZE) {
+    LOGE("stun_msg_write_attr: overflow (need %u, have %zu)", (unsigned)(msg->size + sizeof(StunAttribute) + padded_len), (size_t)STUN_ATTR_BUF_SIZE);
+    return -1;
+  }
+
   stun_attr->type = htons(type);
   stun_attr->length = htons(length);
   if (value)
     memcpy(stun_attr->value, value, length);
 
-  length = 4 * ((length + 3) / 4);
+  length = padded_len;
   header->length = htons(ntohs(header->length) + sizeof(StunAttribute) + length);
 
   msg->size += length + sizeof(StunAttribute);
 
+  // Store attribute values and their lengths for MESSAGE-INTEGRITY computation
+  uint16_t orig_len = ntohs(stun_attr->length);  // Use original length before padding
   switch (type) {
     case STUN_ATTR_TYPE_REALM:
-      memcpy(msg->realm, value, length);
+      if (orig_len < sizeof(msg->realm)) {
+        memset(msg->realm, 0, sizeof(msg->realm));
+        memcpy(msg->realm, value, orig_len);
+        msg->realm_len = orig_len;
+      }
       break;
     case STUN_ATTR_TYPE_NONCE:
-      memcpy(msg->nonce, value, length);
+      if (orig_len < sizeof(msg->nonce)) {
+        memset(msg->nonce, 0, sizeof(msg->nonce));
+        memcpy(msg->nonce, value, orig_len);
+        msg->nonce_len = orig_len;
+      }
       break;
     case STUN_ATTR_TYPE_USERNAME:
-      memcpy(msg->username, value, length);
+      if (orig_len < sizeof(msg->username)) {
+        memset(msg->username, 0, sizeof(msg->username));
+        memcpy(msg->username, value, orig_len);
+        msg->username_len = orig_len;
+      }
       break;
     default:
       break;
@@ -269,7 +350,7 @@ int stun_msg_finish(StunMessage* msg, StunCredential credential, const char* pas
   StunAttribute* stun_attr;
 
   uint16_t header_length = ntohs(header->length);
-  char key[256];
+  char key[512];  // Increased: username(256) + realm(128) + password + separators
   char hash_key[17];
   memset(key, 0, sizeof(key));
   memset(hash_key, 0, sizeof(hash_key));
@@ -277,7 +358,6 @@ int stun_msg_finish(StunMessage* msg, StunCredential credential, const char* pas
   switch (credential) {
     case STUN_CREDENTIAL_LONG_TERM:
       snprintf(key, sizeof(key), "%s:%s:%s", msg->username, msg->realm, password);
-      LOGD("key: %s", key);
       utils_get_md5(key, strlen(key), (unsigned char*)hash_key);
       password = hash_key;
       password_len = 16;
@@ -286,21 +366,56 @@ int stun_msg_finish(StunMessage* msg, StunCredential credential, const char* pas
       break;
   }
 
+  // MESSAGE-INTEGRITY:
+  // Many deployed TURN servers (including Cloudflare) expect the HMAC to be computed
+  // over the STUN message up to (but excluding) the MESSAGE-INTEGRITY attribute,
+  // with the header length field including the MESSAGE-INTEGRITY attribute (24 bytes)
+  // and excluding any later FINGERPRINT attribute.
+  if (msg->size + sizeof(StunAttribute) + 20 > STUN_ATTR_BUF_SIZE) {
+    LOGE("stun_msg_finish: overflow adding MESSAGE-INTEGRITY (need %zu, have %d)",
+         msg->size + sizeof(StunAttribute) + 20, STUN_ATTR_BUF_SIZE);
+    return -1;
+  }
   stun_attr = (StunAttribute*)(msg->buf + msg->size);
-  header->length = htons(header_length + 24); /* HMAC-SHA1 */
   stun_attr->type = htons(STUN_ATTR_TYPE_MESSAGE_INTEGRITY);
   stun_attr->length = htons(20);
-  utils_get_hmac_sha1((char*)msg->buf, msg->size, password, password_len, (unsigned char*)stun_attr->value);
+  header->length = htons(header_length + 24); /* header length INCLUDES MI */
+  if (credential == STUN_CREDENTIAL_SHORT_TERM) {
+    // RFC 5389 §15.4: For short-term credentials, the HMAC input is the message
+    // UP TO (but not including) the MESSAGE-INTEGRITY attribute. The header length
+    // is adjusted to include MI BEFORE computing the HMAC.
+    utils_get_hmac_sha1((char*)msg->buf, msg->size, password, password_len, (unsigned char*)stun_attr->value);
+  } else {
+    // TURN long-term: same computation (HMAC excludes MI attribute).
+    utils_get_hmac_sha1((char*)msg->buf, msg->size, password, password_len, (unsigned char*)stun_attr->value);
+  }
   msg->size += sizeof(StunAttribute) + 20;
-  // FINGERPRINT
 
+  // FINGERPRINT: RFC 5389 §15.5 says optional, but aiortc/aioice ALWAYS includes it.
+  // Pipecat Cloud (aiortc-based) may silently reject binding requests without FINGERPRINT.
+  // Always add FINGERPRINT for maximum interoperability.
+  if (msg->size + sizeof(StunAttribute) + 4 > STUN_ATTR_BUF_SIZE) {
+    LOGE("stun_msg_finish: overflow adding FINGERPRINT (need %zu, have %d)", msg->size + sizeof(StunAttribute) + 4, STUN_ATTR_BUF_SIZE);
+    return -1;
+  }
   stun_attr = (StunAttribute*)(msg->buf + msg->size);
-  header->length = htons(header_length + 24 /* HMAC-SHA1 */ + 8 /* FINGERPRINT */);
+  // Header length must include the FINGERPRINT attribute (8 bytes total)
+  header_length = ntohs(header->length);
+  header->length = htons(header_length + 8);
   stun_attr->type = htons(STUN_ATTR_TYPE_FINGERPRINT);
   stun_attr->length = htons(4);
   stun_calculate_fingerprint((char*)msg->buf, msg->size, (uint32_t*)stun_attr->value);
   msg->size += sizeof(StunAttribute) + 4;
+
   return 0;
+}
+
+// Detect TURN ChannelData packets per RFC 5766 §11: first two bits must be 01
+int stun_is_channel_data(const uint8_t* data, size_t len) {
+  if (data == NULL || len < 1) {
+    return 0;
+  }
+  return (data[0] & 0xC0) == 0x40;
 }
 
 int stun_probe(uint8_t* buf, size_t size) {
@@ -351,7 +466,7 @@ StunMsgType stun_is_stun_msg(uint8_t *buf, size_t size) {
   return 0;
 }
 #endif
-int stun_msg_is_valid(uint8_t* buf, size_t size, char* password) {
+int stun_msg_is_valid(uint8_t* buf, size_t size, const char* password, size_t password_len) {
   StunMessage msg;
 
   memcpy(msg.buf, buf, size);
@@ -360,32 +475,64 @@ int stun_msg_is_valid(uint8_t* buf, size_t size, char* password) {
 
   StunHeader* header = (StunHeader*)msg.buf;
 
-  // FINGERPRINT
-  uint32_t fingerprint = 0;
-  size_t length = size - 4 - sizeof(StunAttribute);
-  stun_calculate_fingerprint((char*)msg.buf, length, &fingerprint);
-  // LOGD("Fingerprint: 0x%08x", fingerprint);
-
-  if (fingerprint != msg.fingerprint) {
-    // LOGE("Fingerprint does not match.");
-    return -1;
-  } else {
-    // LOGD("Fingerprint matches.");
+  // FINGERPRINT (optional).
+  // If absent, msg.fingerprint will be 0; skip validation in that case.
+  if (msg.fingerprint != 0) {
+    uint32_t fingerprint = 0;
+    size_t length = size - 4 - sizeof(StunAttribute);
+    stun_calculate_fingerprint((char*)msg.buf, length, &fingerprint);
+    if (fingerprint != msg.fingerprint) {
+      return -1;
+    }
   }
 
   // MESSAGE-INTEGRITY
-  unsigned char message_integrity_hex[41];
-  unsigned char message_integrity[20];
-  header->length = htons(ntohs(header->length) - 4 - sizeof(StunAttribute));
-  length = length - 20 - sizeof(StunAttribute);
-  utils_get_hmac_sha1((char*)msg.buf, length, password, strlen(password), message_integrity);
-  for (int i = 0; i < 20; i++) {
-    sprintf((char*)&message_integrity_hex[2 * i], "%02x", (uint8_t)message_integrity[i]);
+  // Validate MESSAGE-INTEGRITY per RFC 5389 semantics used by ICE short-term credentials:
+  // compute HMAC over the message up to and including the MESSAGE-INTEGRITY attribute,
+  // with the MI value bytes treated as zero during computation, and with the header
+  // length excluding the FINGERPRINT attribute.
+  unsigned char computed_mi[20];
+  memset(computed_mi, 0, sizeof(computed_mi));
+
+  // Copy message excluding FINGERPRINT (assumed last).
+  size_t msg_no_fp_size = size - (sizeof(StunAttribute) + 4);
+  if (msg_no_fp_size > STUN_ATTR_BUF_SIZE) {
+    return -1;
+  }
+  uint8_t tmp[STUN_ATTR_BUF_SIZE];
+  memcpy(tmp, msg.buf, msg_no_fp_size);
+
+  // Adjust header length to exclude fingerprint.
+  StunHeader* tmp_header = (StunHeader*)tmp;
+  tmp_header->length = htons(ntohs(tmp_header->length) - (uint16_t)(sizeof(StunAttribute) + 4));
+
+  // Find MESSAGE-INTEGRITY offset.
+  size_t pos = sizeof(StunHeader);
+  size_t mi_attr_offset = 0;
+  while (pos + sizeof(StunAttribute) <= msg_no_fp_size) {
+    StunAttribute* attr = (StunAttribute*)(tmp + pos);
+    uint16_t attr_type = ntohs(attr->type);
+    uint16_t attr_len = ntohs(attr->length);
+    size_t padded_len = 4 * ((attr_len + 3) / 4);
+    if (pos + sizeof(StunAttribute) + padded_len > msg_no_fp_size) {
+      break;
+    }
+    if (attr_type == STUN_ATTR_TYPE_MESSAGE_INTEGRITY && attr_len == 20) {
+      mi_attr_offset = pos;
+      break;
+    }
+    pos += sizeof(StunAttribute) + padded_len;
+  }
+  if (mi_attr_offset == 0) {
+    return -1;
   }
 
-  // LOGD("message_integrity: 0x%s", message_integrity_hex);
+  // RFC 5389 §15.4: HMAC input is up to (but NOT including) the MESSAGE-INTEGRITY attribute.
+  // The header length should already be adjusted to include MI in the received message.
+  // We compute HMAC over the bytes up to the MI attribute offset.
+  utils_get_hmac_sha1((char*)tmp, mi_attr_offset, password, password_len, computed_mi);
 
-  if (memcmp(message_integrity, msg.message_integrity, 20) != 0) {
+  if (memcmp(computed_mi, msg.message_integrity, 20) != 0) {
     // LOGE("Message Integrity does not match.");
     return -1;
   } else {

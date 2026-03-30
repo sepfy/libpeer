@@ -60,4 +60,8 @@ int ice_candidate_from_description(IceCandidate* candidate, char* description, c
 
 int ice_candidate_get_local_address(IceCandidate* candidate, Address* address);
 
+// RFC 8445 §7.1.1: Compute priority for PRIORITY attribute in binding requests
+// Uses peer-reflexive type preference instead of actual candidate type
+uint32_t ice_candidate_compute_prflx_priority(IceCandidate* candidate);
+
 #endif  // ICE_H_

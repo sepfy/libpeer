@@ -34,8 +34,13 @@ int rtp_packet_validate(uint8_t* packet, size_t size) {
   if (size < 12)
     return 0;
 
-  RtpHeader* rtp_header = (RtpHeader*)packet;
-  return ((rtp_header->type < 64) || (rtp_header->type >= 96));
+  // RTP packet format (network byte order):
+  // Byte 0: V(2) | P(1) | X(1) | CC(4)
+  // Byte 1: M(1) | PT(7)
+  // Per RFC 5761 demux rule: PT outside 64-95 goes to RTP path (PT < 64 or PT >= 96)
+  // Note: Don't use RtpHeader bitfield - it doesn't handle network byte order correctly
+  uint8_t pt = packet[1] & 0x7F;  // Mask off marker bit to get payload type
+  return ((pt < 64) || (pt >= 96));
 }
 
 uint32_t rtp_get_ssrc(uint8_t* packet) {
@@ -268,9 +273,25 @@ static int rtp_decode_h264(RtpDecoder* rtp_decoder, uint8_t* buf, size_t size) {
 
 static int rtp_decode_generic(RtpDecoder* rtp_decoder, uint8_t* buf, size_t size) {
   RtpPacket* rtp_packet = (RtpPacket*)buf;
+
+  // Calculate payload offset: skip fixed header, CSRC entries, and extensions
+  size_t offset = sizeof(RtpHeader);
+
+  // Skip CSRC entries (each 4 bytes, count in CC field)
+  offset += rtp_packet->header.csrccount * sizeof(uint32_t);
+
+  // Skip header extension if present (RFC 3550 Section 5.3.1)
+  if (rtp_packet->header.extension && offset + 4 <= size) {
+    // Extension header: 2 bytes profile + 2 bytes length (in 32-bit words)
+    uint16_t ext_length = (uint16_t)((buf[offset + 2] << 8) | buf[offset + 3]);
+    offset += 4 + ext_length * 4;
+  }
+
+  if (offset > size)
+    return -1;  // malformed packet
+
   if (rtp_decoder->on_packet != NULL)
-    rtp_decoder->on_packet(rtp_packet->payload, size - sizeof(RtpHeader), rtp_decoder->user_data);
-  // even if there is no callback set, assume everything is ok for caller and do not return an error
+    rtp_decoder->on_packet(buf + offset, size - offset, rtp_decoder->user_data);
   return (int)size;
 }
 

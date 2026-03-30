@@ -9,8 +9,13 @@ int rtcp_probe(uint8_t* packet, size_t size) {
   if (size < 8)
     return -1;
 
-  RtpHeader* header = (RtpHeader*)packet;
-  return ((header->type >= 64) && (header->type < 96));
+  // RTP/RTCP packet format (network byte order):
+  // Byte 0: V(2) | P(1) | X/RC(5)
+  // Byte 1: M(1) | PT(7)
+  // Per RFC 5761 demux rule: PT 64-95 goes to RTCP path
+  // Note: Don't use RtpHeader bitfield - it doesn't handle network byte order correctly
+  uint8_t pt = packet[1] & 0x7F;  // Mask off marker bit to get payload type
+  return ((pt >= 64) && (pt < 96));
 }
 
 int rtcp_get_pli(uint8_t* packet, int len, uint32_t ssrc) {

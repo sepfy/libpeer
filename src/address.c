@@ -42,7 +42,7 @@ int addr_from_string(const char* buf, Address* addr) {
 }
 
 int addr_to_string(const Address* addr, char* buf, size_t len) {
-  memset(buf, 0, sizeof(len));
+  memset(buf, 0, len);
   switch (addr->family) {
     case AF_INET6:
       return inet_ntop(AF_INET6, &addr->sin6.sin6_addr, buf, len) != NULL;
@@ -56,4 +56,19 @@ int addr_to_string(const Address* addr, char* buf, size_t len) {
 int addr_equal(const Address* a, const Address* b) {
   // TODO
   return 1;
+}
+
+int addr_cmp(const Address* a, const Address* b) {
+  if (a->family != b->family) return -1;
+  if (a->port != b->port) return -1;
+  switch (a->family) {
+    case AF_INET:
+    default:
+      if (a->sin.sin_addr.s_addr != b->sin.sin_addr.s_addr) return -1;
+      break;
+    case AF_INET6:
+      if (memcmp(&a->sin6.sin6_addr, &b->sin6.sin6_addr, sizeof(a->sin6.sin6_addr)) != 0) return -1;
+      break;
+  }
+  return 0;
 }

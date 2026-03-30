@@ -17,11 +17,29 @@ static uint8_t ice_candidate_type_preference(IceCandidateType type) {
       return 126;
     case ICE_CANDIDATE_TYPE_SRFLX:
       return 100;
+    case ICE_CANDIDATE_TYPE_PRFLX:
+      return 110;  // RFC 8445: peer-reflexive between host and srflx
     case ICE_CANDIDATE_TYPE_RELAY:
-      return 0;
+      // Boosted from 0 to 50 to ensure relay candidates are tried earlier.
+      // RFC 8445 recommends lower priority for relay, but libpeer's sequential
+      // checking means relay pairs may never be reached if host/srflx all fail.
+      // With priority=50, relay pairs interleave with srflx (100) checks.
+      return 50;
     default:
       return 0;
   }
+}
+
+// RFC 8445 §7.1.1: PRIORITY attribute in binding request must use peer-reflexive
+// type preference, not the actual candidate type preference.
+uint32_t ice_candidate_compute_prflx_priority(IceCandidate* candidate) {
+  // priority = (2^24)*(type preference) + (2^8)*(local preference) + (256 - component ID)
+  // Use PRFLX type preference (110) instead of actual candidate type
+  // Use maximum local_pref (65535) like aiortc - the prflx candidate doesn't exist yet
+  // so we use maximum preference for this hypothetical candidate
+  uint8_t prflx_type_pref = 110;
+  uint16_t local_pref = 65535;  // aiortc uses max local preference
+  return (1 << 24) * prflx_type_pref + (1 << 8) * local_pref + (256 - candidate->component);
 }
 
 static uint16_t ice_candidate_local_preference(IceCandidate* candidate) {
@@ -43,7 +61,7 @@ void ice_candidate_create(IceCandidate* candidate, int foundation, IceCandidateT
 
   ice_candidate_priority(candidate);
 
-  snprintf(candidate->transport, sizeof(candidate->transport), "%s", "UDP");
+  snprintf(candidate->transport, sizeof(candidate->transport), "%s", "udp");
 }
 
 void ice_candidate_to_description(IceCandidate* candidate, char* description, int length) {
@@ -60,8 +78,12 @@ void ice_candidate_to_description(IceCandidate* candidate, char* description, in
     case ICE_CANDIDATE_TYPE_SRFLX:
       snprintf(typ_raddr, sizeof(typ_raddr), "srflx raddr %s rport %d", addr_string, candidate->raddr.port);
       break;
+    case ICE_CANDIDATE_TYPE_PRFLX:
+      snprintf(typ_raddr, sizeof(typ_raddr), "prflx raddr %s rport %d", addr_string, candidate->raddr.port);
+      break;
     case ICE_CANDIDATE_TYPE_RELAY:
       snprintf(typ_raddr, sizeof(typ_raddr), "relay raddr %s rport %d", addr_string, candidate->raddr.port);
+      break;
     default:
       break;
   }
@@ -118,15 +140,37 @@ int ice_candidate_from_description(IceCandidate* candidate, char* description, c
     return -1;
   }
 
-  addr_set_port(&candidate->addr, port);
+  // IMPORTANT: udp_socket_sendto() uses addr->sin/sin6 port from the sockaddr.
+  // So we must set IP/family first, then set the port via addr_set_port().
+  memset(&candidate->addr, 0, sizeof(candidate->addr));
+  memset(&candidate->raddr, 0, sizeof(candidate->raddr));
 
   if (strstr(addrstring, "local") != NULL) {
     if (mdns_resolve_addr(addrstring, &candidate->addr) == 0) {
       LOGW("Failed to resolve mDNS address");
       return -1;
     }
-  } else if (addr_from_string(addrstring, &candidate->addr) == 0) {
-    return -1;
+  } else {
+    if (addr_from_string(addrstring, &candidate->addr) == 0) {
+      return -1;
+    }
+  }
+
+  addr_set_port(&candidate->addr, (uint16_t)port);
+
+  // Parse optional base address (raddr/rport) for srflx/relay candidates.
+  // Example:
+  // a=candidate:... 1 udp ... 1.2.3.4 12345 typ srflx raddr 192.168.1.10 rport 56789
+  char raddrstring[ADDRSTRLEN];
+  uint32_t rport = 0;
+  memset(raddrstring, 0, sizeof(raddrstring));
+  if (strstr(candidate_start, " raddr ") && strstr(candidate_start, " rport ")) {
+    if (sscanf(strstr(candidate_start, " raddr "), " raddr %s", raddrstring) == 1 &&
+        sscanf(strstr(candidate_start, " rport "), " rport %" PRIu32, &rport) == 1) {
+      if (addr_from_string(raddrstring, &candidate->raddr) != 0) {
+        addr_set_port(&candidate->raddr, (uint16_t)rport);
+      }
+    }
   }
 
   return 0;
