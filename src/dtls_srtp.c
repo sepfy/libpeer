@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -31,9 +32,16 @@ int dtls_srtp_udp_recv(void* ctx, uint8_t* buf, size_t len) {
   UdpSocket* udp_socket = (UdpSocket*)dtls_srtp->user_data;
 
   int ret;
+  int timeout_ms = 5000;  // 5 second timeout to prevent hanging
+  int elapsed_ms = 0;
 
   while ((ret = udp_socket_recvfrom(udp_socket, &udp_socket->bind_addr, buf, len)) <= 0) {
-    ports_sleep_ms(1);
+    ports_sleep_ms(10);
+    elapsed_ms += 10;
+    if (elapsed_ms >= timeout_ms) {
+      LOGW("dtls_srtp_udp_recv timeout after %d ms", elapsed_ms);
+      return MBEDTLS_ERR_SSL_TIMEOUT;
+    }
   }
 
   LOGD("dtls_srtp_udp_recv (%d)", ret);
@@ -128,9 +136,21 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp* dtls_srtp) {
 
   if (ret < 0) {
     LOGE("mbedtls_x509write_crt_pem failed -0x%.4x", (unsigned int)-ret);
+    mbedtls_x509write_crt_free(&crt);
+    free(cert_buf);
+    return ret;
   }
 
-  mbedtls_x509_crt_parse(&dtls_srtp->cert, cert_buf, 2 * RSA_KEY_LENGTH);
+  // Parse the generated PEM certificate - use strlen to get actual PEM length
+  size_t cert_len = strlen((char*)cert_buf) + 1;  // Include null terminator for PEM
+  ret = mbedtls_x509_crt_parse(&dtls_srtp->cert, cert_buf, cert_len);
+  if (ret != 0) {
+    LOGE("mbedtls_x509_crt_parse failed -0x%.4x", (unsigned int)-ret);
+    mbedtls_x509write_crt_free(&crt);
+    free(cert_buf);
+    return ret;
+  }
+  LOGD("Self-signed certificate generated (len=%zu)", cert_len);
 
   mbedtls_x509write_crt_free(&crt);
 
@@ -146,6 +166,7 @@ static void dtls_srtp_debug(void* ctx, int level, const char* file, int line, co
 #endif
 
 int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
+  int ret;
   static const mbedtls_ssl_srtp_profile default_profiles[] = {
       MBEDTLS_TLS_SRTP_AES128_CM_HMAC_SHA1_80,
       MBEDTLS_TLS_SRTP_AES128_CM_HMAC_SHA1_32,
@@ -153,72 +174,150 @@ int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
       MBEDTLS_TLS_SRTP_NULL_HMAC_SHA1_32,
       MBEDTLS_TLS_SRTP_UNSET};
 
+  // Initialize libsrtp once (required before any srtp_create calls)
+  // Note: srtp_init() may be called multiple times if peer_init() was called first
+  // Error code 2 means already initialized, which is fine
+  static bool srtp_initialized = false;
+  if (!srtp_initialized) {
+    srtp_err_status_t srtp_err = srtp_init();
+    if (srtp_err != srtp_err_status_ok && srtp_err != 2) {  // 2 = already initialized
+      LOGE("srtp_init() failed: %d", (int)srtp_err);
+      return -1;
+    }
+    if (srtp_err == 2) {
+      LOGD("libsrtp already initialized (by peer_init)");
+    } else {
+      LOGD("libsrtp initialized");
+    }
+    srtp_initialized = true;
+  }
+
   dtls_srtp->role = role;
   dtls_srtp->state = DTLS_SRTP_STATE_INIT;
   dtls_srtp->user_data = user_data;
   dtls_srtp->udp_send = dtls_srtp_udp_send;
   dtls_srtp->udp_recv = dtls_srtp_udp_recv;
+  
+  // Initialize SRTP pointers to NULL
+  dtls_srtp->srtp_in = NULL;
+  dtls_srtp->srtp_out = NULL;
 
+  // Initialize all mbedtls structures first
   mbedtls_ssl_config_init(&dtls_srtp->conf);
   mbedtls_ssl_init(&dtls_srtp->ssl);
-
   mbedtls_x509_crt_init(&dtls_srtp->cert);
   mbedtls_pk_init(&dtls_srtp->pkey);
   mbedtls_entropy_init(&dtls_srtp->entropy);
   mbedtls_ctr_drbg_init(&dtls_srtp->ctr_drbg);
+
 #if CONFIG_MBEDTLS_DEBUG
   mbedtls_debug_set_threshold(3);
-  mbedtls_ssl_conf_dbg(&dtls_srtp->conf, dtls_srtp_debug, NULL);
 #endif
-  dtls_srtp_selfsign_cert(dtls_srtp);
 
-  mbedtls_ssl_conf_verify(&dtls_srtp->conf, dtls_srtp_cert_verify, NULL);
+  // Generate self-signed certificate BEFORE setting up SSL config
+  ret = dtls_srtp_selfsign_cert(dtls_srtp);
+  if (ret != 0) {
+    LOGE("Failed to generate self-signed certificate: -0x%.4x", (unsigned int)-ret);
+    return ret;
+  }
 
-  mbedtls_ssl_conf_authmode(&dtls_srtp->conf, MBEDTLS_SSL_VERIFY_REQUIRED);
-
-  mbedtls_ssl_conf_ca_chain(&dtls_srtp->conf, &dtls_srtp->cert, NULL);
-
-  mbedtls_ssl_conf_own_cert(&dtls_srtp->conf, &dtls_srtp->cert, &dtls_srtp->pkey);
-
-  mbedtls_ssl_conf_rng(&dtls_srtp->conf, mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
-
-  mbedtls_ssl_conf_read_timeout(&dtls_srtp->conf, 1000);
-
+  // Set up SSL config defaults FIRST (this resets many settings)
   if (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) {
-    mbedtls_ssl_config_defaults(&dtls_srtp->conf,
+    ret = mbedtls_ssl_config_defaults(&dtls_srtp->conf,
                                 MBEDTLS_SSL_IS_SERVER,
                                 MBEDTLS_SSL_TRANSPORT_DATAGRAM,
                                 MBEDTLS_SSL_PRESET_DEFAULT);
+    if (ret != 0) {
+      LOGE("mbedtls_ssl_config_defaults (server) failed: -0x%.4x", (unsigned int)-ret);
+      return ret;
+    }
 
     mbedtls_ssl_cookie_init(&dtls_srtp->cookie_ctx);
-
     mbedtls_ssl_cookie_setup(&dtls_srtp->cookie_ctx, mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
-
     mbedtls_ssl_conf_dtls_cookies(&dtls_srtp->conf, mbedtls_ssl_cookie_write, mbedtls_ssl_cookie_check, &dtls_srtp->cookie_ctx);
-
+    LOGD("DTLS-SRTP: SERVER mode");
   } else {
-    mbedtls_ssl_config_defaults(&dtls_srtp->conf,
+    ret = mbedtls_ssl_config_defaults(&dtls_srtp->conf,
                                 MBEDTLS_SSL_IS_CLIENT,
                                 MBEDTLS_SSL_TRANSPORT_DATAGRAM,
                                 MBEDTLS_SSL_PRESET_DEFAULT);
+    if (ret != 0) {
+      LOGE("mbedtls_ssl_config_defaults (client) failed: -0x%.4x", (unsigned int)-ret);
+      return ret;
+    }
+    LOGD("DTLS-SRTP: CLIENT mode");
   }
 
+  // Now configure SSL settings AFTER defaults are set
+#if CONFIG_MBEDTLS_DEBUG
+  mbedtls_ssl_conf_dbg(&dtls_srtp->conf, dtls_srtp_debug, NULL);
+#endif
+
+  mbedtls_ssl_conf_verify(&dtls_srtp->conf, dtls_srtp_cert_verify, NULL);
+  mbedtls_ssl_conf_authmode(&dtls_srtp->conf, MBEDTLS_SSL_VERIFY_REQUIRED);
+  mbedtls_ssl_conf_ca_chain(&dtls_srtp->conf, &dtls_srtp->cert, NULL);
+
+  ret = mbedtls_ssl_conf_own_cert(&dtls_srtp->conf, &dtls_srtp->cert, &dtls_srtp->pkey);
+  if (ret != 0) {
+    LOGE("mbedtls_ssl_conf_own_cert failed: -0x%.4x", (unsigned int)-ret);
+    return ret;
+  }
+
+  mbedtls_ssl_conf_rng(&dtls_srtp->conf, mbedtls_ctr_drbg_random, &dtls_srtp->ctr_drbg);
+  mbedtls_ssl_conf_read_timeout(&dtls_srtp->conf, 1000);
+
+  // Generate fingerprint from our certificate
   dtls_srtp_x509_digest(&dtls_srtp->cert, dtls_srtp->local_fingerprint);
+  LOGD("DTLS fingerprint: %s", dtls_srtp->local_fingerprint);
 
-  LOGD("local fingerprint: %s", dtls_srtp->local_fingerprint);
-
+  // Configure SRTP profiles
   mbedtls_ssl_conf_dtls_srtp_protection_profiles(&dtls_srtp->conf, default_profiles);
-
   mbedtls_ssl_conf_srtp_mki_value_supported(&dtls_srtp->conf, MBEDTLS_SSL_DTLS_SRTP_MKI_UNSUPPORTED);
-
   mbedtls_ssl_conf_cert_req_ca_list(&dtls_srtp->conf, MBEDTLS_SSL_CERT_REQ_CA_LIST_DISABLED);
 
-  mbedtls_ssl_setup(&dtls_srtp->ssl, &dtls_srtp->conf);
+  // Configure cipher suites for aiortc compatibility
+  // aiortc ONLY accepts ECDHE-ECDSA-* ciphers, in this order:
+  // - ECDHE-ECDSA-AES128-GCM-SHA256
+  // - ECDHE-ECDSA-CHACHA20-POLY1305
+  // - ECDHE-ECDSA-AES128-SHA
+  // - ECDHE-ECDSA-AES256-SHA
+  static const int aiortc_ciphersuites[] = {
+      MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+#ifdef MBEDTLS_TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+      MBEDTLS_TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+#endif
+      MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+      MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+      0  // Must be 0-terminated
+  };
+  mbedtls_ssl_conf_ciphersuites(&dtls_srtp->conf, aiortc_ciphersuites);
+  LOGI("DTLS: Configured %d aiortc-compatible cipher suites",
+       (int)(sizeof(aiortc_ciphersuites)/sizeof(aiortc_ciphersuites[0]) - 1));
+
+  // Finally, set up the SSL context with our config
+  ret = mbedtls_ssl_setup(&dtls_srtp->ssl, &dtls_srtp->conf);
+  if (ret != 0) {
+    LOGE("mbedtls_ssl_setup failed: -0x%.4x", (unsigned int)-ret);
+    return ret;
+  }
 
   return 0;
 }
 
 void dtls_srtp_deinit(DtlsSrtp* dtls_srtp) {
+  // Send close_notify to peer if we have an established connection
+  // This allows the peer to cleanly close its side
+  if (dtls_srtp->state == DTLS_SRTP_STATE_CONNECTED) {
+    int ret;
+    // Try to send close_notify (best effort, ignore errors)
+    do {
+      ret = mbedtls_ssl_close_notify(&dtls_srtp->ssl);
+    } while (ret == MBEDTLS_ERR_SSL_WANT_WRITE);
+    
+    srtp_dealloc(dtls_srtp->srtp_in);
+    srtp_dealloc(dtls_srtp->srtp_out);
+  }
+
   mbedtls_ssl_free(&dtls_srtp->ssl);
   mbedtls_ssl_config_free(&dtls_srtp->conf);
 
@@ -230,23 +329,21 @@ void dtls_srtp_deinit(DtlsSrtp* dtls_srtp) {
   if (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) {
     mbedtls_ssl_cookie_free(&dtls_srtp->cookie_ctx);
   }
-
-  if (dtls_srtp->state == DTLS_SRTP_STATE_CONNECTED) {
-    srtp_dealloc(dtls_srtp->srtp_in);
-    srtp_dealloc(dtls_srtp->srtp_out);
-  }
 }
 
 static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* master_secret, size_t secret_len, const unsigned char* randbytes, size_t randbytes_len, mbedtls_tls_prf_types tls_prf_type) {
   int ret;
   const char* dtls_srtp_label = "EXTRACTOR-dtls_srtp";
   uint8_t key_material[DTLS_SRTP_KEY_MATERIAL_LENGTH];
+
   // Export keying material
   if ((ret = mbedtls_ssl_tls_prf(tls_prf_type, master_secret, secret_len, dtls_srtp_label,
                                  randbytes, randbytes_len, key_material, sizeof(key_material))) != 0) {
     LOGE("mbedtls_ssl_tls_prf failed(%d)", ret);
     return ret;
   }
+
+  LOGI("DTLS-SRTP: Key material derived (%zu bytes from %zu byte secret)", sizeof(key_material), secret_len);
 
 #if 0
   int i, j;
@@ -300,12 +397,15 @@ static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* ma
   dtls_srtp->remote_policy.key = dtls_srtp->remote_policy_key;
   dtls_srtp->remote_policy.next = NULL;
 
-  if (srtp_create(&dtls_srtp->srtp_in, &dtls_srtp->remote_policy) != srtp_err_status_ok) {
-    LOGD("Error creating inbound SRTP session for component");
+  srtp_err_status_t srtp_err;
+  
+  srtp_err = srtp_create(&dtls_srtp->srtp_in, &dtls_srtp->remote_policy);
+  if (srtp_err != srtp_err_status_ok) {
+    LOGE("Error creating inbound SRTP session: %d", (int)srtp_err);
     return -1;
   }
 
-  LOGI("Created inbound SRTP session");
+  LOGI("SRTP inbound session created (ssrc_any_inbound)");
 
   // derive outbounds keys
   memset(&dtls_srtp->local_policy, 0, sizeof(dtls_srtp->local_policy));
@@ -320,12 +420,15 @@ static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* ma
   dtls_srtp->local_policy.key = dtls_srtp->local_policy_key;
   dtls_srtp->local_policy.next = NULL;
 
-  if (srtp_create(&dtls_srtp->srtp_out, &dtls_srtp->local_policy) != srtp_err_status_ok) {
-    LOGE("Error creating outbound SRTP session");
+  srtp_err = srtp_create(&dtls_srtp->srtp_out, &dtls_srtp->local_policy);
+  if (srtp_err != srtp_err_status_ok) {
+    LOGE("Error creating outbound SRTP session: %d", (int)srtp_err);
+    srtp_dealloc(dtls_srtp->srtp_in);  // Clean up inbound session
+    dtls_srtp->srtp_in = NULL;
     return -1;
   }
 
-  LOGI("Created outbound SRTP session");
+  LOGI("SRTP outbound session created (ssrc_any_outbound)");
   dtls_srtp->state = DTLS_SRTP_STATE_CONNECTED;
   return 0;
 }
@@ -351,6 +454,9 @@ static void dtls_srtp_key_derivation_cb(void* context,
 #endif
   DtlsSrtp* dtls_srtp = (DtlsSrtp*)context;
 
+  LOGI("DTLS key export callback invoked (secret_type=%d, secret_len=%zu)", 
+       (int)secret_type, secret_len);
+
   unsigned char master_secret[48];
   unsigned char randbytes[64];
 
@@ -362,14 +468,21 @@ static void dtls_srtp_key_derivation_cb(void* context,
   return dtls_srtp_key_derivation(dtls_srtp, master_secret, sizeof(master_secret), randbytes, sizeof(randbytes), tls_prf_type);
 #else
   memcpy(master_secret, secret, sizeof(master_secret));
-  dtls_srtp_key_derivation(dtls_srtp, master_secret, sizeof(master_secret), randbytes, sizeof(randbytes), tls_prf_type);
+  int ret = dtls_srtp_key_derivation(dtls_srtp, master_secret, sizeof(master_secret), randbytes, sizeof(randbytes), tls_prf_type);
+  if (ret != 0) {
+    LOGE("SRTP session creation failed: %d", ret);
+  }
 #endif
 }
 
 static int dtls_srtp_do_handshake(DtlsSrtp* dtls_srtp) {
   int ret;
+  int timeout_count = 0;
+  const int max_timeouts = 10;  // Allow up to 10 timeout retries (30 seconds total at 3s each)
 
   static mbedtls_timing_delay_context timer;
+
+  LOGI("DTLS: do_handshake starting (role=%d)", dtls_srtp->role);
 
   mbedtls_ssl_set_timer_cb(&dtls_srtp->ssl, &timer, mbedtls_timing_set_delay, mbedtls_timing_get_delay);
 
@@ -381,8 +494,21 @@ static int dtls_srtp_do_handshake(DtlsSrtp* dtls_srtp) {
 
   mbedtls_ssl_set_bio(&dtls_srtp->ssl, dtls_srtp, dtls_srtp->udp_send, dtls_srtp->udp_recv, NULL);
 
+  LOGI("DTLS: calling mbedtls_ssl_handshake...");
   do {
     ret = mbedtls_ssl_handshake(&dtls_srtp->ssl);
+    LOGI("DTLS: mbedtls_ssl_handshake returned %d (0x%04x)", ret, (unsigned int)-ret);
+
+    // Handle timeout - retry up to max_timeouts times
+    if (ret == MBEDTLS_ERR_SSL_TIMEOUT) {
+      timeout_count++;
+      if (timeout_count >= max_timeouts) {
+        LOGE("DTLS handshake timeout after %d retries", timeout_count);
+        break;
+      }
+      LOGD("DTLS handshake timeout, retrying (%d/%d)", timeout_count, max_timeouts);
+      continue;
+    }
 
   } while (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE);
 
@@ -391,30 +517,40 @@ static int dtls_srtp_do_handshake(DtlsSrtp* dtls_srtp) {
 
 static int dtls_srtp_handshake_server(DtlsSrtp* dtls_srtp) {
   int ret;
+  int retry_count = 0;
+  const int max_retries = 5;  // Limit retries to prevent infinite loops
 
-  while (1) {
+  while (retry_count < max_retries) {
     unsigned char client_ip[] = "test";
 
-    mbedtls_ssl_session_reset(&dtls_srtp->ssl);
+    // Only reset session on retries after hello verify, not on first attempt
+    if (retry_count > 0) {
+      mbedtls_ssl_session_reset(&dtls_srtp->ssl);
+    }
 
     mbedtls_ssl_set_client_transport_id(&dtls_srtp->ssl, client_ip, sizeof(client_ip));
 
     ret = dtls_srtp_do_handshake(dtls_srtp);
 
     if (ret == MBEDTLS_ERR_SSL_HELLO_VERIFY_REQUIRED) {
-      LOGD("DTLS hello verification requested");
+      LOGD("DTLS hello verification requested, retrying (%d/%d)", retry_count + 1, max_retries);
+      retry_count++;
+      continue;
 
     } else if (ret != 0) {
       LOGE("failed! mbedtls_ssl_handshake returned -0x%.4x", (unsigned int)-ret);
-
       break;
 
     } else {
+      LOGD("DTLS server handshake done");
       break;
     }
   }
 
-  LOGD("DTLS server handshake done");
+  if (retry_count >= max_retries) {
+    LOGE("DTLS handshake exceeded max retries");
+    ret = -1;
+  }
 
   return ret;
 }
@@ -507,17 +643,49 @@ int dtls_srtp_probe(uint8_t* buf) {
 }
 
 void dtls_srtp_decrypt_rtp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
-  srtp_unprotect(dtls_srtp->srtp_in, packet, bytes);
+  if (dtls_srtp->srtp_in == NULL) {
+    LOGE("Cannot decrypt RTP: SRTP session not initialized");
+    *bytes = 0;
+    return;
+  }
+
+  srtp_err_status_t status = srtp_unprotect(dtls_srtp->srtp_in, packet, bytes);
+  if (status != srtp_err_status_ok) {
+    LOGE("SRTP decrypt failed: status=%d", status);
+    *bytes = 0;
+    return;
+  }
 }
 
 void dtls_srtp_decrypt_rtcp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
+  if (dtls_srtp->srtp_in == NULL) {
+    LOGE("Cannot decrypt RTCP: SRTP session not initialized");
+    *bytes = 0;
+    return;
+  }
   srtp_unprotect_rtcp(dtls_srtp->srtp_in, packet, bytes);
 }
 
 void dtls_srtp_encrypt_rtp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
-  srtp_protect(dtls_srtp->srtp_out, packet, bytes);
+  if (dtls_srtp->srtp_out == NULL) {
+    LOGE("Cannot encrypt RTP: SRTP session not initialized");
+    *bytes = 0;
+    return;
+  }
+
+  srtp_err_status_t status = srtp_protect(dtls_srtp->srtp_out, packet, bytes);
+  if (status != srtp_err_status_ok) {
+    LOGE("SRTP encrypt failed: status=%d", status);
+    *bytes = 0;
+    return;
+  }
 }
 
 void dtls_srtp_encrypt_rctp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
+  if (dtls_srtp->srtp_out == NULL) {
+    LOGE("Cannot encrypt RTCP: SRTP session not initialized");
+    *bytes = 0;
+    return;
+  }
   srtp_protect_rtcp(dtls_srtp->srtp_out, packet, bytes);
 }

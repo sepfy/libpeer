@@ -33,4 +33,7 @@ int addr_from_string(const char* str, Address* addr);
 
 int addr_equal(const Address* a, const Address* b);
 
+// Compare two addresses; return 0 if equal, non-zero otherwise
+int addr_cmp(const Address* a, const Address* b);
+
 #endif  // ADDRESS_H_
