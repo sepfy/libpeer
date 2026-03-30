@@ -81,7 +81,7 @@ ExternalProject_Add(cjson
 ExternalProject_Add(mbedtls
   SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mbedtls
   CMAKE_ARGS
-    -DCMAKE_C_FLAGS="-fPIC"
+    "-DCMAKE_C_FLAGS=-fPIC -Wno-error=documentation -Wno-error"
     -DENABLE_TESTING=off
     -DENABLE_PROGRAMS=off
     -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/dist
