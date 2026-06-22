@@ -1,7 +1,6 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 
 #include "agent.h"
 #include "config.h"
@@ -163,7 +162,8 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
   agent_create(&pc->agent);
 
   memset(&pc->sctp, 0, sizeof(pc->sctp));
-
+  memset(&pc->artp_encoder, 0, sizeof(pc->artp_encoder));
+  memset(&pc->vrtp_encoder, 0, sizeof(pc->vrtp_encoder));
   if (pc->config.audio_codec) {
     rtp_encoder_init(&pc->artp_encoder, pc->config.audio_codec,
                      peer_connection_outgoing_rtp_packet, (void*)pc);
@@ -185,6 +185,8 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
 
 void peer_connection_destroy(PeerConnection* pc) {
   if (pc) {
+    rtp_decoder_destory(&pc->vrtp_decoder);
+    rtp_decoder_destory(&pc->artp_decoder);
     sctp_destroy_association(&pc->sctp);
     dtls_srtp_deinit(&pc->dtls_srtp);
     agent_destroy(&pc->agent);

@@ -184,7 +184,7 @@ void sctp_parse_data_channel_open(Sctp* sctp, uint16_t sid, char* data, size_t l
     char* label = (char*)(data + 12);
 
     // copy and null-terminate
-    char label_str[label_length + 1];
+    char* label_str = malloc(label_length + 1);
     memcpy(label_str, label, label_length);
     label_str[label_length] = '\0';
 
@@ -195,6 +195,7 @@ void sctp_parse_data_channel_open(Sctp* sctp, uint16_t sid, char* data, size_t l
     sctp_add_stream_mapping(sctp, label_str, sid);
     char ack = DATA_CHANNEL_ACK;
     sctp_outgoing_data(sctp, &ack, 1, DATA_CHANNEL_PPID_CONTROL, sid);
+    free(label_str);
   }
 }
 

@@ -8,10 +8,8 @@
 #include "utils.h"
 
 typedef enum RtpH264Type {
-
   NALU = 23,
   FU_A = 28,
-
 } RtpH264Type;
 
 typedef struct NaluHeader {
@@ -222,19 +220,18 @@ int rtp_encoder_encode(RtpEncoder* rtp_encoder, const uint8_t* buf, size_t size)
 
 static int rtp_decode_h264(RtpDecoder* rtp_decoder, uint8_t* buf, size_t size) {
   static const uint32_t nalu_start_4bytecode = 0x01000000;
-  static uint8_t nalu_buf[CONFIG_MAX_NALU_SIZE];
-  static int offset = 0;
+  uint8_t* nalu_buf = rtp_decoder->nal_buff;
   RtpPacket* rtp_packet = (RtpPacket*)buf;
   uint8_t nalu_type = *rtp_packet->payload & 0x1f;
   int payload_size = size - sizeof(RtpHeader);
   if (nalu_type > 0 && nalu_type < 24) {
     // NALU type 1-23 are single NALUs
     memcpy(nalu_buf, &nalu_start_4bytecode, sizeof(nalu_start_4bytecode));
-    offset = sizeof(nalu_start_4bytecode);
-    memcpy(nalu_buf + offset, rtp_packet->payload, payload_size);
-    offset += payload_size;
+    rtp_decoder->offset = sizeof(nalu_start_4bytecode);
+    memcpy(nalu_buf + rtp_decoder->offset, rtp_packet->payload, payload_size);
+    rtp_decoder->offset += payload_size;
     if (rtp_decoder->on_packet != NULL) {
-      rtp_decoder->on_packet(nalu_buf, offset, rtp_decoder->user_data);
+      rtp_decoder->on_packet(nalu_buf, rtp_decoder->offset, rtp_decoder->user_data);
     }
     return (int)size;
   } else {
@@ -246,20 +243,28 @@ static int rtp_decode_h264(RtpDecoder* rtp_decoder, uint8_t* buf, size_t size) {
     payload_size -= sizeof(NaluHeader) + sizeof(FuHeader);
     if (fu_header->s) {
       memcpy(nalu_buf, &nalu_start_4bytecode, sizeof(nalu_start_4bytecode));
-      offset = sizeof(nalu_start_4bytecode);
-      memcpy(nalu_buf + offset, &reconstructed_nalu_type, 1);
-      offset += 1;
-      memcpy(nalu_buf + offset, rtp_packet->payload + 2, payload_size);
-      offset += payload_size;
-    } else if (offset < CONFIG_MAX_NALU_SIZE) {
-      memcpy(nalu_buf + offset, rtp_packet->payload + 2, payload_size);
-      offset += payload_size;
+      rtp_decoder->offset = sizeof(nalu_start_4bytecode);
+      memcpy(nalu_buf + rtp_decoder->offset, &reconstructed_nalu_type, 1);
+      rtp_decoder->offset += 1;
+      memcpy(nalu_buf + rtp_decoder->offset, rtp_packet->payload + 2, payload_size);
+      rtp_decoder->offset += payload_size;
+    } else {
+      if (rtp_decoder->offset + payload_size > rtp_decoder->size) {
+        rtp_decoder->size = rtp_decoder->size * 2;
+        rtp_decoder->nal_buff = realloc(rtp_decoder->nal_buff, rtp_decoder->size);
+        if (rtp_decoder->nal_buff == NULL) {
+          LOGE("Failed to realloc nal buffer");
+          return -1;
+        }
+      }
+      memcpy(nalu_buf + rtp_decoder->offset, rtp_packet->payload + 2, payload_size);
+      rtp_decoder->offset += payload_size;
       if (fu_header->e) {
         // end of fragmented NALU
         if (rtp_decoder->on_packet != NULL) {
-          rtp_decoder->on_packet(nalu_buf, offset, rtp_decoder->user_data);
+          rtp_decoder->on_packet(nalu_buf, rtp_decoder->offset, rtp_decoder->user_data);
         }
-        offset = 0;  // reset for next NALU
+        rtp_decoder->offset = 0;  // reset for next NALU
       }
     }
   }
@@ -277,10 +282,13 @@ static int rtp_decode_generic(RtpDecoder* rtp_decoder, uint8_t* buf, size_t size
 void rtp_decoder_init(RtpDecoder* rtp_decoder, MediaCodec codec, RtpOnPacket on_packet, void* user_data) {
   rtp_decoder->on_packet = on_packet;
   rtp_decoder->user_data = user_data;
-
+  rtp_decoder->nal_buff = NULL;
+  rtp_decoder->offset = 0;
   switch (codec) {
     case CODEC_H264:
       rtp_decoder->decode_func = rtp_decode_h264;
+      rtp_decoder->size = CONFIG_MAX_NALU_SIZE;
+      rtp_decoder->nal_buff = malloc(rtp_decoder->size);
       break;
     case CODEC_PCMA:
     case CODEC_PCMU:
@@ -295,4 +303,13 @@ int rtp_decoder_decode(RtpDecoder* rtp_decoder, const uint8_t* buf, size_t size)
   if (rtp_decoder->decode_func == NULL)
     return -1;
   return rtp_decoder->decode_func(rtp_decoder, (uint8_t*)buf, size);
+}
+
+void rtp_decoder_destory(RtpDecoder* rtp_decoder){
+  if(rtp_decoder && rtp_decoder->nal_buff != NULL){
+    free(rtp_decoder->nal_buff);
+    rtp_decoder->nal_buff = NULL;
+    rtp_decoder->size = 0;
+    rtp_decoder->offset = 0;
+  }
 }

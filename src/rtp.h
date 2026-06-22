@@ -53,13 +53,13 @@ typedef struct RtpHeader {
   uint16_t seq_number;
   uint32_t timestamp;
   uint32_t ssrc;
-  uint32_t csrc[0];
+  //uint32_t csrc[0];
 
 } RtpHeader;
 
 typedef struct RtpPacket {
   RtpHeader header;
-  uint8_t payload[0];
+  uint8_t payload[1];
 
 } RtpPacket;
 
@@ -79,6 +79,8 @@ struct RtpDecoder {
   RtpOnPacket on_packet;
   int (*decode_func)(RtpDecoder* rtp_decoder, uint8_t* data, size_t size);
   void* user_data;
+  uint8_t* nal_buff;
+  uint32_t offset, size;
 };
 
 struct RtpEncoder {
@@ -100,7 +102,7 @@ void rtp_encoder_init(RtpEncoder* rtp_encoder, MediaCodec codec, RtpOnPacket on_
 int rtp_encoder_encode(RtpEncoder* rtp_encoder, const uint8_t* data, size_t size);
 
 void rtp_decoder_init(RtpDecoder* rtp_decoder, MediaCodec codec, RtpOnPacket on_packet, void* user_data);
-
+void rtp_decoder_destory(RtpDecoder* rtp_decoder);
 int rtp_decoder_decode(RtpDecoder* rtp_decoder, const uint8_t* data, size_t size);
 
 uint32_t rtp_get_ssrc(uint8_t* packet);

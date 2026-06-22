@@ -2,8 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef WIN32
 #include <sys/select.h>
 #include <unistd.h>
+#endif
 #include "address.h"
 #include "socket.h"
 #include "utils.h"
@@ -53,6 +55,7 @@ static int mdns_add_hostname(const char* hostname, uint8_t* buf, int size) {
   buf[offset++] = 0x00;
   return offset;
 }
+
 static int mdns_parse_answer(uint8_t* buf, int size, Address* addr, const char* hostname) {
   int flags_qr, offset;
   DnsHeader* header;
