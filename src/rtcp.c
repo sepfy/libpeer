@@ -9,8 +9,9 @@ int rtcp_probe(uint8_t* packet, size_t size) {
   if (size < 8)
     return -1;
 
-  RtpHeader* header = (RtpHeader*)packet;
-  return ((header->type >= 64) && (header->type < 96));
+  return (packet[0] & RTP_HEADER_VERSION_MASK) ==
+             (RTP_HEADER_VERSION << RTP_HEADER_VERSION_SHIFT) &&
+         packet[1] >= 192 && packet[1] <= 223;
 }
 
 int rtcp_get_pli(uint8_t* packet, int len, uint32_t ssrc) {
