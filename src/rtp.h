@@ -1,16 +1,8 @@
 #ifndef RTP_H_
 #define RTP_H_
 
+#include <stddef.h>
 #include <stdint.h>
-
-#ifdef __BYTE_ORDER
-#define __BIG_ENDIAN 4321
-#define __LITTLE_ENDIAN 1234
-#elif __APPLE__
-#include <machine/endian.h>
-#else
-#include <endian.h>
-#endif
 
 #include "config.h"
 #include "peer_connection.h"
@@ -34,22 +26,16 @@ typedef enum RtpSsrc {
 
 } RtpSsrc;
 
+#define RTP_HEADER_VERSION 2u
+#define RTP_HEADER_VERSION_MASK 0xC0u
+#define RTP_HEADER_VERSION_SHIFT 6u
+#define RTP_HEADER_MARKER_BIT 0x80u
+#define RTP_HEADER_PAYLOAD_TYPE_MASK 0x7Fu
+
 typedef struct RtpHeader {
-#if __BYTE_ORDER == __BIG_ENDIAN
-  uint16_t version : 2;
-  uint16_t padding : 1;
-  uint16_t extension : 1;
-  uint16_t csrccount : 4;
-  uint16_t markerbit : 1;
-  uint16_t type : 7;
-#elif __BYTE_ORDER == __LITTLE_ENDIAN
-  uint16_t csrccount : 4;
-  uint16_t extension : 1;
-  uint16_t padding : 1;
-  uint16_t version : 2;
-  uint16_t type : 7;
-  uint16_t markerbit : 1;
-#endif
+  /* RFC 3550 fixed header bytes. Do not use C bitfields for wire data. */
+  uint8_t version_padding_extension_csrc;
+  uint8_t marker_payload_type;
   uint16_t seq_number;
   uint32_t timestamp;
   uint32_t ssrc;
