@@ -75,8 +75,18 @@ static int dtls_srtp_x509_digest(const mbedtls_x509_crt* crt, char* buf) {
   return 0;
 }
 
-// Do not verify CA
+// WebRTC authenticates the peer certificate through the SDP fingerprint.
 static int dtls_srtp_cert_verify(void* data, mbedtls_x509_crt* crt, int depth, uint32_t* flags) {
+  DtlsSrtp* dtls_srtp = (DtlsSrtp*)data;
+
+  if (dtls_srtp == NULL || crt == NULL || flags == NULL) {
+    return -1;
+  }
+
+  if (depth == 0 && dtls_srtp_x509_digest(crt, dtls_srtp->actual_remote_fingerprint) != 0) {
+    return -1;
+  }
+
   *flags &= ~(MBEDTLS_X509_BADCERT_NOT_TRUSTED | MBEDTLS_X509_BADCERT_CN_MISMATCH | MBEDTLS_X509_BADCERT_BAD_KEY);
   return 0;
 }
@@ -275,7 +285,7 @@ int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
   mbedtls_ssl_conf_dbg(&dtls_srtp->conf, dtls_srtp_debug, NULL);
 #endif
 
-  mbedtls_ssl_conf_verify(&dtls_srtp->conf, dtls_srtp_cert_verify, NULL);
+  mbedtls_ssl_conf_verify(&dtls_srtp->conf, dtls_srtp_cert_verify, dtls_srtp);
 
   mbedtls_ssl_conf_authmode(&dtls_srtp->conf, MBEDTLS_SSL_VERIFY_REQUIRED);
 
@@ -564,6 +574,7 @@ static int dtls_srtp_handshake_client(DtlsSrtp* dtls_srtp) {
 int dtls_srtp_handshake(DtlsSrtp* dtls_srtp, Address* addr) {
   int ret;
   dtls_srtp->remote_addr = addr;
+  dtls_srtp->actual_remote_fingerprint[0] = '\0';
 
   if (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) {
     ret = dtls_srtp_handshake_server(dtls_srtp);
@@ -571,19 +582,19 @@ int dtls_srtp_handshake(DtlsSrtp* dtls_srtp, Address* addr) {
     ret = dtls_srtp_handshake_client(dtls_srtp);
   }
 
-  const mbedtls_x509_crt* remote_crt;
-  if ((remote_crt = mbedtls_ssl_get_peer_cert(&dtls_srtp->ssl)) != NULL) {
-    dtls_srtp_x509_digest(remote_crt, dtls_srtp->actual_remote_fingerprint);
+  if (ret != 0) {
+    return ret;
+  }
 
-    if (strncmp(dtls_srtp->remote_fingerprint, dtls_srtp->actual_remote_fingerprint, DTLS_SRTP_FINGERPRINT_LENGTH) != 0) {
-      LOGE("Actual and Expected Fingerprint mismatch: %s %s",
-           dtls_srtp->remote_fingerprint,
-           dtls_srtp->actual_remote_fingerprint);
-      return -1;
-    }
-
-  } else {
+  if (dtls_srtp->actual_remote_fingerprint[0] == '\0') {
     LOGE("no remote fingerprint");
+    return -1;
+  }
+
+  if (strncmp(dtls_srtp->remote_fingerprint, dtls_srtp->actual_remote_fingerprint, DTLS_SRTP_FINGERPRINT_LENGTH) != 0) {
+    LOGE("Actual and Expected Fingerprint mismatch: %s %s",
+         dtls_srtp->remote_fingerprint,
+         dtls_srtp->actual_remote_fingerprint);
     return -1;
   }
 
