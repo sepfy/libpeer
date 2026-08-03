@@ -3,10 +3,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mbedtls/ctr_drbg.h"
 #include "mbedtls/debug.h"
-#include "mbedtls/entropy.h"
 #include "mbedtls/ssl.h"
+#include "mbedtls/version.h"
+#if MBEDTLS_VERSION_MAJOR >= 4
+#include "psa/crypto.h"
+#else
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/entropy.h"
+#endif
 
 #include <sys/select.h>
 #include "config.h"
@@ -46,13 +51,20 @@ int ssl_transport_connect(NetworkContext_t* net_ctx,
                           const char* host,
                           uint16_t port,
                           const char* cacert) {
-  const char* pers = "ssl_client";
   int ret;
   Address resolved_addr;
 
   mbedtls_ssl_init(&net_ctx->ssl);
   mbedtls_ssl_config_init(&net_ctx->conf);
   // mbedtls_x509_crt_init(&net_ctx->cacert);
+#if MBEDTLS_VERSION_MAJOR >= 4
+  psa_status_t status = psa_crypto_init();
+  if (status != PSA_SUCCESS) {
+    LOGE("psa crypto init error: %d", (int)status);
+    return -1;
+  }
+#else
+  const char* pers = "ssl_client";
   mbedtls_ctr_drbg_init(&net_ctx->ctr_drbg);
   mbedtls_entropy_init(&net_ctx->entropy);
 
@@ -60,6 +72,7 @@ int ssl_transport_connect(NetworkContext_t* net_ctx,
                                    (const unsigned char*)pers, strlen(pers))) != 0) {
     return -1;
   }
+#endif
 
   if ((ret = mbedtls_ssl_config_defaults(&net_ctx->conf,
                                          MBEDTLS_SSL_IS_CLIENT,
@@ -79,7 +92,9 @@ int ssl_transport_connect(NetworkContext_t* net_ctx,
   mbedtls_ssl_conf_ca_chain(&net_ctx->conf, &net_ctx->cacert, NULL);
   */
 
+#if MBEDTLS_VERSION_MAJOR < 4
   mbedtls_ssl_conf_rng(&net_ctx->conf, mbedtls_ctr_drbg_random, &net_ctx->ctr_drbg);
+#endif
 
   if ((ret = mbedtls_ssl_setup(&net_ctx->ssl, &net_ctx->conf)) != 0) {
     LOGE("ssl setup error: -0x%x", (unsigned int)-ret);
@@ -118,8 +133,10 @@ int ssl_transport_connect(NetworkContext_t* net_ctx,
 void ssl_transport_disconnect(NetworkContext_t* net_ctx) {
   mbedtls_ssl_config_free(&net_ctx->conf);
   // mbedtls_x509_crt_free(&net_ctx->cacert);
+#if MBEDTLS_VERSION_MAJOR < 4
   mbedtls_ctr_drbg_free(&net_ctx->ctr_drbg);
   mbedtls_entropy_free(&net_ctx->entropy);
+#endif
   mbedtls_ssl_free(&net_ctx->ssl);
 
   tcp_socket_close(&net_ctx->tcp_socket);

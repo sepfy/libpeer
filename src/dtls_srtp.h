@@ -4,14 +4,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/entropy.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/ssl.h>
 #include <mbedtls/ssl_cookie.h>
 #include <mbedtls/timing.h>
+#include <mbedtls/version.h>
 #include <mbedtls/x509_crt.h>
 #include <mbedtls/x509_csr.h>
+
+#if MBEDTLS_VERSION_MAJOR >= 4
+#include <psa/crypto.h>
+#else
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/entropy.h>
+#endif
 
 #include <srtp2/srtp.h>
 
@@ -44,8 +50,12 @@ typedef struct DtlsSrtp {
   mbedtls_ssl_cookie_ctx cookie_ctx;
   mbedtls_x509_crt cert;
   mbedtls_pk_context pkey;
+#if MBEDTLS_VERSION_MAJOR >= 4
+  mbedtls_svc_key_id_t pkey_id;
+#else
   mbedtls_entropy_context entropy;
   mbedtls_ctr_drbg_context ctr_drbg;
+#endif
 
   // SRTP
   srtp_policy_t remote_policy;
@@ -62,6 +72,7 @@ typedef struct DtlsSrtp {
 
   DtlsSrtpRole role;
   DtlsSrtpState state;
+  int initialized;
 
   char local_fingerprint[DTLS_SRTP_FINGERPRINT_LENGTH];
   char remote_fingerprint[DTLS_SRTP_FINGERPRINT_LENGTH];

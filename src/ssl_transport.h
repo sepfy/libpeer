@@ -3,10 +3,14 @@
 
 #ifndef DISABLE_PEER_SIGNALING
 
+#include <mbedtls/ssl.h>
+#include <mbedtls/version.h>
+#include <stdint.h>
+
+#if MBEDTLS_VERSION_MAJOR < 4
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>
-#include <mbedtls/ssl.h>
-#include <stdint.h>
+#endif
 
 #include "socket.h"
 #include "transport_interface.h"
@@ -14,8 +18,10 @@
 struct NetworkContext {
   TcpSocket tcp_socket;
   mbedtls_ssl_context ssl;
+#if MBEDTLS_VERSION_MAJOR < 4
   mbedtls_entropy_context entropy;
   mbedtls_ctr_drbg_context ctr_drbg;
+#endif
   mbedtls_ssl_config conf;
   mbedtls_x509_crt cacert;
 };

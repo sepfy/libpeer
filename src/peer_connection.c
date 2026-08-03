@@ -445,7 +445,9 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
   }
 
   dtls_srtp_reset_session(&pc->dtls_srtp);
-  dtls_srtp_init(&pc->dtls_srtp, role, pc);
+  if (dtls_srtp_init(&pc->dtls_srtp, role, pc) != 0) {
+    return NULL;
+  }
   pc->dtls_srtp.udp_recv = peer_connection_dtls_srtp_recv;
   pc->dtls_srtp.udp_send = peer_connection_dtls_srtp_send;
 
@@ -509,6 +511,9 @@ const char* peer_connection_create_offer(PeerConnection* pc) {
 
 const char* peer_connection_create_answer(PeerConnection* pc) {
   const char* sdp = peer_connection_create_sdp(pc, SDP_TYPE_ANSWER);
+  if (sdp == NULL) {
+    return NULL;
+  }
   agent_update_candidate_pairs(&pc->agent);
   STATE_CHANGED(pc, PEER_CONNECTION_CHECKING);
   return sdp;
