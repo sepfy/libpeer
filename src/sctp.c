@@ -273,8 +273,24 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
           length += ntohs(data_chunk->length);
         } else if (ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_DOMSTRING || ntohl(data_chunk->ppid) == DATA_CHANNEL_PPID_BINARY) {
           if (sctp->onmessage) {
+            /*
+             * In case the "onmessage" callback sends a DATA chunk, we
+             * send the SACK first, and stop the processing after the
+             * callback.
+             */
+            out_packet->header.source_port = htons(sctp->local_port);
+            out_packet->header.destination_port = htons(sctp->remote_port);
+            out_packet->header.verification_tag = sctp->verification_tag;
+            out_packet->header.checksum = 0x00;
+            if (length > 0) {
+              // padding 4
+              length = (4 * ((length + 3) / 4));
+              out_packet->header.checksum = sctp_get_checksum(sctp, sctp->buf, length);
+              dtls_srtp_write(sctp->dtls_srtp, sctp->buf, length);
+            }
             sctp->onmessage((char*)data_chunk->data, ntohs(data_chunk->length) - sizeof(SctpDataChunk),
                             sctp->userdata, ntohs(data_chunk->sid));
+            return;
           }
         }
         pos = len;  // Do not handle other msg
