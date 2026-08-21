@@ -88,7 +88,8 @@ int agent_send_binding_request(Agent* agent);
 
 void agent_clear_candidates(Agent* agent);
 
-int agent_create(Agent* agent);
+int agent_create(Agent* agent, uint16_t port_range_begin,
+                 uint16_t port_range_end);
 
 void agent_destroy(Agent* agent);
 

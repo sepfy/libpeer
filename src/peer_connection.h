@@ -78,6 +78,9 @@ typedef struct PeerConfiguration {
   void (*on_request_keyframe)(void* userdata);
   void* user_data;
 
+  uint16_t port_range_begin;
+  uint16_t port_range_end;
+
 } PeerConfiguration;
 
 typedef struct PeerConnection PeerConnection;

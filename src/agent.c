@@ -23,35 +23,57 @@ void agent_clear_candidates(Agent* agent) {
   agent->candidate_pairs_num = 0;
 }
 
-int agent_create(Agent* agent) {
-  int ret;
-  if ((ret = udp_socket_open(&agent->udp_sockets[0], AF_INET, 0)) < 0) {
-    LOGE("Failed to create UDP socket.");
-    return ret;
+int agent_create(Agent* agent, uint16_t port_range_begin,
+                 uint16_t port_range_end) {
+  uint32_t port;
+  int result = -1;
+
+  agent->udp_sockets[0].fd = -1;
+  agent->udp_sockets[1].fd = -1;
+  if (port_range_begin == 0 && port_range_end == 0) {
+    result = udp_socket_open(&agent->udp_sockets[0], AF_INET, 0);
+  } else if (port_range_begin > 0 && port_range_end >= port_range_begin) {
+    for (port = port_range_begin;
+         result < 0 && port <= port_range_end;
+         port++) {
+      result = udp_socket_open(&agent->udp_sockets[0], AF_INET, (int)port);
+    }
+  } else {
+    LOGE("Invalid UDP port range: %u-%u", port_range_begin, port_range_end);
   }
-  LOGI("create IPv4 UDP socket: %d", agent->udp_sockets[0].fd);
+
+  if (result < 0) {
+    LOGE("Failed to create UDP socket.");
+  } else {
+    LOGI("create IPv4 UDP socket: %d", agent->udp_sockets[0].fd);
+  }
 
 #if CONFIG_IPV6
-  if ((ret = udp_socket_open(&agent->udp_sockets[1], AF_INET6, 0)) < 0) {
+  if (result == 0 &&
+      (result = udp_socket_open(&agent->udp_sockets[1], AF_INET6, 0)) < 0) {
     LOGE("Failed to create IPv6 UDP socket.");
-    return ret;
+    udp_socket_close(&agent->udp_sockets[0]);
+  } else if (result == 0) {
+    LOGI("create IPv6 UDP socket: %d", agent->udp_sockets[1].fd);
   }
-  LOGI("create IPv6 UDP socket: %d", agent->udp_sockets[1].fd);
 #endif
 
-  agent_clear_candidates(agent);
-  memset(agent->remote_ufrag, 0, sizeof(agent->remote_ufrag));
-  memset(agent->remote_upwd, 0, sizeof(agent->remote_upwd));
-  return 0;
+  if (result == 0) {
+    agent_clear_candidates(agent);
+    memset(agent->remote_ufrag, 0, sizeof(agent->remote_ufrag));
+    memset(agent->remote_upwd, 0, sizeof(agent->remote_upwd));
+  }
+
+  return result;
 }
 
 void agent_destroy(Agent* agent) {
-  if (agent->udp_sockets[0].fd > 0) {
+  if (agent->udp_sockets[0].fd >= 0) {
     udp_socket_close(&agent->udp_sockets[0]);
   }
 
 #if CONFIG_IPV6
-  if (agent->udp_sockets[1].fd > 0) {
+  if (agent->udp_sockets[1].fd >= 0) {
     udp_socket_close(&agent->udp_sockets[1]);
   }
 #endif

@@ -146,7 +146,7 @@ static void test_authenticated_nomination_learns_peer_reflexive_address(void) {
   char address_string[ADDRSTRLEN];
 
   memset(&agent, 0, sizeof(agent));
-  CHECK(agent_create(&agent) == 0);
+  CHECK(agent_create(&agent, 0, 0) == 0);
   snprintf(agent.local_upwd, sizeof(agent.local_upwd), "%s", "secret");
   CHECK(addr_from_string("127.0.0.2", &source) != 0);
   addr_set_port(&source, 55000);

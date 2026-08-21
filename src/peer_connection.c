@@ -164,24 +164,30 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
 
   memcpy(&pc->config, config, sizeof(PeerConfiguration));
 
-  agent_create(&pc->agent);
-
-  memset(&pc->sctp, 0, sizeof(pc->sctp));
-
-  if (pc->config.audio_codec) {
-    rtp_encoder_init(&pc->artp_encoder, pc->config.audio_codec,
-                     peer_connection_outgoing_rtp_packet, (void*)pc);
-
-    rtp_decoder_init(&pc->artp_decoder, pc->config.audio_codec,
-                     pc->config.onaudiotrack, pc->config.user_data);
+  if (agent_create(&pc->agent, config->port_range_begin,
+                   config->port_range_end) < 0) {
+    free(pc);
+    pc = NULL;
   }
 
-  if (pc->config.video_codec) {
-    rtp_encoder_init(&pc->vrtp_encoder, pc->config.video_codec,
-                     peer_connection_outgoing_rtp_packet, (void*)pc);
+  if (pc != NULL) {
+    memset(&pc->sctp, 0, sizeof(pc->sctp));
 
-    rtp_decoder_init(&pc->vrtp_decoder, pc->config.video_codec,
-                     pc->config.onvideotrack, pc->config.user_data);
+    if (pc->config.audio_codec) {
+      rtp_encoder_init(&pc->artp_encoder, pc->config.audio_codec,
+                       peer_connection_outgoing_rtp_packet, (void*)pc);
+
+      rtp_decoder_init(&pc->artp_decoder, pc->config.audio_codec,
+                       pc->config.onaudiotrack, pc->config.user_data);
+    }
+
+    if (pc->config.video_codec) {
+      rtp_encoder_init(&pc->vrtp_encoder, pc->config.video_codec,
+                       peer_connection_outgoing_rtp_packet, (void*)pc);
+
+      rtp_decoder_init(&pc->vrtp_decoder, pc->config.video_codec,
+                       pc->config.onvideotrack, pc->config.user_data);
+    }
   }
 
   return pc;
