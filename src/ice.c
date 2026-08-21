@@ -15,6 +15,8 @@ static uint8_t ice_candidate_type_preference(IceCandidateType type) {
   switch (type) {
     case ICE_CANDIDATE_TYPE_HOST:
       return 126;
+    case ICE_CANDIDATE_TYPE_PRFLX:
+      return 110;  /* RFC 5245: peer reflexive between HOST(126) and SRFLX(100) */
     case ICE_CANDIDATE_TYPE_SRFLX:
       return 100;
     case ICE_CANDIDATE_TYPE_RELAY:
@@ -60,6 +62,9 @@ void ice_candidate_to_description(IceCandidate* candidate, char* description, in
     case ICE_CANDIDATE_TYPE_SRFLX:
       snprintf(typ_raddr, sizeof(typ_raddr), "srflx raddr %s rport %d", addr_string, candidate->raddr.port);
       break;
+    case ICE_CANDIDATE_TYPE_PRFLX:
+      snprintf(typ_raddr, sizeof(typ_raddr), "prflx");
+      break;
     case ICE_CANDIDATE_TYPE_RELAY:
       snprintf(typ_raddr, sizeof(typ_raddr), "relay raddr %s rport %d", addr_string, candidate->raddr.port);
     default:
@@ -81,15 +86,18 @@ int ice_candidate_from_description(IceCandidate* candidate, char* description, c
   char* candidate_start = description;
   uint32_t port;
   char type[16];
-  char addrstring[ADDRSTRLEN];
+  char addrstring[256]; // 局域网会使用 mDNS 主机名
 
   if (strncmp("a=", candidate_start, strlen("a=")) == 0) {
     candidate_start += strlen("a=");
   }
   candidate_start += strlen("candidate:");
 
-  // a=candidate:448736988 1 udp 2122260223 172.17.0.1 49250 typ host generation 0 network-id 1 network-cost 50
-  // a=candidate:udpcandidate 1 udp 120 192.168.1.102 8000 typ host
+// a=candidate:448736988 1 udp 2122260223 172.17.0.1 49250 typ host generation 0 network-id 1 network-cost 50
+// a=candidate:3989800143 1 udp 2113937151 48c82aba-d349-4784-a733-404f193524f5.local 64630 typ host generation 0 network-cost 999
+// a=candidate:udpcandidate 1 udp 120 192.168.1.102 8000 typ host
+// a=candidate:1623718428 1 udp 2113937151 10.65.209.95 55476 typ host generation 0 network-cost 999
+// a=candidate:69123048 1 udp 2113939711 240e:469:246:4066:6c3e:6cff:fefd:58dd 43249 typ host generation 0 network-cost 999
   if (sscanf(candidate_start, "%s %d %s %" PRIu32 " %s %" PRIu32 " typ %s",
              candidate->foundation,
              &candidate->component,
@@ -120,8 +128,19 @@ int ice_candidate_from_description(IceCandidate* candidate, char* description, c
 
   addr_set_port(&candidate->addr, port);
 
-  if (strstr(addrstring, "local") != NULL) {
-    if (mdns_resolve_addr(addrstring, &candidate->addr) == 0) {
+  if (strstr(addrstring, ".local") != NULL) {
+    /**
+     * In a LAN environment, Chrome assigns a local domain name like uuid.local.
+     * If the device is a Wi‑Fi AP and the PC is directly connected via Wi‑Fi,
+     * while the PC's wired network interface is also connected to another network,
+     * an mDNS query will return the IP of the wired interface.
+     * In this case, mdns_resolve_addr() will have 3 retries × 5 receive attempts × 1s timeout
+     * = up to 15 seconds, and it will definitely fail.
+     */
+#if CONFIG_USE_MDNS
+    if (mdns_resolve_addr(addrstring, &candidate->addr) == 0)
+#endif
+    {
       LOGW("Failed to resolve mDNS address");
       return -1;
     }

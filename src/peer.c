@@ -1,4 +1,4 @@
-#include <srtp2/srtp.h>
+#include <srtp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

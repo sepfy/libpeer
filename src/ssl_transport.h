@@ -14,7 +14,9 @@
 struct NetworkContext {
   TcpSocket tcp_socket;
   mbedtls_ssl_context ssl;
+#ifndef LIBPEER_USE_SHARED_ENTROPY
   mbedtls_entropy_context entropy;
+#endif
   mbedtls_ctr_drbg_context ctr_drbg;
   mbedtls_ssl_config conf;
   mbedtls_x509_crt cacert;

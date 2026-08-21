@@ -99,6 +99,11 @@ void rtp_encoder_init(RtpEncoder* rtp_encoder, MediaCodec codec, RtpOnPacket on_
 
 int rtp_encoder_encode(RtpEncoder* rtp_encoder, const uint8_t* data, size_t size);
 
+// 按实际帧间隔动态调整媒体时钟步进（90kHz 单位）
+static inline void rtp_encoder_set_timestamp_increment(RtpEncoder* rtp_encoder, uint32_t increment) {
+  rtp_encoder->timestamp_increment = increment;
+}
+
 void rtp_decoder_init(RtpDecoder* rtp_decoder, MediaCodec codec, RtpOnPacket on_packet, void* user_data);
 
 int rtp_decoder_decode(RtpDecoder* rtp_decoder, const uint8_t* data, size_t size);

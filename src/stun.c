@@ -65,9 +65,11 @@ int stun_set_mapped_address(char* value, uint8_t* mask, Address* addr) {
   uint32_t* val32 = (uint32_t*)(value + 4);
   uint16_t* val16 = (uint16_t*)(value + 4);
   uint32_t* addr32 = (uint32_t*)(&addr->sin.sin_addr);
+#if CONFIG_USE_IPV6
   uint16_t* addr16 = (uint16_t*)(&addr->sin6.sin6_addr);
-
+#endif
   switch (addr->family) {
+#if CONFIG_USE_IPV6
     case AF_INET6:
       *family = STUN_FAMILY_IPV6;
       for (i = 0; i < 8; i++) {
@@ -75,6 +77,7 @@ int stun_set_mapped_address(char* value, uint8_t* mask, Address* addr) {
       }
       ret = 20;
       break;
+#endif
     case AF_INET:
     default:
       *family = STUN_FAMILY_IPV4;
@@ -96,17 +99,21 @@ void stun_get_mapped_address(char* value, uint8_t* mask, Address* addr) {
   int i;
   char addr_string[ADDRSTRLEN];
   uint32_t* addr32 = (uint32_t*)&addr->sin.sin_addr;
+#if CONFIG_USE_IPV6
   uint16_t* addr16 = (uint16_t*)&addr->sin6.sin6_addr;
+#endif
   uint8_t family = value[1];
   uint16_t port;
 
   switch (family) {
+#if CONFIG_USE_IPV6
     case STUN_FAMILY_IPV6:
       addr_set_family(addr, AF_INET6);
       for (i = 0; i < 8; i++) {
         addr16[i] = (*(uint16_t*)(value + 4 + 2 * i) ^ *(uint16_t*)(mask + 2 * i));
       }
       break;
+#endif
     case STUN_FAMILY_IPV4:
     default:
       addr_set_family(addr, AF_INET);

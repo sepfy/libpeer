@@ -56,7 +56,7 @@ typedef enum MediaCodec {
   CODEC_MJPEG,  // not implemented yet
 
   /* Audio */
-  CODEC_OPUS,  // not implemented yet
+  CODEC_OPUS,  // SDP + RTP passthrough only, no Opus codec/packetizer
   CODEC_PCMA,
   CODEC_PCMU,
 
@@ -80,6 +80,9 @@ typedef struct PeerConfiguration {
   void (*onvideotrack)(uint8_t* data, size_t size, void* userdata);
   void (*on_request_keyframe)(void* userdata);
   void* user_data;
+
+  /* NACK 重传 ring 槽位数: 0 = 禁用; 非 0 必须为 2 的幂 (非法时 create 失败) */
+  uint32_t nack_ring_packets;
 
 } PeerConfiguration;
 
@@ -116,6 +119,15 @@ int peer_connection_datachannel_send_sid(PeerConnection* pc, char* message, size
 int peer_connection_send_audio(PeerConnection* pc, const uint8_t* packet, size_t bytes);
 
 int peer_connection_send_video(PeerConnection* pc, const uint8_t* packet, size_t bytes);
+
+// 按实际视频帧间隔调整媒体时钟步进（90kHz 单位）
+void peer_connection_set_video_timestamp_increment(PeerConnection* pc, uint32_t increment);
+
+// NACK 重传统计 (config.nack_ring_packets==0 禁用时恒为 0)
+uint32_t peer_connection_get_nack_retransmits(PeerConnection* pc);
+
+// SRTP/SRTCP 入向鉴权失败丢包计数
+uint32_t peer_connection_get_srtp_auth_failures(PeerConnection* pc);
 
 void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp, SdpType sdp_type);
 

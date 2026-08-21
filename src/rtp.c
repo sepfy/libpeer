@@ -43,26 +43,23 @@ uint32_t rtp_get_ssrc(uint8_t* packet) {
   return ntohl(rtp_header->ssrc);
 }
 
-static int rtp_encoder_encode_h264_single(RtpEncoder* rtp_encoder, uint8_t* buf, size_t size) {
+static int rtp_encoder_encode_h264_single(RtpEncoder* rtp_encoder, uint8_t* buf, size_t size, int is_last) {
   RtpPacket* rtp_packet = (RtpPacket*)rtp_encoder->buf;
 
   rtp_packet->header.version = 2;
   rtp_packet->header.padding = 0;
   rtp_packet->header.extension = 0;
   rtp_packet->header.csrccount = 0;
-  rtp_packet->header.markerbit = 0;
+  // marker 表示 access unit 结束：仅帧末 NAL 置位（RFC 6184 5.1）
+  rtp_packet->header.markerbit = is_last;
   rtp_packet->header.type = rtp_encoder->type;
   rtp_packet->header.seq_number = htons(rtp_encoder->seq_number++);
   rtp_packet->header.timestamp = htonl(rtp_encoder->timestamp);
   rtp_packet->header.ssrc = htonl(rtp_encoder->ssrc);
 
-  // I frame and P frame
-  if ((*buf & 0x1f) == 0x05 || (*buf & 0x1f) == 0x01) {
-    rtp_packet->header.markerbit = 1;
-    rtp_encoder->timestamp += rtp_encoder->timestamp_increment;
-  }
 #if 0
-  LOGI("markbit: %d, timestamp: %d, nalu type: %d", rtp_packet->header.markerbit, rtp_encoder->timestamp, buf[0] & 0x1f);
+  LOGI("h264 nalu: type=%d size=%d ts=%u seq=%u marker=%d", buf[0] & 0x1f, (int)size,
+       rtp_encoder->timestamp, rtp_encoder->seq_number, rtp_packet->header.markerbit);
 #endif
 
   memcpy(rtp_packet->payload, buf, size);
@@ -70,7 +67,7 @@ static int rtp_encoder_encode_h264_single(RtpEncoder* rtp_encoder, uint8_t* buf,
   return 0;
 }
 
-static int rtp_encoder_encode_h264_fu_a(RtpEncoder* rtp_encoder, uint8_t* buf, size_t size) {
+static int rtp_encoder_encode_h264_fu_a(RtpEncoder* rtp_encoder, uint8_t* buf, size_t size, int is_last) {
   RtpPacket* rtp_packet = (RtpPacket*)rtp_encoder->buf;
 
   rtp_packet->header.version = 2;
@@ -83,13 +80,9 @@ static int rtp_encoder_encode_h264_fu_a(RtpEncoder* rtp_encoder, uint8_t* buf, s
   rtp_packet->header.ssrc = htonl(rtp_encoder->ssrc);
   uint8_t type = buf[0] & 0x1f;
   uint8_t nri = (buf[0] & 0x60) >> 5;
+  size_t total_size = size;
   buf = buf + 1;
   size = size - 1;
-
-  // increase timestamp if I, P frame
-  if (type == 0x05 || type == 0x01) {
-    rtp_encoder->timestamp += rtp_encoder->timestamp_increment;
-  }
 
   NaluHeader* fu_indicator = (NaluHeader*)rtp_packet->payload;
   FuHeader* fu_header = (FuHeader*)rtp_packet->payload + sizeof(NaluHeader);
@@ -105,7 +98,12 @@ static int rtp_encoder_encode_h264_fu_a(RtpEncoder* rtp_encoder, uint8_t* buf, s
 
     if (size <= FU_PAYLOAD_SIZE) {
       fu_header->e = 1;
-      rtp_packet->header.markerbit = 1;
+      // 末片 + 帧末 NAL 才置 marker
+      rtp_packet->header.markerbit = is_last;
+#if 0
+      LOGI("h264 nalu: type=%d size=%d ts=%u seq=%u marker=%d", type, (int)total_size,
+           rtp_encoder->timestamp, rtp_encoder->seq_number, rtp_packet->header.markerbit);
+#endif
       memcpy(rtp_packet->payload + sizeof(NaluHeader) + sizeof(FuHeader), buf, size);
       rtp_encoder->on_packet(rtp_encoder->buf, size + sizeof(RtpHeader) + sizeof(NaluHeader) + sizeof(FuHeader), rtp_encoder->user_data);
       break;
@@ -139,24 +137,38 @@ static int rtp_encoder_encode_h264(RtpEncoder* rtp_encoder, uint8_t* buf, size_t
   uint8_t* buf_end = buf + size;
   uint8_t *pstart, *pend;
   size_t nalu_size;
+  int sent = 0;
 
+#if 0
+  LOGI("h264 frame: %d bytes, ts=%u", (int)size, rtp_encoder->timestamp);
+#endif
+
+  // 一帧（access unit）含多个 NAL（本流 slices=3）：所有 NAL 共享同一 RTP timestamp，
+  // marker 仅在帧末 NAL 的最后一个包置位（RFC 6184 5.1）
   for (pstart = h264_find_nalu(buf, buf_end); pstart < buf_end; pstart = pend) {
     pend = h264_find_nalu(pstart, buf_end);
     nalu_size = pend - pstart;
 
-    if (pend != buf_end)
-      nalu_size--;
+    // h264_find_nalu 匹配 4 字节起始码(00 00 00 01)的尾 3 字节并返回 01 之后一位，
+    // 故非末 NAL 的 nalu_size 含尾随 3 字节 00 00 00（demux 恒写 4 字节起始码），精确剥离
+    if (pend != buf_end) {
+      if (nalu_size <= 3)
+        continue;
+      nalu_size -= 3;
+    }
 
-    while (pstart[nalu_size - 1] == 0x00)
-      nalu_size--;
-
+    sent = 1;
     if (nalu_size <= RTP_PAYLOAD_SIZE) {
-      rtp_encoder_encode_h264_single(rtp_encoder, pstart, nalu_size);
-
+      rtp_encoder_encode_h264_single(rtp_encoder, pstart, nalu_size, pend == buf_end);
     } else {
-      rtp_encoder_encode_h264_fu_a(rtp_encoder, pstart, nalu_size);
+      rtp_encoder_encode_h264_fu_a(rtp_encoder, pstart, nalu_size, pend == buf_end);
     }
   }
+
+  // timestamp 按帧递增一次（与 generic 路径"每次调用一帧"语义一致），
+  // 帧内多 NAL 包共享同一媒体时间戳
+  if (sent)
+    rtp_encoder->timestamp += rtp_encoder->timestamp_increment;
 
   return 0;
 }
@@ -190,7 +202,7 @@ void rtp_encoder_init(RtpEncoder* rtp_encoder, MediaCodec codec, RtpOnPacket on_
     case CODEC_H264:
       rtp_encoder->type = PT_H264;
       rtp_encoder->ssrc = SSRC_H264;
-      rtp_encoder->timestamp_increment = 90000 / 30;  // 30 FPS.
+      rtp_encoder->timestamp_increment = 90000 / 15;  // 15 FPS，实际由 set_timestamp_increment 按 pts 动态调整
       rtp_encoder->encode_func = rtp_encoder_encode_h264;
       break;
     case CODEC_PCMA:

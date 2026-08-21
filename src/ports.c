@@ -29,6 +29,7 @@ int ports_get_host_addr(Address* addr, const char* iface_prefix) {
   int i;
   for (netif = netif_list; netif != NULL; netif = netif->next) {
     switch (addr->family) {
+#if CONFIG_USE_IPV6
       case AF_INET6:
         for (i = 0; i < LWIP_IPV6_NUM_ADDRESSES; i++) {
           if (!ip6_addr_isany(netif_ip6_addr(netif, i))) {
@@ -38,10 +39,15 @@ int ports_get_host_addr(Address* addr, const char* iface_prefix) {
           }
         }
         break;
+#endif
       case AF_INET:
       default:
         if (!ip_addr_isany(&netif->ip_addr)) {
+    #if CONFIG_USE_IPV6
           memcpy(&addr->sin.sin_addr, &netif->ip_addr.u_addr.ip4, 4);
+    #else
+          memcpy(&addr->sin.sin_addr, &netif->ip_addr, 4);
+    #endif
           ret = 1;
         }
         break;
@@ -89,9 +95,11 @@ int ports_get_host_addr(Address* addr, const char* iface_prefix) {
     }
 
     switch (ifa->ifa_addr->sa_family) {
+#if CONFIG_USE_IPV6
       case AF_INET6:
         memcpy(&addr->sin6, ifa->ifa_addr, sizeof(struct sockaddr_in6));
         break;
+#endif
       case AF_INET:
       default:
         memcpy(&addr->sin, ifa->ifa_addr, sizeof(struct sockaddr_in));
@@ -124,9 +132,11 @@ int ports_resolve_addr(const char* host, Address* addr) {
   for (p = res; p != NULL; p = p->ai_next) {
     if (p->ai_family == addr->family) {
       switch (addr->family) {
+#if CONFIG_USE_IPV6
         case AF_INET6:
           memcpy(&addr->sin6, p->ai_addr, sizeof(struct sockaddr_in6));
           break;
+#endif
         case AF_INET:
         default:
           memcpy(&addr->sin, p->ai_addr, sizeof(struct sockaddr_in));

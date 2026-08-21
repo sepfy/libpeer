@@ -13,13 +13,17 @@
 #include <mbedtls/x509_crt.h>
 #include <mbedtls/x509_csr.h>
 
-#include <srtp2/srtp.h>
+#include <srtp.h>
 
 #include "address.h"
 
 #define SRTP_MASTER_KEY_LENGTH 16
+/* 双 profile：CM (RFC 5764) 盐(salt) 14B，GCM (RFC 7714) 盐 12B。
+ * 无后缀宏为 CM 值（= 缓冲上限），key 缓冲按上限 16+14=30B 容纳两种 profile */
 #define SRTP_MASTER_SALT_LENGTH 14
+#define SRTP_MASTER_SALT_LENGTH_GCM SRTP_AEAD_SALT_LEN /* 12, 来自 libsrtp srtp.h */
 #define DTLS_SRTP_KEY_MATERIAL_LENGTH 60
+#define DTLS_SRTP_KEY_MATERIAL_LENGTH_GCM (2 * (SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_SALT_LENGTH_GCM))
 #define DTLS_SRTP_FINGERPRINT_LENGTH 160
 
 typedef enum DtlsSrtpRole {
@@ -44,7 +48,9 @@ typedef struct DtlsSrtp {
   mbedtls_ssl_cookie_ctx cookie_ctx;
   mbedtls_x509_crt cert;
   mbedtls_pk_context pkey;
+#ifndef LIBPEER_USE_SHARED_ENTROPY
   mbedtls_entropy_context entropy;
+#endif
   mbedtls_ctr_drbg_context ctr_drbg;
 
   // SRTP
@@ -89,12 +95,14 @@ void dtls_srtp_sctp_to_dtls(DtlsSrtp* dtls_srtp, uint8_t* packet, int bytes);
 
 int dtls_srtp_probe(uint8_t* buf);
 
-void dtls_srtp_decrypt_rtp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes);
+/* 返回 0 成功，-1 加密/鉴权失败（调用方必须丢弃该包，不得送解码器/网络）。
+ * srtp 会话未建立时返回 0（透传，保持既有语义） */
+int dtls_srtp_decrypt_rtp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes);
 
-void dtls_srtp_decrypt_rtcp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes);
+int dtls_srtp_decrypt_rtcp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes);
 
-void dtls_srtp_encrypt_rtp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes);
+int dtls_srtp_encrypt_rtp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes);
 
-void dtls_srtp_encrypt_rctp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes);
+int dtls_srtp_encrypt_rctp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes);
 
 #endif  // DTLS_SRTP_H_

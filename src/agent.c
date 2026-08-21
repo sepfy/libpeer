@@ -350,6 +350,70 @@ void agent_process_stun_request(Agent* agent, StunMessage* stun_msg, Address* ad
         agent_create_binding_response(agent, &msg, addr);
         agent_socket_send(agent, addr, msg.buf, msg.size);
         agent->binding_request_time = ports_get_epoch_time();
+
+        /**
+         * When there are no candidate pairs (e.g., the browser's mDNS hostname cannot be resolved),
+         * create a candidate pair from the UDP source address of the STUN request.
+         * Mark it as FROZEN; later, the standard ICE procedure will select the pair,
+         * send USE‑CANDIDATE, and establish connectivity.
+        */
+        if (agent->candidate_pairs_num == 0 && agent->local_candidates_count > 0) {
+          memcpy(&agent->remote_candidates[0].addr, addr, sizeof(Address));
+          agent->remote_candidates[0].type = ICE_CANDIDATE_TYPE_HOST;
+          agent->remote_candidates[0].addr.port = addr->port;
+          agent->remote_candidates_count = 1;
+          agent->candidate_pairs[0].local = &agent->local_candidates[0];
+          agent->candidate_pairs[0].remote = &agent->remote_candidates[0];
+          agent->candidate_pairs[0].state = ICE_CANDIDATE_STATE_FROZEN;
+          agent->candidate_pairs[0].priority = agent->local_candidates[0].priority;
+          agent->candidate_pairs[0].conncheck = 0;
+          agent->candidate_pairs_num = 1;
+          agent->nominated_pair = &agent->candidate_pairs[0];
+        } else {
+          int found = 0;
+
+          /* Phase A: match source address to existing remote candidates */
+          for (int i = 0; i < agent->candidate_pairs_num; i++) {
+            if (addr_equal(&agent->candidate_pairs[i].remote->addr, addr)) {
+              agent->candidate_pairs[i].state = ICE_CANDIDATE_STATE_SUCCEEDED;
+              agent->nominated_pair = &agent->candidate_pairs[i];
+              agent->selected_pair  = &agent->candidate_pairs[i];
+              LOGD("ICE pair %d SUCCEEDED via inbound STUN request", i);
+              found = 1;
+              break;
+            }
+          }
+
+          /* Phase B: source differs from SDP — create peer-reflexive candidate */
+          if (!found
+              && agent->remote_candidates_count < AGENT_MAX_CANDIDATES
+              && agent->local_candidates_count > 0) {
+            IceCandidate *prflx =
+                &agent->remote_candidates[agent->remote_candidates_count];
+            ice_candidate_create(prflx, agent->remote_candidates_count,
+                                 ICE_CANDIDATE_TYPE_PRFLX, addr);
+            agent->remote_candidates_count++;
+
+            for (int j = 0; j < agent->local_candidates_count; j++) {
+              if (agent->local_candidates[j].addr.family == addr->family
+                  && agent->candidate_pairs_num < AGENT_MAX_CANDIDATE_PAIRS) {
+                int idx = agent->candidate_pairs_num;
+                agent->candidate_pairs[idx].local  = &agent->local_candidates[j];
+                agent->candidate_pairs[idx].remote = prflx;
+                agent->candidate_pairs[idx].priority =
+                    agent->local_candidates[j].priority + prflx->priority;
+                agent->candidate_pairs[idx].state = ICE_CANDIDATE_STATE_SUCCEEDED;
+                agent->candidate_pairs[idx].conncheck = 0;
+                agent->nominated_pair = &agent->candidate_pairs[idx];
+                agent->selected_pair  = &agent->candidate_pairs[idx];
+                agent->candidate_pairs_num++;
+                LOGI("ICE: created PRFLX candidate pair from inbound STUN");
+                found = 1;
+                break;
+              }
+            }
+          }
+        }
       }
       break;
     default:
@@ -395,36 +459,46 @@ int agent_recv(Agent* agent, uint8_t* buf, int len) {
 }
 
 void agent_set_remote_description(Agent* agent, char* description) {
-  /*
-  a=ice-ufrag:Iexb
-  a=ice-pwd:IexbSoY7JulyMbjKwISsG9
-  a=candidate:1 1 UDP 1 36.231.28.50 38143 typ srflx
-  */
-  int i;
+    /*
+    a=ice-ufrag:Iexb
+    a=ice-pwd:IexbSoY7JulyMbjKwISsG9
+    a=candidate:1 1 UDP 1 36.231.28.50 38143 typ srflx
+    */
+    int i;
 
-  LOGD("Set remote description:\n%s", description);
+    LOGD("Set remote description:\n%s", description);
 
-  char* line_start = description;
-  char* line_end = NULL;
+    char* line_start = description;
+    char* line_end = NULL;
+    agent->remote_ufrag[0] = '\0';
+    agent->remote_upwd[0] = '\0';
+    while ((line_end = strstr(line_start, "\r\n")) != NULL) {
+    if (strncmp(line_start, "a=ice-ufrag:", sizeof("a=ice-ufrag:") - 1) == 0) {
+        line_start += sizeof("a=ice-ufrag:") - 1;
+        size_t len = line_end - line_start;
+        len = len >= sizeof(agent->remote_ufrag) ? (sizeof(agent->remote_ufrag) - 1) : len;
+        strncpy(agent->remote_ufrag, line_start, len);
+        agent->remote_ufrag[len] = '\0';
+    } else
+    if (strncmp(line_start, "a=ice-pwd:", sizeof("a=ice-pwd:") - 1) == 0) {
+        line_start += sizeof("a=ice-pwd:") - 1;
+        size_t len = line_end - line_start;
+        len = len >= sizeof(agent->remote_upwd) ? (sizeof(agent->remote_upwd) - 1) : len;
+        strncpy(agent->remote_upwd, line_start, len);
+        agent->remote_upwd[len] = '\0';
+    } else
+    if (strncmp(line_start, "a=candidate:", sizeof("a=candidate:") - 1) == 0) {
 
-  while ((line_end = strstr(line_start, "\r\n")) != NULL) {
-    if (strncmp(line_start, "a=ice-ufrag:", strlen("a=ice-ufrag:")) == 0) {
-      strncpy(agent->remote_ufrag, line_start + strlen("a=ice-ufrag:"), line_end - line_start - strlen("a=ice-ufrag:"));
-
-    } else if (strncmp(line_start, "a=ice-pwd:", strlen("a=ice-pwd:")) == 0) {
-      strncpy(agent->remote_upwd, line_start + strlen("a=ice-pwd:"), line_end - line_start - strlen("a=ice-pwd:"));
-
-    } else if (strncmp(line_start, "a=candidate:", strlen("a=candidate:")) == 0) {
-      if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], line_start, line_end) == 0) {
-        for (i = 0; i < agent->remote_candidates_count; i++) {
-          if (strcmp(agent->remote_candidates[i].foundation, agent->remote_candidates[agent->remote_candidates_count].foundation) == 0) {
-            break;
-          }
+        if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], line_start, line_end) == 0) {
+            for (i = 0; i < agent->remote_candidates_count; i++) {
+                if (strcmp(agent->remote_candidates[i].foundation, agent->remote_candidates[agent->remote_candidates_count].foundation) == 0) {
+                    break;
+                }
+            }
+            if (i == agent->remote_candidates_count) {
+                agent->remote_candidates_count++;
+            }
         }
-        if (i == agent->remote_candidates_count) {
-          agent->remote_candidates_count++;
-        }
-      }
     }
 
     line_start = line_end + 2;
@@ -455,6 +529,21 @@ int agent_connectivity_check(Agent* agent) {
   char addr_string[ADDRSTRLEN];
   uint8_t buf[1400];
   StunMessage msg;
+
+  if (agent->nominated_pair == NULL) {
+    /**
+     * No candidate pairs yet (all mDNS attempts failed),
+     * only receive and process STUN requests actively sent by the browser.
+     */
+    agent_recv(agent, buf, sizeof(buf));
+    return -1;
+  }
+
+  /* Handle pair already marked SUCCEEDED by agent_process_stun_request */
+  if (agent->nominated_pair->state == ICE_CANDIDATE_STATE_SUCCEEDED) {
+    agent->selected_pair = agent->nominated_pair;
+    return 0;
+  }
 
   if (agent->nominated_pair->state != ICE_CANDIDATE_STATE_INPROGRESS) {
     LOGI("nominated pair is not in progress");

@@ -7,6 +7,10 @@
 #define SCTP_MTU (1200)
 #define CONFIG_MTU (1300)
 
+// Advertised receiver window. Incoming DATA is dispatched to the user callback
+// immediately without buffering, so the window is always fully available.
+#define SCTP_LOCAL_RWND (0x100000)
+
 #ifndef CONFIG_USE_LWIP
 #define CONFIG_USE_LWIP 0
 #endif
@@ -49,6 +53,15 @@
 #define CONFIG_TLS_READ_TIMEOUT 3000
 #endif
 
+#ifndef CONFIG_CHECKING_TIMEOUT
+// 默认的 PEER_CONNECTION_CHECKING 状态超时为 15S
+#define CONFIG_CHECKING_TIMEOUT  15000
+#endif
+
+#ifndef CONFIG_DTLS_HANDSHAKE_TIMEOUT
+#define CONFIG_DTLS_HANDSHAKE_TIMEOUT  30000
+#endif
+
 #ifndef CONFIG_KEEPALIVE_TIMEOUT
 #define CONFIG_KEEPALIVE_TIMEOUT 10000
 #endif
@@ -65,7 +78,7 @@
 // empty will use first active interface
 #define CONFIG_IFACE_PREFIX ""
 
-// #define LOG_LEVEL LEVEL_DEBUG
+// #define LIBPEER_LOG_LEVEL LIBPEER_LOG_LEVEL_DEBUG
 #ifndef LOG_REDIRECT
 #define LOG_REDIRECT 0
 #endif

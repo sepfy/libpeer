@@ -14,6 +14,11 @@
 #include "ssl_transport.h"
 #include "utils.h"
 
+/* 当未启用共享熵源时，LIBPEER_ENTROPY_CTX 回退到原有的结构体字段指针 */
+#ifndef LIBPEER_ENTROPY_CTX
+#define LIBPEER_ENTROPY_CTX   (&net_ctx->entropy)
+#endif
+
 static int ssl_transport_mbedtls_recv_timeout(void* ctx, unsigned char* buf, size_t len, uint32_t timeout) {
   int ret;
   fd_set read_fds;
@@ -54,9 +59,11 @@ int ssl_transport_connect(NetworkContext_t* net_ctx,
   mbedtls_ssl_config_init(&net_ctx->conf);
   // mbedtls_x509_crt_init(&net_ctx->cacert);
   mbedtls_ctr_drbg_init(&net_ctx->ctr_drbg);
+#ifndef LIBPEER_USE_SHARED_ENTROPY
   mbedtls_entropy_init(&net_ctx->entropy);
+#endif
 
-  if ((ret = mbedtls_ctr_drbg_seed(&net_ctx->ctr_drbg, mbedtls_entropy_func, &net_ctx->entropy,
+  if ((ret = mbedtls_ctr_drbg_seed(&net_ctx->ctr_drbg, mbedtls_entropy_func, LIBPEER_ENTROPY_CTX,
                                    (const unsigned char*)pers, strlen(pers))) != 0) {
     return -1;
   }
@@ -119,7 +126,9 @@ void ssl_transport_disconnect(NetworkContext_t* net_ctx) {
   mbedtls_ssl_config_free(&net_ctx->conf);
   // mbedtls_x509_crt_free(&net_ctx->cacert);
   mbedtls_ctr_drbg_free(&net_ctx->ctr_drbg);
+#ifndef LIBPEER_USE_SHARED_ENTROPY
   mbedtls_entropy_free(&net_ctx->entropy);
+#endif
   mbedtls_ssl_free(&net_ctx->ssl);
 
   tcp_socket_close(&net_ctx->tcp_socket);

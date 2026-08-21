@@ -15,6 +15,11 @@
 #include "socket.h"
 #include "utils.h"
 
+/* 当未启用共享熵源时，LIBPEER_ENTROPY_CTX 回退到原有的结构体字段指针 */
+#ifndef LIBPEER_ENTROPY_CTX
+#define LIBPEER_ENTROPY_CTX   (&dtls_srtp->entropy)
+#endif
+
 int dtls_srtp_udp_send(void* ctx, const uint8_t* buf, size_t len) {
   DtlsSrtp* dtls_srtp = (DtlsSrtp*)ctx;
   UdpSocket* udp_socket = (UdpSocket*)dtls_srtp->user_data;
@@ -85,7 +90,7 @@ static int dtls_srtp_selfsign_cert(DtlsSrtp* dtls_srtp) {
     return -1;
   }
 
-  mbedtls_ctr_drbg_seed(&dtls_srtp->ctr_drbg, mbedtls_entropy_func, &dtls_srtp->entropy, (const unsigned char*)pers, strlen(pers));
+  mbedtls_ctr_drbg_seed(&dtls_srtp->ctr_drbg, mbedtls_entropy_func, LIBPEER_ENTROPY_CTX, (const unsigned char*)pers, strlen(pers));
 
 #if CONFIG_DTLS_USE_ECDSA
   mbedtls_pk_setup(&dtls_srtp->pkey, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
@@ -147,10 +152,10 @@ static void dtls_srtp_debug(void* ctx, int level, const char* file, int line, co
 
 int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
   static const mbedtls_ssl_srtp_profile default_profiles[] = {
+      /* AEAD_AES_128_GCM (RFC 7714) 优先，SRTP_AES128_CM_HMAC_SHA1_80 (RFC 5764) 回退。
+       * 板端作 DTLS client 时此顺序即偏好序；作 server 时选择由客户端优先级决定 */
+      MBEDTLS_TLS_SRTP_AEAD_AES_128_GCM,
       MBEDTLS_TLS_SRTP_AES128_CM_HMAC_SHA1_80,
-      MBEDTLS_TLS_SRTP_AES128_CM_HMAC_SHA1_32,
-      MBEDTLS_TLS_SRTP_NULL_HMAC_SHA1_80,
-      MBEDTLS_TLS_SRTP_NULL_HMAC_SHA1_32,
       MBEDTLS_TLS_SRTP_UNSET};
 
   dtls_srtp->role = role;
@@ -164,7 +169,9 @@ int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
 
   mbedtls_x509_crt_init(&dtls_srtp->cert);
   mbedtls_pk_init(&dtls_srtp->pkey);
+#ifndef LIBPEER_USE_SHARED_ENTROPY
   mbedtls_entropy_init(&dtls_srtp->entropy);
+#endif
   mbedtls_ctr_drbg_init(&dtls_srtp->ctr_drbg);
 #if CONFIG_MBEDTLS_DEBUG
   mbedtls_debug_set_threshold(3);
@@ -207,13 +214,19 @@ int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
 
   LOGD("local fingerprint: %s", dtls_srtp->local_fingerprint);
 
-  mbedtls_ssl_conf_dtls_srtp_protection_profiles(&dtls_srtp->conf, default_profiles);
+  if (mbedtls_ssl_conf_dtls_srtp_protection_profiles(&dtls_srtp->conf, default_profiles) != 0) {
+    LOGE("mbedtls_ssl_conf_dtls_srtp_protection_profiles failed");
+    return -1;
+  }
 
   mbedtls_ssl_conf_srtp_mki_value_supported(&dtls_srtp->conf, MBEDTLS_SSL_DTLS_SRTP_MKI_UNSUPPORTED);
 
   mbedtls_ssl_conf_cert_req_ca_list(&dtls_srtp->conf, MBEDTLS_SSL_CERT_REQ_CA_LIST_DISABLED);
 
   mbedtls_ssl_setup(&dtls_srtp->ssl, &dtls_srtp->conf);
+
+  dtls_srtp->srtp_in = NULL;
+  dtls_srtp->srtp_out = NULL;
 
   return 0;
 }
@@ -224,7 +237,9 @@ void dtls_srtp_deinit(DtlsSrtp* dtls_srtp) {
 
   mbedtls_x509_crt_free(&dtls_srtp->cert);
   mbedtls_pk_free(&dtls_srtp->pkey);
+#ifndef LIBPEER_USE_SHARED_ENTROPY
   mbedtls_entropy_free(&dtls_srtp->entropy);
+#endif
   mbedtls_ctr_drbg_free(&dtls_srtp->ctr_drbg);
 
   if (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) {
@@ -241,9 +256,19 @@ static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* ma
   int ret;
   const char* dtls_srtp_label = "EXTRACTOR-dtls_srtp";
   uint8_t key_material[DTLS_SRTP_KEY_MATERIAL_LENGTH];
+
+  /* 双 profile：密钥/盐长度取决于协商结果。use_srtp 扩展在 Hello 阶段已定，
+   * Finished 阶段的密钥导出回调触发时结果可读 */
+  mbedtls_dtls_srtp_info derivation_negotiation_result;
+  mbedtls_ssl_get_dtls_srtp_negotiation_result(&dtls_srtp->ssl, &derivation_negotiation_result);
+  const int is_gcm =
+      (derivation_negotiation_result.chosen_dtls_srtp_profile == MBEDTLS_TLS_SRTP_AEAD_AES_128_GCM);
+  const size_t salt_len = is_gcm ? (size_t)SRTP_MASTER_SALT_LENGTH_GCM : (size_t)SRTP_MASTER_SALT_LENGTH;
+  const size_t material_len = is_gcm ? (size_t)DTLS_SRTP_KEY_MATERIAL_LENGTH_GCM : (size_t)DTLS_SRTP_KEY_MATERIAL_LENGTH;
+
   // Export keying material
   if ((ret = mbedtls_ssl_tls_prf(tls_prf_type, master_secret, secret_len, dtls_srtp_label,
-                                 randbytes, randbytes_len, key_material, sizeof(key_material))) != 0) {
+                                 randbytes, randbytes_len, key_material, material_len)) != 0) {
     LOGE("mbedtls_ssl_tls_prf failed(%d)", ret);
     return ret;
   }
@@ -270,10 +295,10 @@ static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* ma
   printf("\n");
 #endif
 
-  const uint8_t* client_key = key_material;
-  const uint8_t* server_key = client_key + SRTP_MASTER_KEY_LENGTH;
-  const uint8_t* client_salt = server_key + SRTP_MASTER_KEY_LENGTH;
-  const uint8_t* server_salt = client_salt + SRTP_MASTER_SALT_LENGTH;
+  uint8_t* client_key = key_material;
+  uint8_t* server_key = client_key + SRTP_MASTER_KEY_LENGTH;
+  uint8_t* client_salt = server_key + SRTP_MASTER_KEY_LENGTH;
+  uint8_t* server_salt = client_salt + salt_len;
   uint8_t *local_key, *remote_key, *local_salt, *remote_salt;
   if (dtls_srtp->role == DTLS_SRTP_ROLE_SERVER) {
     local_key = server_key;
@@ -290,18 +315,24 @@ static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* ma
 
   memset(&dtls_srtp->remote_policy, 0, sizeof(dtls_srtp->remote_policy));
 
-  srtp_crypto_policy_set_rtp_default(&dtls_srtp->remote_policy.rtp);
-  srtp_crypto_policy_set_rtcp_default(&dtls_srtp->remote_policy.rtcp);
+  if (is_gcm) {
+    /* RFC 7714：RTP/SRTCP 统一 16B tag（SRTCP 强制 16B） */
+    srtp_crypto_policy_set_aes_gcm_128_16_auth(&dtls_srtp->remote_policy.rtp);
+    srtp_crypto_policy_set_aes_gcm_128_16_auth(&dtls_srtp->remote_policy.rtcp);
+  } else {
+    srtp_crypto_policy_set_rtp_default(&dtls_srtp->remote_policy.rtp);
+    srtp_crypto_policy_set_rtcp_default(&dtls_srtp->remote_policy.rtcp);
+  }
 
   memcpy(dtls_srtp->remote_policy_key, remote_key, SRTP_MASTER_KEY_LENGTH);
-  memcpy(dtls_srtp->remote_policy_key + SRTP_MASTER_KEY_LENGTH, remote_salt, SRTP_MASTER_SALT_LENGTH);
+  memcpy(dtls_srtp->remote_policy_key + SRTP_MASTER_KEY_LENGTH, remote_salt, salt_len);
 
   dtls_srtp->remote_policy.ssrc.type = ssrc_any_inbound;
   dtls_srtp->remote_policy.key = dtls_srtp->remote_policy_key;
   dtls_srtp->remote_policy.next = NULL;
 
   if (srtp_create(&dtls_srtp->srtp_in, &dtls_srtp->remote_policy) != srtp_err_status_ok) {
-    LOGD("Error creating inbound SRTP session for component");
+    LOGE("Error creating inbound SRTP session for component");
     return -1;
   }
 
@@ -310,11 +341,16 @@ static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* ma
   // derive outbounds keys
   memset(&dtls_srtp->local_policy, 0, sizeof(dtls_srtp->local_policy));
 
-  srtp_crypto_policy_set_rtp_default(&dtls_srtp->local_policy.rtp);
-  srtp_crypto_policy_set_rtcp_default(&dtls_srtp->local_policy.rtcp);
+  if (is_gcm) {
+    srtp_crypto_policy_set_aes_gcm_128_16_auth(&dtls_srtp->local_policy.rtp);
+    srtp_crypto_policy_set_aes_gcm_128_16_auth(&dtls_srtp->local_policy.rtcp);
+  } else {
+    srtp_crypto_policy_set_rtp_default(&dtls_srtp->local_policy.rtp);
+    srtp_crypto_policy_set_rtcp_default(&dtls_srtp->local_policy.rtcp);
+  }
 
   memcpy(dtls_srtp->local_policy_key, local_key, SRTP_MASTER_KEY_LENGTH);
-  memcpy(dtls_srtp->local_policy_key + SRTP_MASTER_KEY_LENGTH, local_salt, SRTP_MASTER_SALT_LENGTH);
+  memcpy(dtls_srtp->local_policy_key + SRTP_MASTER_KEY_LENGTH, local_salt, salt_len);
 
   dtls_srtp->local_policy.ssrc.type = ssrc_any_outbound;
   dtls_srtp->local_policy.key = dtls_srtp->local_policy_key;
@@ -461,6 +497,19 @@ int dtls_srtp_handshake(DtlsSrtp* dtls_srtp, Address* addr) {
   mbedtls_dtls_srtp_info dtls_srtp_negotiation_result;
   mbedtls_ssl_get_dtls_srtp_negotiation_result(&dtls_srtp->ssl, &dtls_srtp_negotiation_result);
 
+  if (ret == 0) {
+    if (dtls_srtp_negotiation_result.chosen_dtls_srtp_profile == MBEDTLS_TLS_SRTP_AEAD_AES_128_GCM) {
+      LOGI("DTLS-SRTP negotiated profile: AEAD_AES_128_GCM (RFC 7714)");
+    } else if (dtls_srtp_negotiation_result.chosen_dtls_srtp_profile == MBEDTLS_TLS_SRTP_AES128_CM_HMAC_SHA1_80) {
+      LOGI("DTLS-SRTP negotiated profile: SRTP_AES128_CM_HMAC_SHA1_80 (fallback)");
+    } else {
+      /* 无共同 use_srtp profile（chosen==UNSET 等）：不得带未协商密钥继续 */
+      LOGE("DTLS-SRTP no profile negotiated (chosen=0x%04x)",
+           dtls_srtp_negotiation_result.chosen_dtls_srtp_profile);
+      return -1;
+    }
+  }
+
   return ret;
 }
 
@@ -468,6 +517,8 @@ void dtls_srtp_reset_session(DtlsSrtp* dtls_srtp) {
   if (dtls_srtp->state == DTLS_SRTP_STATE_CONNECTED) {
     srtp_dealloc(dtls_srtp->srtp_in);
     srtp_dealloc(dtls_srtp->srtp_out);
+    dtls_srtp->srtp_in = NULL;
+    dtls_srtp->srtp_out = NULL;
     mbedtls_ssl_session_reset(&dtls_srtp->ssl);
   }
 
@@ -506,18 +557,30 @@ int dtls_srtp_probe(uint8_t* buf) {
   return (buf[0] == 0x17);
 }
 
-void dtls_srtp_decrypt_rtp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
-  srtp_unprotect(dtls_srtp->srtp_in, packet, bytes);
+int dtls_srtp_decrypt_rtp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
+  if (dtls_srtp->srtp_in) {
+    return (srtp_unprotect(dtls_srtp->srtp_in, packet, bytes) == srtp_err_status_ok) ? 0 : -1;
+  }
+  return 0;
 }
 
-void dtls_srtp_decrypt_rtcp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
-  srtp_unprotect_rtcp(dtls_srtp->srtp_in, packet, bytes);
+int dtls_srtp_decrypt_rtcp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
+  if (dtls_srtp->srtp_in) {
+    return (srtp_unprotect_rtcp(dtls_srtp->srtp_in, packet, bytes) == srtp_err_status_ok) ? 0 : -1;
+  }
+  return 0;
 }
 
-void dtls_srtp_encrypt_rtp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
-  srtp_protect(dtls_srtp->srtp_out, packet, bytes);
+int dtls_srtp_encrypt_rtp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
+  if (dtls_srtp->srtp_out) {
+    return (srtp_protect(dtls_srtp->srtp_out, packet, bytes) == srtp_err_status_ok) ? 0 : -1;
+  }
+  return 0;
 }
 
-void dtls_srtp_encrypt_rctp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
-  srtp_protect_rtcp(dtls_srtp->srtp_out, packet, bytes);
+int dtls_srtp_encrypt_rctp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
+  if (dtls_srtp->srtp_out) {
+    return (srtp_protect_rtcp(dtls_srtp->srtp_out, packet, bytes) == srtp_err_status_ok) ? 0 : -1;
+  }
+  return 0;
 }

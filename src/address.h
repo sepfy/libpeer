@@ -10,12 +10,18 @@
 #endif
 #include <stdint.h>
 
+#if CONFIG_USE_IPV6
 #define ADDRSTRLEN INET6_ADDRSTRLEN
+#else
+#define ADDRSTRLEN INET_ADDRSTRLEN
+#endif
 
 typedef struct Address {
   uint8_t family;
   struct sockaddr_in sin;
+#if CONFIG_USE_IPV6
   struct sockaddr_in6 sin6;
+#endif
   uint16_t port;
 } Address;
 

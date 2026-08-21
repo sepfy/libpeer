@@ -35,6 +35,7 @@ int udp_socket_open(UdpSocket* udp_socket, int family, int port) {
 
   udp_socket->bind_addr.family = family;
   switch (family) {
+#if CONFIG_USE_IPV6
     case AF_INET6:
       udp_socket->fd = socket(AF_INET6, SOCK_DGRAM, 0);
       udp_socket->bind_addr.sin6.sin6_family = AF_INET6;
@@ -44,6 +45,7 @@ int udp_socket_open(UdpSocket* udp_socket, int family, int port) {
       sa = (struct sockaddr*)&udp_socket->bind_addr.sin6;
       sock_len = sizeof(struct sockaddr_in6);
       break;
+#endif
     case AF_INET:
     default:
       udp_socket->fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -82,9 +84,11 @@ int udp_socket_open(UdpSocket* udp_socket, int family, int port) {
   }
 
   switch (udp_socket->bind_addr.family) {
+#if CONFIG_USE_IPV6
     case AF_INET6:
       udp_socket->bind_addr.port = ntohs(udp_socket->bind_addr.sin6.sin6_port);
       break;
+#endif
     case AF_INET:
     default:
       udp_socket->bind_addr.port = ntohs(udp_socket->bind_addr.sin.sin_port);
@@ -111,11 +115,13 @@ int udp_socket_sendto(UdpSocket* udp_socket, Address* addr, const uint8_t* buf, 
   }
 
   switch (addr->family) {
+#if CONFIG_USE_IPV6
     case AF_INET6:
       addr->sin6.sin6_family = AF_INET6;
       sa = (struct sockaddr*)&addr->sin6;
       sock_len = sizeof(struct sockaddr_in6);
       break;
+#endif
     case AF_INET:
     default:
       addr->sin.sin_family = AF_INET;
@@ -133,7 +139,9 @@ int udp_socket_sendto(UdpSocket* udp_socket, Address* addr, const uint8_t* buf, 
 }
 
 int udp_socket_recvfrom(UdpSocket* udp_socket, Address* addr, uint8_t* buf, int len) {
+#if CONFIG_USE_IPV6
   struct sockaddr_in6 sin6;
+#endif
   struct sockaddr_in sin;
   struct sockaddr* sa;
   socklen_t sock_len;
@@ -145,11 +153,13 @@ int udp_socket_recvfrom(UdpSocket* udp_socket, Address* addr, uint8_t* buf, int 
   }
 
   switch (udp_socket->bind_addr.family) {
+#if CONFIG_USE_IPV6
     case AF_INET6:
       sin6.sin6_family = AF_INET6;
       sa = (struct sockaddr*)&sin6;
       sock_len = sizeof(struct sockaddr_in6);
       break;
+#endif
     case AF_INET:
     default:
       sin.sin_family = AF_INET;
@@ -165,11 +175,13 @@ int udp_socket_recvfrom(UdpSocket* udp_socket, Address* addr, uint8_t* buf, int 
 
   if (addr) {
     switch (udp_socket->bind_addr.family) {
+#if CONFIG_USE_IPV6
       case AF_INET6:
         addr->family = AF_INET6;
         addr->port = htons(sin6.sin6_port);
         memcpy(&addr->sin6, &sin6, sizeof(struct sockaddr_in6));
         break;
+#endif
       case AF_INET:
       default:
         addr->family = AF_INET;
@@ -185,9 +197,11 @@ int udp_socket_recvfrom(UdpSocket* udp_socket, Address* addr, uint8_t* buf, int 
 int tcp_socket_open(TcpSocket* tcp_socket, int family) {
   tcp_socket->bind_addr.family = family;
   switch (family) {
+#if CONFIG_USE_IPV6
     case AF_INET6:
       tcp_socket->fd = socket(AF_INET6, SOCK_STREAM, 0);
       break;
+#endif
     case AF_INET:
     default:
       tcp_socket->fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -213,11 +227,13 @@ int tcp_socket_connect(TcpSocket* tcp_socket, Address* addr) {
   }
 
   switch (addr->family) {
+#if CONFIG_USE_IPV6
     case AF_INET6:
       addr->sin6.sin6_family = AF_INET6;
       sa = (struct sockaddr*)&addr->sin6;
       sock_len = sizeof(struct sockaddr_in6);
       break;
+#endif
     case AF_INET:
     default:
       addr->sin.sin_family = AF_INET;
