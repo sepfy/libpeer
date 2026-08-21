@@ -81,6 +81,14 @@ typedef struct PeerConfiguration {
   uint16_t port_range_begin;
   uint16_t port_range_end;
 
+  uint8_t video_payload_type;
+  uint32_t video_ssrc;
+  const char* video_mid;
+  const char* video_fmtp;
+  const char* video_stream_id;
+  const char* video_track_id;
+  int video_send_only;
+
 } PeerConfiguration;
 
 typedef struct PeerConnection PeerConnection;

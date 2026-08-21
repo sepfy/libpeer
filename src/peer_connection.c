@@ -187,6 +187,14 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
 
       rtp_decoder_init(&pc->vrtp_decoder, pc->config.video_codec,
                        pc->config.onvideotrack, pc->config.user_data);
+      if (pc->config.video_payload_type >= 96 &&
+          pc->config.video_payload_type <= 127) {
+        pc->vrtp_encoder.type =
+            (RtpPayloadType)pc->config.video_payload_type;
+      }
+      if (pc->config.video_ssrc != 0) {
+        pc->vrtp_encoder.ssrc = pc->config.video_ssrc;
+      }
     }
   }
 
@@ -503,7 +511,8 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
   int sdp_audio = (pc->config.audio_codec != CODEC_NONE) && (sdp_type == SDP_TYPE_OFFER || pc->remote_assrc > 0);
   int sdp_video = (pc->config.video_codec != CODEC_NONE) && (sdp_type == SDP_TYPE_OFFER || pc->remote_vssrc > 0);
 
-  sdp_create(pc->sdp, sdp_video, sdp_audio, pc->config.datachannel);
+  sdp_create(pc->sdp, sdp_video, sdp_audio, pc->config.datachannel,
+             pc->config.video_mid);
 
   sdp_append(pc->sdp, "a=ice-ufrag:%s", pc->agent.local_ufrag);
   sdp_append(pc->sdp, "a=ice-pwd:%s", pc->agent.local_upwd);
@@ -513,7 +522,14 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
   if (sdp_video) {
     switch (pc->config.video_codec) {
       case CODEC_H264:
-        sdp_append_h264(pc->sdp);
+        sdp_append_h264(pc->sdp,
+                        pc->config.video_payload_type,
+                        pc->config.video_ssrc,
+                        pc->config.video_mid,
+                        pc->config.video_fmtp,
+                        pc->config.video_send_only,
+                        pc->config.video_stream_id,
+                        pc->config.video_track_id);
         break;
       case CODEC_VP8:
         sdp_append_vp8(pc->sdp);

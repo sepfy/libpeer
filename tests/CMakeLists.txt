@@ -10,7 +10,8 @@ foreach(sourcefile ${SRCS})
   add_executable(${appname} ${sourcefile})
   target_link_libraries(${appname} peer pthread)
   if(appname STREQUAL "test_ice_mdns" OR
-     appname STREQUAL "test_port_range")
+     appname STREQUAL "test_port_range" OR
+     appname STREQUAL "test_h264_sdp")
     add_test(NAME ${appname} COMMAND ${appname})
   endif()
 endforeach(sourcefile ${TEST_SRCS})
