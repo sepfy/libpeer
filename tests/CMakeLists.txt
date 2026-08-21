@@ -9,7 +9,9 @@ foreach(sourcefile ${SRCS})
   string(REPLACE "${PROJECT_SOURCE_DIR}/" "" appname ${appname})
   add_executable(${appname} ${sourcefile})
   target_link_libraries(${appname} peer pthread)
+  if(appname STREQUAL "test_ice_mdns")
+    add_test(NAME ${appname} COMMAND ${appname})
+  endif()
 endforeach(sourcefile ${TEST_SRCS})
 
 target_link_libraries(test_peer_connection cjson)
-

@@ -365,13 +365,27 @@ int agent_send_binding_request(Agent* agent) {
 void agent_process_stun_request(Agent* agent, StunMessage* stun_msg, Address* addr) {
   StunMessage msg;
   StunHeader* header;
+  char addr_string[ADDRSTRLEN];
+
   switch (stun_msg->stunmethod) {
     case STUN_METHOD_BINDING:
       if (stun_msg_is_valid(stun_msg->buf, stun_msg->size, agent->local_upwd) == 0) {
         header = (StunHeader*)stun_msg->buf;
         memcpy(agent->transaction_id, header->transaction_id, sizeof(header->transaction_id));
         agent_create_binding_response(agent, &msg, addr);
-        agent_socket_send(agent, addr, msg.buf, msg.size);
+        if (agent_socket_send(agent, addr, msg.buf, msg.size) >= 0) {
+          agent->binding_request_time = ports_get_epoch_time();
+          if (stun_msg->use_candidate && agent->nominated_pair != NULL &&
+              agent->nominated_pair->remote != NULL &&
+              agent->nominated_pair->state == ICE_CANDIDATE_STATE_INPROGRESS) {
+            memcpy(&agent->nominated_pair->remote->addr, addr, sizeof(Address));
+            agent->nominated_pair->remote->type = ICE_CANDIDATE_TYPE_PRFLX;
+            agent->nominated_pair->state = ICE_CANDIDATE_STATE_SUCCEEDED;
+            addr_to_string(addr, addr_string, sizeof(addr_string));
+            LOGI("Accepted peer-reflexive ICE source %s:%d", addr_string,
+                 addr->port);
+          }
+        }
       }
       break;
     default:
