@@ -125,6 +125,10 @@ int peer_connection_send_audio(PeerConnection* pc, const uint8_t* packet, size_t
 
 int peer_connection_send_video(PeerConnection* pc, const uint8_t* packet, size_t bytes);
 
+/* Send one H264 access unit at an explicit 90 kHz RTP timestamp. */
+int peer_connection_send_video_at(PeerConnection* pc, const uint8_t* packet,
+                                  size_t bytes, uint32_t timestamp);
+
 void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp, SdpType sdp_type);
 
 void peer_connection_set_local_description(PeerConnection* pc, const char* sdp, SdpType sdp_type);

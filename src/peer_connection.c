@@ -231,6 +231,18 @@ int peer_connection_send_video(PeerConnection* pc, const uint8_t* buf, size_t le
   return rtp_encoder_encode(&pc->vrtp_encoder, buf, len);
 }
 
+int peer_connection_send_video_at(PeerConnection* pc, const uint8_t* buf,
+                                  size_t len, uint32_t timestamp) {
+  int result = -1;
+
+  if (pc->state == PEER_CONNECTION_COMPLETED) {
+    pc->vrtp_encoder.timestamp = timestamp;
+    result = rtp_encoder_encode(&pc->vrtp_encoder, buf, len);
+  }
+
+  return result;
+}
+
 int peer_connection_datachannel_send(PeerConnection* pc, char* message, size_t len) {
   return peer_connection_datachannel_send_sid(pc, message, len, 0);
 }
