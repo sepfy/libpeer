@@ -75,6 +75,9 @@ int agent_send(Agent* agent, const uint8_t* buf, int len);
 
 int agent_recv(Agent* agent, uint8_t* buf, int len);
 
+void agent_process_stun_request(Agent* agent, StunMessage* stun_msg,
+                                Address* addr);
+
 void agent_set_remote_description(Agent* agent, char* description);
 
 int agent_select_candidate_pair(Agent* agent);
@@ -85,7 +88,8 @@ int agent_send_binding_request(Agent* agent);
 
 void agent_clear_candidates(Agent* agent);
 
-int agent_create(Agent* agent);
+int agent_create(Agent* agent, uint16_t port_range_begin,
+                 uint16_t port_range_end);
 
 void agent_destroy(Agent* agent);
 

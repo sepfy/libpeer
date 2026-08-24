@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/types.h>
 
 #include "ice.h"
@@ -77,57 +78,105 @@ void ice_candidate_to_description(IceCandidate* candidate, char* description, in
            typ_raddr);
 }
 
-int ice_candidate_from_description(IceCandidate* candidate, char* description, char* end) {
-  char* candidate_start = description;
-  uint32_t port;
-  char type[16];
-  char addrstring[ADDRSTRLEN];
+static int ice_is_mdns_hostname(const char* hostname) {
+  size_t length;
+  int result = 0;
 
-  if (strncmp("a=", candidate_start, strlen("a=")) == 0) {
-    candidate_start += strlen("a=");
-  }
-  candidate_start += strlen("candidate:");
-
-  // a=candidate:448736988 1 udp 2122260223 172.17.0.1 49250 typ host generation 0 network-id 1 network-cost 50
-  // a=candidate:udpcandidate 1 udp 120 192.168.1.102 8000 typ host
-  if (sscanf(candidate_start, "%s %d %s %" PRIu32 " %s %" PRIu32 " typ %s",
-             candidate->foundation,
-             &candidate->component,
-             candidate->transport,
-             &candidate->priority,
-             addrstring,
-             &port,
-             type) != 7) {
-    LOGE("Failed to parse ICE candidate description");
-    return -1;
-  }
-
-  if (strncmp(candidate->transport, "UDP", 3) != 0 && strncmp(candidate->transport, "udp", 3) != 0) {
-    LOGE("Only UDP transport is supported");
-    return -1;
-  }
-
-  if (strncmp(type, "host", 4) == 0) {
-    candidate->type = ICE_CANDIDATE_TYPE_HOST;
-  } else if (strncmp(type, "srflx", 5) == 0) {
-    candidate->type = ICE_CANDIDATE_TYPE_SRFLX;
-  } else if (strncmp(type, "relay", 5) == 0) {
-    candidate->type = ICE_CANDIDATE_TYPE_RELAY;
-  } else {
-    LOGE("Unknown candidate type: %s", type);
-    return -1;
-  }
-
-  addr_set_port(&candidate->addr, port);
-
-  if (strstr(addrstring, "local") != NULL) {
-    if (mdns_resolve_addr(addrstring, &candidate->addr) == 0) {
-      LOGW("Failed to resolve mDNS address");
-      return -1;
+  if (hostname != NULL) {
+    length = strlen(hostname);
+    if (length > 0 && hostname[length - 1] == '.') {
+      length--;
     }
-  } else if (addr_from_string(addrstring, &candidate->addr) == 0) {
-    return -1;
+    if (length > 6 && strncasecmp(hostname + length - 6, ".local", 6) == 0) {
+      result = 1;
+    }
   }
 
-  return 0;
+  return result;
+}
+
+int ice_candidate_from_description(IceCandidate* candidate, char* description,
+                                   char* end) {
+  char line[512];
+  char* candidate_start = line;
+  char type[16];
+  char addrstring[256];
+  uint32_t port = 0;
+  size_t line_length = 0;
+  int parsed = 0;
+  int result = -1;
+
+  if (candidate != NULL && description != NULL) {
+    if (end == NULL) {
+      end = description + strlen(description);
+    }
+    if (end >= description) {
+      line_length = (size_t)(end - description);
+    }
+  }
+
+  if (line_length > 0 && line_length < sizeof(line)) {
+    memcpy(line, description, line_length);
+    line[line_length] = '\0';
+    memset(candidate, 0, sizeof(*candidate));
+    memset(type, 0, sizeof(type));
+    memset(addrstring, 0, sizeof(addrstring));
+
+    if (strncmp(candidate_start, "a=", 2) == 0) {
+      candidate_start += 2;
+    }
+    if (strncmp(candidate_start, "candidate:", 10) == 0) {
+      candidate_start += 10;
+      parsed = sscanf(candidate_start,
+                      "%32s %d %32s %" PRIu32 " %255s %" PRIu32
+                      " typ %15s",
+                      candidate->foundation,
+                      &candidate->component,
+                      candidate->transport,
+                      &candidate->priority,
+                      addrstring,
+                      &port,
+                      type);
+    }
+  }
+
+  if (parsed != 7) {
+    LOGE("Failed to parse ICE candidate description");
+  } else if (strcasecmp(candidate->transport, "UDP") != 0) {
+    LOGE("Only UDP transport is supported");
+  } else if (candidate->component < 1 || candidate->component > 256) {
+    LOGE("ICE candidate component is out of range");
+  } else if (port > UINT16_MAX) {
+    LOGE("ICE candidate port is out of range");
+  } else {
+    if (strcasecmp(type, "host") == 0) {
+      candidate->type = ICE_CANDIDATE_TYPE_HOST;
+    } else if (strcasecmp(type, "srflx") == 0) {
+      candidate->type = ICE_CANDIDATE_TYPE_SRFLX;
+    } else if (strcasecmp(type, "relay") == 0) {
+      candidate->type = ICE_CANDIDATE_TYPE_RELAY;
+    } else {
+      LOGE("Unknown candidate type: %s", type);
+      parsed = 0;
+    }
+
+    if (parsed == 7) {
+      addr_set_family(&candidate->addr, AF_INET);
+      addr_set_port(&candidate->addr, (uint16_t)port);
+      if (candidate->type == ICE_CANDIDATE_TYPE_HOST &&
+          ice_is_mdns_hostname(addrstring)) {
+        if (mdns_resolve_addr(addrstring, &candidate->addr) == 0) {
+          LOGW("Failed to resolve mDNS address; retaining host candidate");
+        }
+        result = 0;
+      } else if (addr_from_string(addrstring, &candidate->addr) != 0) {
+        addr_set_port(&candidate->addr, (uint16_t)port);
+        result = 0;
+      } else {
+        LOGE("Failed to parse ICE candidate address");
+      }
+    }
+  }
+
+  return result;
 }

@@ -42,7 +42,7 @@ int addr_from_string(const char* buf, Address* addr) {
 }
 
 int addr_to_string(const Address* addr, char* buf, size_t len) {
-  memset(buf, 0, sizeof(len));
+  memset(buf, 0, len);
   switch (addr->family) {
     case AF_INET6:
       return inet_ntop(AF_INET6, &addr->sin6.sin6_addr, buf, len) != NULL;

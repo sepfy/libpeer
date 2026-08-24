@@ -149,6 +149,7 @@ void stun_parse_msg_buf(StunMessage* msg) {
   } else if ((msg->stunmethod & STUN_METHOD_BINDING) == STUN_METHOD_BINDING) {
     msg->stunmethod = STUN_METHOD_BINDING;
   }
+  msg->use_candidate = 0;
 
   while (pos < length) {
     StunAttribute* attr = (StunAttribute*)(msg->buf + pos);
@@ -201,7 +202,9 @@ void stun_parse_msg_buf(StunMessage* msg) {
       case STUN_ATTR_TYPE_PRIORITY:
         break;
       case STUN_ATTR_TYPE_USE_CANDIDATE:
-        // LOGD("Use Candidate");
+        if (ntohs(attr->length) == 0) {
+          msg->use_candidate = 1;
+        }
         break;
       case STUN_ATTR_TYPE_FINGERPRINT:
         memcpy(&msg->fingerprint, attr->value, ntohs(attr->length));

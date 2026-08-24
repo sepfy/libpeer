@@ -60,7 +60,10 @@ int udp_socket_open(UdpSocket* udp_socket, int family, int port) {
   }
 
   do {
-    if ((ret = setsockopt(udp_socket->fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse))) < 0) {
+    /* mDNS shares its well-known port; ICE media ports stay exclusive. */
+    if (port == 5353 &&
+        (ret = setsockopt(udp_socket->fd, SOL_SOCKET, SO_REUSEADDR, &reuse,
+                          sizeof(reuse))) < 0) {
       LOGW("reuse failed. ignore");
     }
 
@@ -94,8 +97,9 @@ int udp_socket_open(UdpSocket* udp_socket, int family, int port) {
 }
 
 void udp_socket_close(UdpSocket* udp_socket) {
-  if (udp_socket->fd > 0) {
+  if (udp_socket->fd >= 0) {
     close(udp_socket->fd);
+    udp_socket->fd = -1;
   }
 }
 

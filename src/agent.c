@@ -23,35 +23,57 @@ void agent_clear_candidates(Agent* agent) {
   agent->candidate_pairs_num = 0;
 }
 
-int agent_create(Agent* agent) {
-  int ret;
-  if ((ret = udp_socket_open(&agent->udp_sockets[0], AF_INET, 0)) < 0) {
-    LOGE("Failed to create UDP socket.");
-    return ret;
+int agent_create(Agent* agent, uint16_t port_range_begin,
+                 uint16_t port_range_end) {
+  uint32_t port;
+  int result = -1;
+
+  agent->udp_sockets[0].fd = -1;
+  agent->udp_sockets[1].fd = -1;
+  if (port_range_begin == 0 && port_range_end == 0) {
+    result = udp_socket_open(&agent->udp_sockets[0], AF_INET, 0);
+  } else if (port_range_begin > 0 && port_range_end >= port_range_begin) {
+    for (port = port_range_begin;
+         result < 0 && port <= port_range_end;
+         port++) {
+      result = udp_socket_open(&agent->udp_sockets[0], AF_INET, (int)port);
+    }
+  } else {
+    LOGE("Invalid UDP port range: %u-%u", port_range_begin, port_range_end);
   }
-  LOGI("create IPv4 UDP socket: %d", agent->udp_sockets[0].fd);
+
+  if (result < 0) {
+    LOGE("Failed to create UDP socket.");
+  } else {
+    LOGI("create IPv4 UDP socket: %d", agent->udp_sockets[0].fd);
+  }
 
 #if CONFIG_IPV6
-  if ((ret = udp_socket_open(&agent->udp_sockets[1], AF_INET6, 0)) < 0) {
+  if (result == 0 &&
+      (result = udp_socket_open(&agent->udp_sockets[1], AF_INET6, 0)) < 0) {
     LOGE("Failed to create IPv6 UDP socket.");
-    return ret;
+    udp_socket_close(&agent->udp_sockets[0]);
+  } else if (result == 0) {
+    LOGI("create IPv6 UDP socket: %d", agent->udp_sockets[1].fd);
   }
-  LOGI("create IPv6 UDP socket: %d", agent->udp_sockets[1].fd);
 #endif
 
-  agent_clear_candidates(agent);
-  memset(agent->remote_ufrag, 0, sizeof(agent->remote_ufrag));
-  memset(agent->remote_upwd, 0, sizeof(agent->remote_upwd));
-  return 0;
+  if (result == 0) {
+    agent_clear_candidates(agent);
+    memset(agent->remote_ufrag, 0, sizeof(agent->remote_ufrag));
+    memset(agent->remote_upwd, 0, sizeof(agent->remote_upwd));
+  }
+
+  return result;
 }
 
 void agent_destroy(Agent* agent) {
-  if (agent->udp_sockets[0].fd > 0) {
+  if (agent->udp_sockets[0].fd >= 0) {
     udp_socket_close(&agent->udp_sockets[0]);
   }
 
 #if CONFIG_IPV6
-  if (agent->udp_sockets[1].fd > 0) {
+  if (agent->udp_sockets[1].fd >= 0) {
     udp_socket_close(&agent->udp_sockets[1]);
   }
 #endif
@@ -365,13 +387,27 @@ int agent_send_binding_request(Agent* agent) {
 void agent_process_stun_request(Agent* agent, StunMessage* stun_msg, Address* addr) {
   StunMessage msg;
   StunHeader* header;
+  char addr_string[ADDRSTRLEN];
+
   switch (stun_msg->stunmethod) {
     case STUN_METHOD_BINDING:
       if (stun_msg_is_valid(stun_msg->buf, stun_msg->size, agent->local_upwd) == 0) {
         header = (StunHeader*)stun_msg->buf;
         memcpy(agent->transaction_id, header->transaction_id, sizeof(header->transaction_id));
         agent_create_binding_response(agent, &msg, addr);
-        agent_socket_send(agent, addr, msg.buf, msg.size);
+        if (agent_socket_send(agent, addr, msg.buf, msg.size) >= 0) {
+          agent->binding_request_time = ports_get_epoch_time();
+          if (stun_msg->use_candidate && agent->nominated_pair != NULL &&
+              agent->nominated_pair->remote != NULL &&
+              agent->nominated_pair->state == ICE_CANDIDATE_STATE_INPROGRESS) {
+            memcpy(&agent->nominated_pair->remote->addr, addr, sizeof(Address));
+            agent->nominated_pair->remote->type = ICE_CANDIDATE_TYPE_PRFLX;
+            agent->nominated_pair->state = ICE_CANDIDATE_STATE_SUCCEEDED;
+            addr_to_string(addr, addr_string, sizeof(addr_string));
+            LOGI("Accepted peer-reflexive ICE source %s:%d", addr_string,
+                 addr->port);
+          }
+        }
       }
       break;
     default:
@@ -428,28 +464,59 @@ void agent_set_remote_description(Agent* agent, char* description) {
   a=candidate:1 1 UDP 1 36.231.28.50 38143 typ srflx
   */
   int i;
+  const char* ufrag_prefix = "a=ice-ufrag:";
+  const char* upwd_prefix = "a=ice-pwd:";
+  size_t prefix_length;
+  size_t value_length;
 
   LOGD("Set remote description:\n%s", description);
 
   char* line_start = description;
   char* line_end = NULL;
+  agent->remote_ufrag[0] = '\0';
+  agent->remote_upwd[0] = '\0';
 
   while ((line_end = strstr(line_start, "\r\n")) != NULL) {
-    if (strncmp(line_start, "a=ice-ufrag:", strlen("a=ice-ufrag:")) == 0) {
-      strncpy(agent->remote_ufrag, line_start + strlen("a=ice-ufrag:"), line_end - line_start - strlen("a=ice-ufrag:"));
+    prefix_length = strlen(ufrag_prefix);
+    if (strncmp(line_start, ufrag_prefix, prefix_length) == 0) {
+      value_length = (size_t)(line_end - line_start);
+      if (value_length >= prefix_length) {
+        value_length -= prefix_length;
+      } else {
+        value_length = 0;
+      }
+      if (value_length >= sizeof(agent->remote_ufrag)) {
+        value_length = sizeof(agent->remote_ufrag) - 1;
+      }
+      memcpy(agent->remote_ufrag, line_start + prefix_length, value_length);
+      agent->remote_ufrag[value_length] = '\0';
 
-    } else if (strncmp(line_start, "a=ice-pwd:", strlen("a=ice-pwd:")) == 0) {
-      strncpy(agent->remote_upwd, line_start + strlen("a=ice-pwd:"), line_end - line_start - strlen("a=ice-pwd:"));
-
-    } else if (strncmp(line_start, "a=candidate:", strlen("a=candidate:")) == 0) {
-      if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], line_start, line_end) == 0) {
-        for (i = 0; i < agent->remote_candidates_count; i++) {
-          if (strcmp(agent->remote_candidates[i].foundation, agent->remote_candidates[agent->remote_candidates_count].foundation) == 0) {
-            break;
-          }
+    } else {
+      prefix_length = strlen(upwd_prefix);
+      if (strncmp(line_start, upwd_prefix, prefix_length) == 0) {
+        value_length = (size_t)(line_end - line_start);
+        if (value_length >= prefix_length) {
+          value_length -= prefix_length;
+        } else {
+          value_length = 0;
         }
-        if (i == agent->remote_candidates_count) {
-          agent->remote_candidates_count++;
+        if (value_length >= sizeof(agent->remote_upwd)) {
+          value_length = sizeof(agent->remote_upwd) - 1;
+        }
+        memcpy(agent->remote_upwd, line_start + prefix_length, value_length);
+        agent->remote_upwd[value_length] = '\0';
+
+      } else if (strncmp(line_start, "a=candidate:", strlen("a=candidate:")) == 0 &&
+                 agent->remote_candidates_count < AGENT_MAX_CANDIDATES) {
+        if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], line_start, line_end) == 0) {
+          for (i = 0; i < agent->remote_candidates_count; i++) {
+            if (strcmp(agent->remote_candidates[i].foundation, agent->remote_candidates[agent->remote_candidates_count].foundation) == 0) {
+              break;
+            }
+          }
+          if (i == agent->remote_candidates_count) {
+            agent->remote_candidates_count++;
+          }
         }
       }
     }

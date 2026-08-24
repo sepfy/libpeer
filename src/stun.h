@@ -85,6 +85,7 @@ struct StunAttribute {
 struct StunMessage {
   StunClass stunclass;
   StunMethod stunmethod;
+  int use_candidate;
   uint32_t fingerprint;
   char message_integrity[20];
   char username[128];

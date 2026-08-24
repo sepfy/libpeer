@@ -16,7 +16,11 @@ if (DEFINED ENV{IDF_PATH})
   return()
 endif()
 
-project(peer)
+project(peer C)
+
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS ON)
 
 option(ENABLE_TESTS "Enable tests" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
@@ -65,6 +69,7 @@ add_subdirectory(src)
 add_subdirectory(examples)
 
 if(ENABLE_TESTS)
+  enable_testing()
   add_subdirectory(tests)
 endif()
 

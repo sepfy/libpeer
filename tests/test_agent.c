@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
   char description[1024];
   memset(&description, 0, sizeof(description));
 
-  agent_create(&agent);
+  agent_create(&agent, 0, 0);
 
   test_gather_host(&agent);
   test_gather_stun(&agent, stunserver);
