@@ -100,7 +100,7 @@ int ice_candidate_from_description(IceCandidate* candidate, char* description,
   char line[512];
   char* candidate_start = line;
   char type[16];
-  char addrstring[ADDRSTRLEN];
+  char addrstring[256];
   uint32_t port = 0;
   size_t line_length = 0;
   int parsed = 0;
@@ -128,7 +128,7 @@ int ice_candidate_from_description(IceCandidate* candidate, char* description,
     if (strncmp(candidate_start, "candidate:", 10) == 0) {
       candidate_start += 10;
       parsed = sscanf(candidate_start,
-                      "%32s %d %32s %" PRIu32 " %45s %" PRIu32
+                      "%32s %d %32s %" PRIu32 " %255s %" PRIu32
                       " typ %15s",
                       candidate->foundation,
                       &candidate->component,

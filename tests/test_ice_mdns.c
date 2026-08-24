@@ -178,11 +178,38 @@ static void test_authenticated_nomination_learns_peer_reflexive_address(void) {
   agent_destroy(&agent);
 }
 
+static void test_remote_credentials_are_bounded(void) {
+  Agent agent;
+  char description[1024];
+  char long_ufrag[400];
+  char long_upwd[400];
+  size_t index;
+
+  for (index = 0; index + 1 < sizeof(long_ufrag); index++) {
+    long_ufrag[index] = 'u';
+    long_upwd[index] = 'p';
+  }
+  long_ufrag[sizeof(long_ufrag) - 1] = '\0';
+  long_upwd[sizeof(long_upwd) - 1] = '\0';
+  snprintf(description, sizeof(description),
+           "a=ice-ufrag:%s\r\na=ice-pwd:%s\r\n", long_ufrag, long_upwd);
+
+  memset(&agent, 0, sizeof(agent));
+  CHECK(agent_create(&agent, 0, 0) == 0);
+  agent_set_remote_description(&agent, description);
+  CHECK(strlen(agent.remote_ufrag) == ICE_UFRAG_LENGTH);
+  CHECK(strlen(agent.remote_upwd) == ICE_UPWD_LENGTH);
+  CHECK(agent.remote_ufrag[ICE_UFRAG_LENGTH] == '\0');
+  CHECK(agent.remote_upwd[ICE_UPWD_LENGTH] == '\0');
+  agent_destroy(&agent);
+}
+
 int main(void) {
   test_compressed_additional_mdns_answer();
   test_malformed_compression_is_rejected();
   test_unresolved_mdns_candidate_is_retained();
   test_authenticated_nomination_learns_peer_reflexive_address();
+  test_remote_credentials_are_bounded();
 
   if (failures != 0) {
     fprintf(stderr, "%d test checks failed\n", failures);

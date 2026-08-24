@@ -464,28 +464,59 @@ void agent_set_remote_description(Agent* agent, char* description) {
   a=candidate:1 1 UDP 1 36.231.28.50 38143 typ srflx
   */
   int i;
+  const char* ufrag_prefix = "a=ice-ufrag:";
+  const char* upwd_prefix = "a=ice-pwd:";
+  size_t prefix_length;
+  size_t value_length;
 
   LOGD("Set remote description:\n%s", description);
 
   char* line_start = description;
   char* line_end = NULL;
+  agent->remote_ufrag[0] = '\0';
+  agent->remote_upwd[0] = '\0';
 
   while ((line_end = strstr(line_start, "\r\n")) != NULL) {
-    if (strncmp(line_start, "a=ice-ufrag:", strlen("a=ice-ufrag:")) == 0) {
-      strncpy(agent->remote_ufrag, line_start + strlen("a=ice-ufrag:"), line_end - line_start - strlen("a=ice-ufrag:"));
+    prefix_length = strlen(ufrag_prefix);
+    if (strncmp(line_start, ufrag_prefix, prefix_length) == 0) {
+      value_length = (size_t)(line_end - line_start);
+      if (value_length >= prefix_length) {
+        value_length -= prefix_length;
+      } else {
+        value_length = 0;
+      }
+      if (value_length >= sizeof(agent->remote_ufrag)) {
+        value_length = sizeof(agent->remote_ufrag) - 1;
+      }
+      memcpy(agent->remote_ufrag, line_start + prefix_length, value_length);
+      agent->remote_ufrag[value_length] = '\0';
 
-    } else if (strncmp(line_start, "a=ice-pwd:", strlen("a=ice-pwd:")) == 0) {
-      strncpy(agent->remote_upwd, line_start + strlen("a=ice-pwd:"), line_end - line_start - strlen("a=ice-pwd:"));
-
-    } else if (strncmp(line_start, "a=candidate:", strlen("a=candidate:")) == 0) {
-      if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], line_start, line_end) == 0) {
-        for (i = 0; i < agent->remote_candidates_count; i++) {
-          if (strcmp(agent->remote_candidates[i].foundation, agent->remote_candidates[agent->remote_candidates_count].foundation) == 0) {
-            break;
-          }
+    } else {
+      prefix_length = strlen(upwd_prefix);
+      if (strncmp(line_start, upwd_prefix, prefix_length) == 0) {
+        value_length = (size_t)(line_end - line_start);
+        if (value_length >= prefix_length) {
+          value_length -= prefix_length;
+        } else {
+          value_length = 0;
         }
-        if (i == agent->remote_candidates_count) {
-          agent->remote_candidates_count++;
+        if (value_length >= sizeof(agent->remote_upwd)) {
+          value_length = sizeof(agent->remote_upwd) - 1;
+        }
+        memcpy(agent->remote_upwd, line_start + prefix_length, value_length);
+        agent->remote_upwd[value_length] = '\0';
+
+      } else if (strncmp(line_start, "a=candidate:", strlen("a=candidate:")) == 0 &&
+                 agent->remote_candidates_count < AGENT_MAX_CANDIDATES) {
+        if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], line_start, line_end) == 0) {
+          for (i = 0; i < agent->remote_candidates_count; i++) {
+            if (strcmp(agent->remote_candidates[i].foundation, agent->remote_candidates[agent->remote_candidates_count].foundation) == 0) {
+              break;
+            }
+          }
+          if (i == agent->remote_candidates_count) {
+            agent->remote_candidates_count++;
+          }
         }
       }
     }
