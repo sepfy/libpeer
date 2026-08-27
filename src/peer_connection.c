@@ -34,6 +34,10 @@
 
 #define PEER_CONNECTION_NACK_SLOT_SIZE (CONFIG_MTU + 16) /* 密文 + SRTP auth tag 余量：GCM 16B tag 下满长包(1300+16)恰好容纳 */
 
+/* sendto 失败(典型 ENOBUFS)后退避重试的间隔：让出 CPU 给 TCPIP/wlan 任务
+ * 排空 TX skb 池。仅失败路径付出该延迟，成功路径零开销。 */
+#define PEER_CONNECTION_SEND_RETRY_DELAY_MS 2
+
 typedef struct {
   uint16_t seq;
   uint16_t len;                                /* len==0 视为空槽 */
@@ -72,6 +76,17 @@ struct PeerConnection {
   uint32_t nack_retransmits; /* NACK 重传包计数 (config.nack_ring_packets==0 时恒 0) */
   uint32_t srtp_auth_failures; /* SRTP/SRTCP 入向鉴权失败丢包计数 */
 
+  /* RTP 出包统计：成功投递到 socket 的包数与最终丢弃(重试后仍失败)的包数。
+   * sendto 失败(典型 ENOBUFS)在 rtp_encoder_encode_* 返回 0 的掩盖下
+   * 对上层不可见，必须在此收敛点显式计数。 */
+  uint32_t rtp_packets_sent;
+  uint32_t rtp_send_failures;
+
+  /* 拥塞帧放弃：FU-A 帧丢一片整帧即废。视频轨本帧首次发送失败后，
+   * 同 timestamp 的剩余分片直接丢弃（等待对端 PLI → IDR 重发恢复）。 */
+  uint32_t last_video_ts;
+  int      video_frame_aborted;
+
   /* 柔性数组 (GCC 零长数组扩展, 仓库既有写法, 见 async_delegation.c):
    * NACK 重传 ring, 槽位数 = config.nack_ring_packets (0 时分配 0 字节),
    * 必须是 struct 最后一个成员, 随 create 一次性 calloc 分配。 */
@@ -85,8 +100,14 @@ static void peer_connection_outgoing_rtp_packet(uint8_t* data, size_t size, void
     LOGW("srtp_protect failed, drop outbound RTP");
     return;
   }
-  /* 缓存密文(含 auth tag)供 NACK 原样重发；只缓存视频轨 */
-  if (pc->config.nack_ring_packets > 0 && (data[1] & 0x7F) == PT_H264 &&
+
+  int is_video = ((data[1] & 0x7F) == PT_H264);
+
+  /* 缓存密文(含 auth tag)供 NACK 原样重发；只缓存视频轨。
+   * 必须在下方的帧放弃判断之前：本帧后续分片被丢弃时，已成功发送的
+   * 分片仍可通过 NACK 补发（虽然整帧已不可解，重传主要用于对端 PLI 前
+   * 的真实丢包场景，缓存成本极低） */
+  if (pc->config.nack_ring_packets > 0 && is_video &&
       size <= PEER_CONNECTION_NACK_SLOT_SIZE) {
     uint16_t seq = ((uint16_t)data[2] << 8) | data[3];
     nack_ring_entry_t* e = &pc->nack_ring[seq & (pc->config.nack_ring_packets - 1)];
@@ -94,7 +115,34 @@ static void peer_connection_outgoing_rtp_packet(uint8_t* data, size_t size, void
     e->len = (uint16_t)size;
     memcpy(e->data, data, size);
   }
-  agent_send(&pc->agent, data, size);
+
+  if (is_video) {
+    uint32_t ts = ntohl(((RtpHeader*)data)->timestamp);
+    if (ts != pc->last_video_ts) {
+      /* 新帧开始，清除上一帧的放弃标志 */
+      pc->last_video_ts = ts;
+      pc->video_frame_aborted = 0;
+    }
+    /* FU-A 帧丢任意一片整帧即废：已放弃的帧剩余分片不再发送，
+     * 避免在拥塞链路上浪费带宽并拖长推流线程持锁时间 */
+    if (pc->video_frame_aborted) {
+      return;
+    }
+  }
+
+  if (agent_send(&pc->agent, data, size) < 0) {
+    /* sendto 失败(典型 ENOBUFS)：退避一次让 wlan 排空 TX skb 池再重试，
+     * 仍失败即丢弃。失败路径才付出延迟，最多一次、2ms 封顶，不累积 */
+    ports_sleep_ms(PEER_CONNECTION_SEND_RETRY_DELAY_MS);
+    if (agent_send(&pc->agent, data, size) < 0) {
+      pc->rtp_send_failures++;
+      if (is_video) {
+        pc->video_frame_aborted = 1;
+      }
+      return;
+    }
+  }
+  pc->rtp_packets_sent++;
 }
 
 static int peer_connection_dtls_srtp_recv(void* ctx, unsigned char* buf, size_t len) {
@@ -136,7 +184,12 @@ static void peer_connection_nack_retransmit(PeerConnection* pc, uint16_t seq) {
   /* 同余槽位校验: seq 超出窗口时槽位内容必不匹配, 天然实现窗口语义 */
   nack_ring_entry_t* e = &pc->nack_ring[seq & (pc->config.nack_ring_packets - 1)];
   if (e->seq == seq && e->len > 0) {
-    agent_send(&pc->agent, e->data, e->len);
+    /* 重传同样计入收发统计：重传失败也是拥塞信号 */
+    if (agent_send(&pc->agent, e->data, e->len) < 0) {
+      pc->rtp_send_failures++;
+    } else {
+      pc->rtp_packets_sent++;
+    }
     pc->nack_retransmits++;
   }
 }
@@ -235,6 +288,14 @@ uint32_t peer_connection_get_nack_retransmits(PeerConnection* pc) {
 
 uint32_t peer_connection_get_srtp_auth_failures(PeerConnection* pc) {
   return pc->srtp_auth_failures;
+}
+
+uint32_t peer_connection_get_rtp_packets_sent(PeerConnection* pc) {
+  return pc->rtp_packets_sent;
+}
+
+uint32_t peer_connection_get_rtp_send_failures(PeerConnection* pc) {
+  return pc->rtp_send_failures;
 }
 
 void* peer_connection_get_sctp(PeerConnection* pc) {

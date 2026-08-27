@@ -129,6 +129,11 @@ uint32_t peer_connection_get_nack_retransmits(PeerConnection* pc);
 // SRTP/SRTCP 入向鉴权失败丢包计数
 uint32_t peer_connection_get_srtp_auth_failures(PeerConnection* pc);
 
+// RTP 出包统计: 成功投递包数与最终丢弃(重试后仍失败)包数
+uint32_t peer_connection_get_rtp_packets_sent(PeerConnection* pc);
+
+uint32_t peer_connection_get_rtp_send_failures(PeerConnection* pc);
+
 void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp, SdpType sdp_type);
 
 void peer_connection_set_local_description(PeerConnection* pc, const char* sdp, SdpType sdp_type);
