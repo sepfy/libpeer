@@ -210,6 +210,7 @@ void stun_parse_msg_buf(StunMessage* msg) {
       case STUN_ATTR_TYPE_ICE_CONTROLLED:
       case STUN_ATTR_TYPE_ICE_CONTROLLING:
       case STUN_ATTR_TYPE_NETWORK_COST:
+      case STUN_ATTR_TYPE_SOFTWARE:
         // Do nothing
         break;
       default:
