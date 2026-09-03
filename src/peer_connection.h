@@ -123,6 +123,15 @@ int peer_connection_send_video(PeerConnection* pc, const uint8_t* packet, size_t
 // 按实际视频帧间隔调整媒体时钟步进（90kHz 单位）
 void peer_connection_set_video_timestamp_increment(PeerConnection* pc, uint32_t increment);
 
+/**
+ * @brief 覆盖当前会话 H264 动态 PT（create 时默认 PT_H264=96）
+ * @param[in] peer connection
+ * @param[in] 动态 PT 值（合法范围 96-127，非法返回 -1）
+ * answerer 在 create_answer 前按 offer 的 a=rtpmap 设置；
+ * 同步更新发送编码器，保证 SDP 广告与 RTP 打包一致。
+ */
+int peer_connection_set_video_payload_type(PeerConnection* pc, int payload_type);
+
 // NACK 重传统计 (config.nack_ring_packets==0 禁用时恒为 0)
 uint32_t peer_connection_get_nack_retransmits(PeerConnection* pc);
 

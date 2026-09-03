@@ -208,6 +208,15 @@ int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
                                 MBEDTLS_SSL_IS_CLIENT,
                                 MBEDTLS_SSL_TRANSPORT_DATAGRAM,
                                 MBEDTLS_SSL_PRESET_DEFAULT);
+
+    /* mbedtls 3.6: client + VERIFY_REQUIRED 未设 hostname 会在验证服务器证书时
+     * 返回 MBEDTLS_ERR_SSL_CERTIFICATE_VERIFICATION_WITHOUT_HOSTNAME(-0x5D80)。
+     * WebRTC 对等指纹比对在 dtls_srtp_handshake 内完成，证书链验证由
+     * dtls_srtp_cert_verify 回调放行，hostname 仅用于让验证流程继续执行 */
+    if (mbedtls_ssl_set_hostname(&dtls_srtp->ssl, "dtls_srtp") != 0) {
+      LOGE("mbedtls_ssl_set_hostname failed");
+      return -1;
+    }
   }
 
   dtls_srtp_x509_digest(&dtls_srtp->cert, dtls_srtp->local_fingerprint);

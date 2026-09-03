@@ -71,6 +71,9 @@ struct PeerConnection {
   uint32_t remote_assrc;
   uint32_t remote_vssrc;
 
+  SdpMediaInfo remote_media[SDP_MEDIA_COUNT]; /* offer 的 per-m-line mid/方向（pc 每会话新建 calloc，无陈旧复用） */
+  int h264_pt;                                /* 当前会话 H264 PT，create 默认 PT_H264，可经 set_video_payload_type 覆盖 */
+
   uint32_t handshake_start_time;
 
   uint32_t nack_retransmits; /* NACK 重传包计数 (config.nack_ring_packets==0 时恒 0) */
@@ -101,7 +104,7 @@ static void peer_connection_outgoing_rtp_packet(uint8_t* data, size_t size, void
     return;
   }
 
-  int is_video = ((data[1] & 0x7F) == PT_H264);
+  int is_video = (pc->config.video_codec != CODEC_NONE) && ((data[1] & 0x7F) == (uint8_t)pc->vrtp_encoder.type);
 
   /* 缓存密文(含 auth tag)供 NACK 原样重发；只缓存视频轨。
    * 必须在下方的帧放弃判断之前：本帧后续分片被丢弃时，已成功发送的
@@ -330,6 +333,8 @@ PeerConnection* peer_connection_create(PeerConfiguration* config) {
 
   pc->state = PEER_CONNECTION_NEW;
 
+  pc->h264_pt = PT_H264;
+
   if (pc->config.audio_codec) {
     rtp_encoder_init(&pc->artp_encoder, pc->config.audio_codec,
                      peer_connection_outgoing_rtp_packet, (void*)pc);
@@ -381,6 +386,20 @@ int peer_connection_send_video(PeerConnection* pc, const uint8_t* buf, size_t le
 
 void peer_connection_set_video_timestamp_increment(PeerConnection* pc, uint32_t increment) {
   rtp_encoder_set_timestamp_increment(&pc->vrtp_encoder, increment);
+}
+
+int peer_connection_set_video_payload_type(PeerConnection* pc, int payload_type) {
+  if (!pc)
+    return -1;
+  /* 动态 PT 范围 96-127（rtp_packet_validate 同款判据） */
+  if (payload_type < 96 || payload_type > 127) {
+    LOGE("invalid h264 payload type: %d", payload_type);
+    return -1;
+  }
+  pc->h264_pt = payload_type;
+  if (pc->config.video_codec == CODEC_H264)
+    pc->vrtp_encoder.type = (RtpPayloadType)payload_type;
+  return 0;
 }
 
 int peer_connection_datachannel_send(PeerConnection* pc, char* message, size_t len) {
@@ -607,6 +626,7 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp,
   char buf[256];
   char* val_start = NULL;
   uint32_t* ssrc = NULL;
+  SdpMediaKind media_kind = SDP_MEDIA_COUNT;
   DtlsSrtpRole role = DTLS_SRTP_ROLE_SERVER;
   int is_update = 0;
   Agent* agent = &pc->agent;
@@ -631,15 +651,43 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp,
       is_update = 1;
     }
 
-    if (strstr(buf, "m=video")) {
+    /* 前缀匹配收紧（strstr "m=video" 可能命中行内其他子串），
+     * 并补 m=application 归属：旧代码不认 datachannel 段，其 mid/方向无法解析 */
+    if (strncmp(buf, "m=video ", 8) == 0) {
+      media_kind = SDP_MEDIA_VIDEO;
       ssrc = &pc->remote_vssrc;
-    } else if (strstr(buf, "m=audio")) {
+      pc->remote_media[media_kind].mid[0] = '\0';
+      pc->remote_media[media_kind].direction = SDP_DIR_NONE;
+    } else if (strncmp(buf, "m=audio ", 8) == 0) {
+      media_kind = SDP_MEDIA_AUDIO;
       ssrc = &pc->remote_assrc;
+      pc->remote_media[media_kind].mid[0] = '\0';
+      pc->remote_media[media_kind].direction = SDP_DIR_NONE;
+    } else if (strncmp(buf, "m=application ", 14) == 0) {
+      media_kind = SDP_MEDIA_APPLICATION;
+      pc->remote_media[media_kind].mid[0] = '\0';
+      pc->remote_media[media_kind].direction = SDP_DIR_NONE;
     }
 
     if ((val_start = strstr(buf, "a=ssrc:")) && ssrc) {
       *ssrc = strtoul(val_start + 7, NULL, 10);
       LOGD("SSRC: %" PRIu32, *ssrc);
+    }
+
+    if (media_kind < SDP_MEDIA_COUNT) {
+      if ((val_start = strstr(buf, "a=mid:"))) {
+        strncpy(pc->remote_media[media_kind].mid, val_start + 6, SDP_MID_MAX_LEN - 1);
+        pc->remote_media[media_kind].mid[SDP_MID_MAX_LEN - 1] = '\0';
+      }
+      if (strncmp(buf, "a=sendrecv", 10) == 0) {
+        pc->remote_media[media_kind].direction = SDP_DIR_SENDRECV;
+      } else if (strncmp(buf, "a=sendonly", 10) == 0) {
+        pc->remote_media[media_kind].direction = SDP_DIR_SENDONLY;
+      } else if (strncmp(buf, "a=recvonly", 10) == 0) {
+        pc->remote_media[media_kind].direction = SDP_DIR_RECVONLY;
+      } else if (strncmp(buf, "a=inactive", 10) == 0) {
+        pc->remote_media[media_kind].direction = SDP_DIR_INACTIVE;
+      }
     }
 
     start = line + 2;
@@ -661,6 +709,7 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
   char* description = (char*)pc->temp_buf;
   memset(pc->temp_buf, 0, sizeof(pc->temp_buf));
   DtlsSrtpRole role = DTLS_SRTP_ROLE_SERVER;
+  SdpGenerateParam gen;
 
   pc->sctp.connected = 0;
 
@@ -684,11 +733,21 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
   pc->dtls_srtp.udp_send = peer_connection_dtls_srtp_send;
 
   memset(pc->sdp, 0, sizeof(pc->sdp));
+
+  /* SDP 生成上下文：ANSWER 按 RFC 5888/8843/3264 归一（mid 回显、端口 0+bundle-only、
+   * 方向取反、PT 用 pc->h264_pt），OFFER 与既有输出字节级一致 */
+  memset(&gen, 0, sizeof(gen));
+  gen.is_answer = (sdp_type == SDP_TYPE_ANSWER);
+  gen.h264_pt = pc->h264_pt;
+  gen.anchor_port = SDP_DATACHANNEL_PORT;
+  memcpy(gen.remote, pc->remote_media, sizeof(gen.remote));
+
   // TODO: check if we have video or audio codecs
   sdp_create(pc->sdp,
              pc->config.video_codec != CODEC_NONE,
              pc->config.audio_codec != CODEC_NONE,
-             pc->config.datachannel);
+             pc->config.datachannel,
+             &gen);
 
   agent_create_ice_credential(&pc->agent);
   sdp_append(pc->sdp, "a=ice-ufrag:%s", pc->agent.local_ufrag);
@@ -716,7 +775,7 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
   agent_get_local_description(&pc->agent, description, sizeof(pc->temp_buf));
 
   if (pc->config.video_codec == CODEC_H264) {
-    sdp_append_h264(pc->sdp);
+    sdp_append_h264(pc->sdp, &gen);
     if(0 == create_candidate_sdp_flag) {
         create_candidate_sdp_flag = 1;
         sdp_append(pc->sdp, description);
@@ -725,21 +784,21 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
 
   switch (pc->config.audio_codec) {
     case CODEC_PCMA:
-      sdp_append_pcma(pc->sdp);
+      sdp_append_pcma(pc->sdp, &gen);
       if(0 == create_candidate_sdp_flag) {
         create_candidate_sdp_flag = 1;
         sdp_append(pc->sdp, description);
       }
       break;
     case CODEC_PCMU:
-      sdp_append_pcmu(pc->sdp);
+      sdp_append_pcmu(pc->sdp, &gen);
       if(0 == create_candidate_sdp_flag) {
         create_candidate_sdp_flag = 1;
         sdp_append(pc->sdp, description);
       }
       break;
     case CODEC_OPUS:
-      sdp_append_opus(pc->sdp);
+      sdp_append_opus(pc->sdp, &gen);
       if(0 == create_candidate_sdp_flag) {
         create_candidate_sdp_flag = 1;
         sdp_append(pc->sdp, description);
@@ -749,7 +808,7 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
   }
 
   if (pc->config.datachannel) {
-    sdp_append_datachannel(pc->sdp);
+    sdp_append_datachannel(pc->sdp, &gen);
   }
 
   if(0 == create_candidate_sdp_flag) {
