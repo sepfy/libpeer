@@ -155,7 +155,7 @@ int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
       /* AEAD_AES_128_GCM (RFC 7714) 优先，SRTP_AES128_CM_HMAC_SHA1_80 (RFC 5764) 回退。
        * 板端作 DTLS client 时此顺序即偏好序；作 server 时选择由客户端优先级决定 */
       MBEDTLS_TLS_SRTP_AEAD_AES_128_GCM,
-      MBEDTLS_TLS_SRTP_AES128_CM_HMAC_SHA1_80,
+    //   MBEDTLS_TLS_SRTP_AES128_CM_HMAC_SHA1_80,
       MBEDTLS_TLS_SRTP_UNSET};
 
   dtls_srtp->role = role;
