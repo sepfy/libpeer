@@ -640,8 +640,11 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp,
       role = DTLS_SRTP_ROLE_CLIENT;
     }
 
-    if (strstr(buf, "a=fingerprint")) {
-      strncpy(pc->dtls_srtp.remote_fingerprint, buf + 22, DTLS_SRTP_FINGERPRINT_LENGTH);
+    /* 只取 sha-256 指纹：dtls_srtp_x509_digest 固定用 SHA-256 算对端证书摘要。
+     * aiortc 一类实现每个媒体段发 sha-256/384/512 三行，无差别取最后一行（sha-512）
+     * 必比对失败、DTLS 反复重试。Chrome 只发 sha-256 单行所以此前未暴露。 */
+    if (strstr(buf, "a=fingerprint:sha-256")) {
+      strncpy(pc->dtls_srtp.remote_fingerprint, buf + strlen("a=fingerprint:sha-256 "), DTLS_SRTP_FINGERPRINT_LENGTH);
       pc->dtls_srtp.remote_fingerprint[DTLS_SRTP_FINGERPRINT_LENGTH - 1] = '\0';
     }
 

@@ -322,7 +322,12 @@ static void agent_create_binding_response(Agent* agent, StunMessage* msg, Addres
 }
 
 static void agent_create_binding_request(Agent* agent, StunMessage* msg) {
-  uint64_t tie_breaker = 0;  // always be controlled
+  /* RFC 5245 §7.3: controlling 的 tie-breaker 取 [2^63, 2^64)，controlled 取 [0, 2^63)。
+   * 对端 (aiortc/aioice) 的 controlled tie-breaker 为随机 64bit (< 2^63)，此处取最大值
+   * 保证角色比较正确；旧代码恒为 0，设备作 controlling (LAN 版 offerer) 时与对端
+   * 角色冲突、提名被对端拒绝 */
+  uint64_t tie_breaker = (agent->mode == AGENT_MODE_CONTROLLING) ?
+                          0xFFFFFFFFFFFFFFFFULL : 0;
   // send binding request
   stun_msg_create(msg, STUN_CLASS_REQUEST | STUN_METHOD_BINDING);
   char username[584];
@@ -337,6 +342,23 @@ static void agent_create_binding_request(Agent* agent, StunMessage* msg) {
     stun_msg_write_attr(msg, STUN_ATTR_TYPE_ICE_CONTROLLED, 8, (char*)&tie_breaker);
   }
   stun_msg_finish(msg, STUN_CREDENTIAL_SHORT_TERM, agent->remote_upwd, strlen(agent->remote_upwd));
+}
+
+/* RFC 5245 §8.1.1.1 (regular nomination): controlling 方在连通性检查成功后
+ * 向选中的 pair 发带 USE-CANDIDATE 的 binding request 完成提名。
+ * 设备作 offerer (LAN 版) 时缺此步骤，对端 (aiortc) 一直等提名、ICE 卡 checking、
+ * DTLS 永不开始。WLAN 版设备为 controlled 被动响应，故此前未暴露。 */
+static void agent_nominate_pair(Agent* agent) {
+  if (agent->mode != AGENT_MODE_CONTROLLING) {
+    return;
+  }
+  if (agent->nominated_pair == NULL) {
+    return;
+  }
+  StunMessage req;
+  agent_create_binding_request(agent, &req);
+  agent_socket_send(agent, &agent->nominated_pair->remote->addr, req.buf, req.size);
+  LOGD("ICE nomination sent (USE-CANDIDATE)");
 }
 
 void agent_process_stun_request(Agent* agent, StunMessage* stun_msg, Address* addr) {
@@ -380,6 +402,7 @@ void agent_process_stun_request(Agent* agent, StunMessage* stun_msg, Address* ad
               agent->selected_pair  = &agent->candidate_pairs[i];
               LOGD("ICE pair %d SUCCEEDED via inbound STUN request", i);
               found = 1;
+              agent_nominate_pair(agent);
               break;
             }
           }
@@ -409,6 +432,7 @@ void agent_process_stun_request(Agent* agent, StunMessage* stun_msg, Address* ad
                 agent->candidate_pairs_num++;
                 LOGI("ICE: created PRFLX candidate pair from inbound STUN");
                 found = 1;
+                agent_nominate_pair(agent);
                 break;
               }
             }
