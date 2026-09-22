@@ -4,21 +4,55 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#if defined(__linux__) || defined(__APPLE__)
+#include <unistd.h>
+#endif
 #include "mbedtls/md.h"
 #include "mbedtls/version.h"
 #if MBEDTLS_VERSION_NUMBER >= 0x04000000
 #include "psa/crypto.h"
 #endif
 
+static unsigned int utils_random_seed(void) {
+  unsigned int seed;
+
+#if defined(__linux__) || defined(__APPLE__)
+  FILE* f = fopen("/dev/urandom", "rb");
+
+  if (f != NULL) {
+    size_t n = fread(&seed, sizeof(seed), 1, f);
+    fclose(f);
+
+    if (n == 1) {
+      return seed;
+    }
+  }
+
+  return (unsigned int)time(NULL) ^ (unsigned int)getpid();
+#else
+  return (unsigned int)time(NULL);
+#endif
+}
+
 void utils_random_string(char* s, const int len) {
   int i;
+  static int seeded = 0;
 
   static const char alphanum[] =
       "0123456789"
       "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
       "abcdefghijklmnopqrstuvwxyz";
 
-  srand(time(NULL));
+  // Seeding on every call from time(NULL) (1-second resolution) made this
+  // fully determined by wall-clock time: any two callers (different
+  // processes, different devices) invoked within the same second produced
+  // byte-identical output, which breaks ICE's requirement (RFC 8445 15.4)
+  // that ufrag/pwd be unguessable. Seed once, from real entropy where
+  // available.
+  if (!seeded) {
+    srand(utils_random_seed());
+    seeded = 1;
+  }
 
   for (i = 0; i < len; ++i) {
     s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
