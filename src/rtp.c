@@ -35,7 +35,7 @@ typedef struct FuHeader {
 #define FU_HEADER_SIZE 1
 
 int rtp_packet_validate(uint8_t* packet, size_t size) {
-  if (size < 12)
+  if (size < 12 || (packet[0] >> 6) != 2)
     return 0;
 
   RtpHeader* rtp_header = (RtpHeader*)packet;
@@ -121,6 +121,7 @@ static int rtp_encoder_encode_h264_fu_a(RtpEncoder* rtp_encoder, uint8_t* buf, s
 }
 
 static uint8_t* h264_find_nalu(uint8_t* buf_start, uint8_t* buf_end) {
+  if ((size_t)(buf_end - buf_start) < 3) return buf_end;
   uint8_t* p = buf_start + 2;
 
   while (p < buf_end) {
@@ -144,8 +145,9 @@ static int rtp_encoder_encode_h264(RtpEncoder* rtp_encoder, uint8_t* buf, size_t
     if (pend != buf_end)
       nalu_size--;
 
-    while (pstart[nalu_size - 1] == 0x00)
+    while (nalu_size && pstart[nalu_size - 1] == 0x00)
       nalu_size--;
+    if (!nalu_size) continue;
 
     if (nalu_size <= RTP_PAYLOAD_SIZE) {
       rtp_encoder_encode_h264_single(rtp_encoder, pstart, nalu_size);
@@ -159,6 +161,7 @@ static int rtp_encoder_encode_h264(RtpEncoder* rtp_encoder, uint8_t* buf, size_t
 }
 
 static int rtp_encoder_encode_generic(RtpEncoder* rtp_encoder, uint8_t* buf, size_t size) {
+  if (size > RTP_PAYLOAD_SIZE) return -1;
   RtpHeader* rtp_header = (RtpHeader*)rtp_encoder->buf;
   rtp_header_init(rtp_header, rtp_encoder->type);
   rtp_header->seq_number = htons(rtp_encoder->seq_number);
@@ -210,6 +213,7 @@ void rtp_encoder_init(RtpEncoder* rtp_encoder, MediaCodec codec, RtpOnPacket on_
 }
 
 int rtp_encoder_encode(RtpEncoder* rtp_encoder, const uint8_t* buf, size_t size) {
+  if (!buf || !size || !rtp_encoder->encode_func) return -1;
   return rtp_encoder->encode_func(rtp_encoder, (uint8_t*)buf, size);
 }
 
@@ -220,11 +224,12 @@ static int rtp_decode_h264_stap_a(RtpDecoder* rtp_decoder,
                                   uint8_t* nalu_buf,
                                   int* nalu_offset) {
   *nalu_offset = 0;
-  while (*nalu_offset + 2 < size) {
-    uint16_t nalu_length = buf[*nalu_offset] << 8 | buf[*nalu_offset + 1];
+  while ((size_t)*nalu_offset + 2 <= size) {
+    size_t nalu_length = (size_t)buf[*nalu_offset] << 8 | buf[*nalu_offset + 1];
     *nalu_offset += 2;
 
-    if (*nalu_offset + nalu_length > size) {
+    if (!nalu_length || nalu_length > CONFIG_MAX_NALU_SIZE - NALU_START_CODE_SIZE ||
+        (size_t)*nalu_offset + nalu_length > size) {
       LOGE("Invalid STAP-A packet: NALU length exceeds packet size");
       return -1;
     }
@@ -238,6 +243,10 @@ static int rtp_decode_h264_stap_a(RtpDecoder* rtp_decoder,
 
     *nalu_offset += nalu_length;
   }
+  if ((size_t)*nalu_offset != size) {
+    *nalu_offset = 0;
+    return -1;
+  }
   return 0;
 }
 
@@ -246,6 +255,7 @@ static int rtp_decode_h264_single(RtpDecoder* rtp_decoder,
                                   size_t size,
                                   uint8_t* nalu_buf,
                                   int* nalu_offset) {
+  if (!size || size > CONFIG_MAX_NALU_SIZE - NALU_START_CODE_SIZE) return -1;
   memcpy(nalu_buf, &nalu_start_4bytecode, NALU_START_CODE_SIZE);
   *nalu_offset = NALU_START_CODE_SIZE;
   memcpy(nalu_buf + *nalu_offset, buf, size);
@@ -262,6 +272,10 @@ static int rtp_decode_h264_fu_a(RtpDecoder* rtp_decoder,
                                 size_t size,
                                 uint8_t* nalu_buf,
                                 int* nalu_offset) {
+  if (size < NALU_HEADER_SIZE + FU_HEADER_SIZE) {
+    *nalu_offset = 0;
+    return -1;
+  }
   NaluHeader* fu_indicator = (NaluHeader*)buf;
   FuHeader* fu_header = (FuHeader*)(buf + NALU_HEADER_SIZE);
   uint8_t reconstructed_nalu_type = (fu_indicator->f << 7) |
@@ -269,6 +283,12 @@ static int rtp_decode_h264_fu_a(RtpDecoder* rtp_decoder,
                                     fu_header->type;
   buf += NALU_HEADER_SIZE + FU_HEADER_SIZE;
   size -= NALU_HEADER_SIZE + FU_HEADER_SIZE;
+  size_t required = fu_header->s ? NALU_START_CODE_SIZE + 1 : (size_t)*nalu_offset;
+  if ((!fu_header->s && !*nalu_offset) || required > CONFIG_MAX_NALU_SIZE ||
+      size > CONFIG_MAX_NALU_SIZE - required) {
+    *nalu_offset = 0;
+    return -1;
+  }
   if (fu_header->s) {
     memcpy(nalu_buf, &nalu_start_4bytecode, NALU_START_CODE_SIZE);
     *nalu_offset = NALU_START_CODE_SIZE;
@@ -293,26 +313,23 @@ static int rtp_decode_h264_fu_a(RtpDecoder* rtp_decoder,
 static int rtp_decode_h264(RtpDecoder* rtp_decoder, uint8_t* buf, size_t size) {
   static uint8_t nalu_buf[CONFIG_MAX_NALU_SIZE];
   static int offset = 0;
-  RtpPacket* rtp_packet = (RtpPacket*)buf;
-  uint8_t nalu_type = *rtp_packet->payload & 0x1f;
-  int payload_size = size - sizeof(RtpHeader);
+  uint8_t nalu_type = *buf & 0x1f;
 
   switch (nalu_type) {
     case STAP_A:
-      return rtp_decode_h264_stap_a(rtp_decoder, rtp_packet->payload + 1, payload_size - 1, nalu_buf, &offset);
+      return rtp_decode_h264_stap_a(rtp_decoder, buf + 1, size - 1, nalu_buf, &offset);
     case FU_A:
-      return rtp_decode_h264_fu_a(rtp_decoder, rtp_packet->payload, payload_size, nalu_buf, &offset);
+      return rtp_decode_h264_fu_a(rtp_decoder, buf, size, nalu_buf, &offset);
     default:
-      return rtp_decode_h264_single(rtp_decoder, rtp_packet->payload, payload_size, nalu_buf, &offset);
+      return rtp_decode_h264_single(rtp_decoder, buf, size, nalu_buf, &offset);
       break;
   }
   return 0;
 }
 
 static int rtp_decode_generic(RtpDecoder* rtp_decoder, uint8_t* buf, size_t size) {
-  RtpPacket* rtp_packet = (RtpPacket*)buf;
   if (rtp_decoder->on_packet != NULL)
-    rtp_decoder->on_packet(rtp_packet->payload, size - sizeof(RtpHeader), rtp_decoder->user_data);
+    rtp_decoder->on_packet(buf, size, rtp_decoder->user_data);
   // even if there is no callback set, assume everything is ok for caller and do not return an error
   return (int)size;
 }
@@ -335,7 +352,21 @@ void rtp_decoder_init(RtpDecoder* rtp_decoder, MediaCodec codec, RtpOnPacket on_
 }
 
 int rtp_decoder_decode(RtpDecoder* rtp_decoder, const uint8_t* buf, size_t size) {
-  if (rtp_decoder->decode_func == NULL)
+  if (!buf || !rtp_decoder->decode_func || size < sizeof(RtpHeader) || (buf[0] >> 6) != 2)
     return -1;
-  return rtp_decoder->decode_func(rtp_decoder, (uint8_t*)buf, size);
+  size_t offset = sizeof(RtpHeader) + 4 * (buf[0] & 0x0f);
+  if (offset > size) return -1;
+  if (buf[0] & 0x10) {
+    if (size - offset < 4) return -1;
+    size_t extension = 4 + 4 * ((size_t)buf[offset + 2] << 8 | buf[offset + 3]);
+    if (extension > size - offset) return -1;
+    offset += extension;
+  }
+  if (buf[0] & 0x20) {
+    size_t padding = buf[size - 1];
+    if (!padding || padding > size - offset) return -1;
+    size -= padding;
+  }
+  if (offset >= size) return -1;
+  return rtp_decoder->decode_func(rtp_decoder, (uint8_t*)buf + offset, size - offset);
 }
