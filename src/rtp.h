@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include <srtp2/srtp.h>
+
 #ifdef __BYTE_ORDER
 #define __BIG_ENDIAN 4321
 #define __LITTLE_ENDIAN 1234
@@ -74,6 +76,8 @@ typedef struct RtpEncoder RtpEncoder;
 typedef struct RtpDecoder RtpDecoder;
 typedef void (*RtpOnPacket)(uint8_t* packet, size_t bytes, void* user_data);
 
+#define RTP_PACKET_BUFFER_SIZE (CONFIG_MTU + SRTP_MAX_TRAILER_LEN)
+
 struct RtpDecoder {
   RtpPayloadType type;
   RtpOnPacket on_packet;
@@ -90,7 +94,7 @@ struct RtpEncoder {
   uint32_t ssrc;
   uint32_t timestamp;
   uint32_t timestamp_increment;
-  uint8_t buf[CONFIG_MTU + 128];
+  uint8_t buf[RTP_PACKET_BUFFER_SIZE];
 };
 
 int rtp_packet_validate(uint8_t* packet, size_t size);

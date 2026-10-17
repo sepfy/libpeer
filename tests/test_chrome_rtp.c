@@ -6,6 +6,7 @@
 static uint8_t received[4096];
 static size_t received_size;
 static int packets;
+static RtpDecoder roundtrip_decoder;
 static void on_packet(uint8_t* data, size_t size, void* unused) {
   (void)unused;
   assert(size <= sizeof(received));
@@ -13,10 +14,15 @@ static void on_packet(uint8_t* data, size_t size, void* unused) {
   received_size = size;
   packets++;
 }
+static void decode_packet(uint8_t* data, size_t size, void* unused) {
+  (void)unused;
+  assert(rtp_decoder_decode(&roundtrip_decoder, data, size) == 0);
+}
 
 int main(void) {
   RtpDecoder decoder = {0};
   RtpEncoder encoder = {0};
+  assert(sizeof(encoder.buf) == RTP_PACKET_BUFFER_SIZE);
   uint8_t packet[64] = {0x91, 0}; /* V2, X, one CSRC */
   packet[16] = 0xbe; packet[17] = 0xde;
   packet[19] = 1; /* One extension word */
@@ -61,6 +67,17 @@ int main(void) {
   const uint8_t nal[] = {0, 0, 0, 1, 0x65, 0xab};
   assert(rtp_encoder_encode(&encoder, nal, sizeof(nal)) == 0);
   assert((received[1] & 0x7f) == 125);
+  uint8_t fragmented[1469];
+  memset(fragmented, 0xab, sizeof(fragmented));
+  fragmented[0] = fragmented[1] = fragmented[2] = 0;
+  fragmented[3] = 1;
+  fragmented[4] = 0x65;
+  received_size = 0;
+  rtp_decoder_init(&roundtrip_decoder, CODEC_H264, on_packet, NULL);
+  rtp_encoder_init(&encoder, CODEC_H264, decode_packet, NULL);
+  assert(rtp_encoder_encode(&encoder, fragmented, sizeof(fragmented)) == 0);
+  assert(received_size == sizeof(fragmented));
+  assert(memcmp(received, fragmented, sizeof(fragmented)) == 0);
   assert(rtp_encoder_encode(&encoder, NULL, 0) < 0);
   const uint8_t empty_nal[] = {0, 0, 1, 0, 0, 0};
   int before = packets;
