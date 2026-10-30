@@ -36,7 +36,8 @@ struct PeerConnection {
   void (*on_receiver_packet_loss)(float fraction_loss, uint32_t total_loss, void* user_data);
 
   uint8_t temp_buf[CONFIG_MTU];
-  uint8_t agent_buf[CONFIG_MTU];
+  /* SRTP authentication/tag overhead is added after RTP packetization. */
+  uint8_t agent_buf[RTP_PACKET_BUFFER_SIZE];
   int agent_ret;
 
   RtpEncoder artp_encoder;
@@ -47,6 +48,11 @@ struct PeerConnection {
   uint32_t remote_assrc;
   uint32_t remote_vssrc;
 };
+
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+_Static_assert(sizeof(((PeerConnection*)0)->agent_buf) >= RTP_PACKET_BUFFER_SIZE,
+               "agent buffer must hold a protected RTP packet");
+#endif
 
 static void peer_connection_outgoing_rtp_packet(uint8_t* data, size_t size, void* user_data) {
   PeerConnection* pc = (PeerConnection*)user_data;
