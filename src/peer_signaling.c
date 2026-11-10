@@ -293,6 +293,9 @@ HTTPResponse_t peer_signaling_http_request(const TransportInterface_t* transport
 
     status = HTTPClient_Send(transport_interface,
                              &request_headers, (uint8_t*)body, body ? body_len : 0, &response, 0);
+    if (status != HTTPSuccess) {
+      LOGE("HTTPClient_Send failed: %s", HTTPClient_strerror(status));
+    }
 
   } else {
     LOGE("Failed to initialize HTTP request headers: Error=%s.", HTTPClient_strerror(status));
