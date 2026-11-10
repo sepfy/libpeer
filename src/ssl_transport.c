@@ -116,7 +116,7 @@ int ssl_transport_connect(NetworkContext_t* net_ctx,
   LOGI("start to handshake");
 
   while ((ret = mbedtls_ssl_handshake(&net_ctx->ssl)) != 0) {
-    if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE) {
+    if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE || ret == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET) {
       continue;
     }
 
@@ -141,7 +141,13 @@ void ssl_transport_disconnect(NetworkContext_t* net_ctx) {
 int32_t ssl_transport_recv(NetworkContext_t* net_ctx, void* buf, size_t len) {
   int ret;
   memset(buf, 0, len);
-  ret = mbedtls_ssl_read(&net_ctx->ssl, buf, len);
+  while ((ret = mbedtls_ssl_read(&net_ctx->ssl, buf, len)) < 0) {
+    if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE || ret == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET) {
+      continue;
+    }
+    LOGE("ssl recv error: -0x%x", (unsigned int)-ret);
+    break;
+  }
 
   return ret;
 }
